@@ -1,0 +1,71 @@
+clear all; close all; clc;
+
+load("cylinder.mat");
+
+idx_Z = find(msh.X(3,:) < -5.0);
+idx_Y = find(abs(msh.X(2,idx_Z)) < 20.0);
+idx_X = find(msh.X(1,idx_Z(idx_Y)) > 50.0);
+
+nodes = idx_Z(idx_Y(idx_X));
+X = msh.X(:, nodes);
+plot3(X(1,:), X(2,:), X(3,:), 'ro');
+xlabel("x"); ylabel("y"); zlabel("z");
+axis equal; grid on;
+
+els = [];
+IEN = [];
+for el = 1:size(msh.IEN,2)
+    isInvolved = 1;
+    ien = zeros(size(msh.IEN,1), 1);
+    for a = 1:size(msh.IEN,1)
+        i = find(nodes == msh.IEN(a, el));
+        if(isempty(i))
+            isInvolved = 0;
+            break;
+        else
+            ien(a) = i;
+        end
+
+    end
+    if(isInvolved)
+        IEN = [IEN ien];
+    end
+end
+
+
+figure(2)
+X_tmp = X(:, IEN(:));
+plot3(X_tmp(1,:), X_tmp(2,:), X_tmp(3,:), 'ro');
+xlabel("x"); ylabel("y"); zlabel("z");
+axis equal; grid on;
+
+rho = ones(size(IEN,2));
+
+msh.X = X;
+msh.IEN = IEN;
+
+save("cylinder.mat", "msh", "rho");
+
+load("chapadlo.mat");
+msh.IEN = msh.IEN + 1; 
+
+keyExport.displacement = false;
+keyExport.velocity = false;
+keyExport.temperature = false;
+keyExport.stress = false;
+keyExport.HMH = false;
+keyExport.eps_eq = false;
+keyExport.partitioning = false;
+
+element.type = "p1hexD";
+
+U = [];
+V = [];
+STRESS = [];
+T = [];
+HMH = [];
+eps_eq = [];
+problem = [];
+
+exportVTK("chapadlo.vtu",keyExport,element,msh,U,V,STRESS,T,HMH,eps_eq,problem)
+

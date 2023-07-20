@@ -1,0 +1,20 @@
+name = "Rho2sdf"
+uuid = "94e57e3a-8545-4178-8785-fc7fba63f629"
+authors = ["Ján Kopačka <J.Kopacka@seznam.cz>"]
+version = "0.1.0"
+
+[deps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+Einsum = "b7d42ee7-0b51-5a75-98ca-779d3107e4c0"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
+JLD = "4138dd39-2aa7-5051-a626-17a0bb65d9c8"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MAT = "23992714-dd62-5051-b70f-ba57cb901cac"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"

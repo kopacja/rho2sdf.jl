@@ -1,0 +1,153 @@
+%% LyX 2.3.6.2 created this file.  For more info, see http://www.lyx.org/.
+%% Do not edit unless you really know what you are doing.
+\documentclass[english]{article}
+\usepackage[T1]{fontenc}
+\usepackage[latin9]{inputenc}
+\usepackage{amsmath}
+\usepackage{babel}
+\begin{document}
+\begin{equation}
+\rho(\boldsymbol{\xi})=\sum_{a=1}^{n_{\mathrm{en}}}N_{a}(\boldsymbol{\xi})\rho_{a}
+\end{equation}
+
+\begin{equation}
+\boldsymbol{x}(\boldsymbol{\xi})=\sum_{a=1}^{n_{\mathrm{en}}}N_{a}(\boldsymbol{\xi})\boldsymbol{x}_{a}
+\end{equation}
+
+\begin{equation}
+\boldsymbol{n}(\boldsymbol{\xi})=\frac{\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}}{\left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert }
+\end{equation}
+
+\begin{equation}
+d(\boldsymbol{\xi})=\left[\boldsymbol{x}_{g}-\boldsymbol{x}(\boldsymbol{\xi})\right]\cdot\boldsymbol{n}(\boldsymbol{\xi})
+\end{equation}
+
+\begin{equation}
+\begin{cases}
+ & \boldsymbol{\xi}=\arg\min d(\boldsymbol{\xi})\\
+\text{subjected to} & \rho(\boldsymbol{\xi})=\rho_{\mathrm{t}}
+\end{cases}
+\end{equation}
+
+Let us define the Laplacian as
+
+\begin{equation}
+\mathcal{L}(\boldsymbol{\xi},\lambda)=d(\boldsymbol{\xi})+\lambda\left(\rho(\boldsymbol{\xi})-\rho_{\mathrm{t}}\right)
+\end{equation}
+
+\begin{align}
+\frac{\partial\mathcal{L}(\boldsymbol{\xi},\lambda)}{\partial\boldsymbol{\xi}} & =\frac{\partial d(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}+\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\lambda=0\\
+\frac{\partial\mathcal{L}(\boldsymbol{\xi},\lambda)}{\partial\lambda} & =\rho(\boldsymbol{\xi})-\rho_{\mathrm{t}}=0
+\end{align}
+
+\begin{align}
+\frac{\partial\mathcal{L}(\boldsymbol{\xi}_{k},\lambda_{k})}{\partial\boldsymbol{\xi}}+\frac{\partial^{2}\mathcal{L}(\boldsymbol{\xi}_{k},\lambda_{k})}{\partial\boldsymbol{\xi}^{2}}\Delta\boldsymbol{\xi}+\frac{\partial^{2}\mathcal{L}(\boldsymbol{\xi}_{k},\lambda_{k})}{\partial\boldsymbol{\xi}\partial\lambda}\Delta\lambda & =0\\
+\frac{\partial\mathcal{L}(\boldsymbol{\xi}_{k},\lambda_{k})}{\partial\lambda}+\frac{\partial^{2}\mathcal{L}(\boldsymbol{\xi}_{k},\lambda_{k})}{\partial\lambda\partial\boldsymbol{\xi}}\Delta\boldsymbol{\xi}+\frac{\partial^{2}\mathcal{L}(\boldsymbol{\xi}_{k},\lambda_{k})}{\partial\lambda^{2}}\Delta\lambda & =0
+\end{align}
+
+\begin{equation}
+\left[\begin{array}{cc}
+\frac{\partial^{2}\mathcal{L}_{k}}{\partial\boldsymbol{\xi}^{2}} & \frac{\partial^{2}\mathcal{L}_{k}}{\partial\boldsymbol{\xi}\partial\lambda}\\
+\frac{\partial^{2}\mathcal{L}_{k}}{\partial\lambda\partial\boldsymbol{\xi}} & \boldsymbol{0}
+\end{array}\right]\left\{ \begin{array}{c}
+\Delta\boldsymbol{\xi}\\
+\Delta\lambda
+\end{array}\right\} =-\left\{ \begin{array}{c}
+\frac{\partial\mathcal{L}_{k}}{\partial\boldsymbol{\xi}}\\
+\frac{\partial\mathcal{L}_{k}}{\partial\lambda}
+\end{array}\right\} 
+\end{equation}
+
+\begin{align}
+\frac{\partial d(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}} & =\frac{\partial}{\partial\boldsymbol{\xi}}\left(\left[\boldsymbol{x}_{g}-\boldsymbol{x}(\boldsymbol{\xi})\right]\cdot\boldsymbol{n}(\boldsymbol{\xi})\right)\\
+ & =-\frac{\partial\boldsymbol{x}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\boldsymbol{n}(\boldsymbol{\xi})+\left[\boldsymbol{x}_{g}-\boldsymbol{x}(\boldsymbol{\xi})\right]\cdot\frac{\partial\boldsymbol{n}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}
+\end{align}
+
+\begin{align}
+\frac{\partial\boldsymbol{n}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}} & =\frac{\partial}{\partial\boldsymbol{\xi}}\left[\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right)^{-\frac{1}{2}}\right]\\
+ & =\left[\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right)^{-\frac{1}{2}}\right]-\frac{1}{2}\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right)^{-\frac{1}{2}-1}\left(\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\cdot\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}+\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\right)\\
+ & =\frac{\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}}{\left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert }-\frac{\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\otimes\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\right)}{\left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert \left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert ^{2}}
+\end{align}
+
+\begin{align}
+\frac{\partial^{2}\boldsymbol{n}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}} & =\frac{\partial}{\partial\boldsymbol{\xi}}\left(\frac{\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}}{\left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert }-\frac{\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\otimes\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\right)}{\left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert \left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert ^{2}}\right)\\
+ & =\frac{\partial}{\partial\boldsymbol{\xi}}\left(\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right)^{-\frac{1}{2}}\right)-\frac{\partial}{\partial\boldsymbol{\xi}}\left[\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\otimes\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\right)\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right)^{-3/2}\right]\\
+ & =\frac{\frac{\partial^{3}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{3}}}{\left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert }-\frac{1}{2}\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right)^{-\frac{1}{2}-1}\otimes\left(\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\cdot\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}+\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\right)\nonumber \\
+ & -\frac{\frac{\partial}{\partial\boldsymbol{\xi}}\left[\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\otimes\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\right)\right]}{\left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert \left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert ^{2}}-\left[\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\otimes\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\right)\right]\frac{\partial}{\partial\boldsymbol{\xi}}\left[\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right)^{-3/2}\right]\\
+ & =\frac{\frac{\partial^{3}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{3}}}{\left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert }-\frac{\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\otimes\left(\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\cdot\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right)}{\left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert \left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert ^{2}}\nonumber \\
+ & -\frac{\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\otimes\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\right)+\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\otimes\left(\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial^{2}\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}+\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{3}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{3}}\right)}{\left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert \left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert ^{2}}\nonumber \\
+ & -\left[\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\otimes\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\right)\right]\otimes\left[-3\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right)^{-5/2}\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\right]\\
+ & =\frac{\frac{\partial^{3}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{3}}}{\left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert }-\frac{\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\otimes\left(\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\cdot\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right)}{\left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert \left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert ^{2}}\\
+ & -\frac{\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\otimes\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\right)+\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\otimes\left(\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial^{2}\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}+\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{3}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{3}}\right)}{\left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert \left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert ^{2}}\\
+ & +3\frac{\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\otimes\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\right)\otimes\left(\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\right)}{\left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert \left\Vert \frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right\Vert ^{4}}
+\end{align}
+
+\begin{equation}
+\end{equation}
+
+\textbf{
+\begin{equation}
+\frac{\partial^{2}\mathcal{L}(\boldsymbol{\xi}_{k},\lambda_{k})}{\partial\lambda^{2}}=0
+\end{equation}
+}
+
+\begin{equation}
+\frac{\partial^{2}\mathcal{L}(\boldsymbol{\xi},\lambda)}{\partial\lambda\partial\boldsymbol{\xi}}=\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}
+\end{equation}
+
+\begin{align}
+\frac{\partial^{2}\mathcal{L}_{k}}{\partial\boldsymbol{\xi}^{2}} & =\frac{\partial}{\partial\boldsymbol{\xi}}\left(\frac{\partial d(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}+\frac{\partial\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\lambda\right)\\
+ & =\frac{\partial^{2}d(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}+\frac{\partial^{2}\rho(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\lambda
+\end{align}
+
+\begin{align}
+\frac{\partial^{2}d(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}} & =\frac{\partial}{\partial\boldsymbol{\xi}}\left(-\frac{\partial\boldsymbol{x}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\boldsymbol{n}(\boldsymbol{\xi})+\left[\boldsymbol{x}_{g}-\boldsymbol{x}(\boldsymbol{\xi})\right]\cdot\frac{\partial\boldsymbol{n}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\right)\\
+ & =-\frac{\partial^{2}\boldsymbol{x}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\cdot\boldsymbol{n}(\boldsymbol{\xi})-\frac{\partial\boldsymbol{x}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial\boldsymbol{n}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}-\frac{\partial\boldsymbol{x}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial\boldsymbol{n}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}+\left[\boldsymbol{x}_{g}-\boldsymbol{x}(\boldsymbol{\xi})\right]\cdot\frac{\partial^{2}\boldsymbol{n}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\\
+ & =-\frac{\partial^{2}\boldsymbol{x}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}\cdot\boldsymbol{n}(\boldsymbol{\xi})-2\frac{\partial\boldsymbol{x}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}\cdot\frac{\partial\boldsymbol{n}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}}+\left[\boldsymbol{x}_{g}-\boldsymbol{x}(\boldsymbol{\xi})\right]\cdot\frac{\partial^{2}\boldsymbol{n}(\boldsymbol{\xi})}{\partial\boldsymbol{\xi}^{2}}
+\end{align}
+
+\begin{equation}
+\left[\frac{\partial^{2}d_{k}}{\partial\boldsymbol{\xi}^{2}}\right]\left\{ \Delta\boldsymbol{\xi}\right\} =-\left\{ \frac{\partial d_{k}}{\partial\boldsymbol{\xi}}\right\} 
+\end{equation}
+
+\rule[0.5ex]{1\columnwidth}{1pt}
+
+\begin{equation}
+\left[\boldsymbol{x}_{g}-\boldsymbol{x}(\boldsymbol{\xi})\right]\times\boldsymbol{n}(\boldsymbol{\xi})=\boldsymbol{0}
+\end{equation}
+
+\begin{equation}
+\det\left(\begin{array}{ccc}
+\mathbf{e}_{1} & \mathbf{e}_{2} & \mathbf{e}_{3}\\
+(x_{g}-x) & (y_{\mathrm{g}}-y) & (z_{\mathrm{g}}-z)\\
+n_{x} & n_{y} & n_{z}
+\end{array}\right)=\left[\left(y_{\mathrm{g}}-y\right)n_{z}-\left(z_{\mathrm{g}}-z\right)n_{y}\right]\boldsymbol{e}_{1}+\left[\left(z_{\mathrm{g}}-z\right)n_{x}-\left(x_{\mathrm{g}}-x\right)n_{z}\right]\boldsymbol{e}_{2}+\left[\left(x_{\mathrm{g}}-x\right)n_{y}-\left(y_{\mathrm{g}}-y\right)n_{x}\right]\boldsymbol{e}_{3}=\mathbf{0}
+\end{equation}
+
+\begin{equation}
+\left[\left(y_{\mathrm{g}}-y\right)n_{z}-\left(z_{\mathrm{g}}-z\right)n_{y}\right]\left\{ \begin{array}{c}
+1\\
+0\\
+0
+\end{array}\right\} +\left[\left(z_{\mathrm{g}}-z\right)n_{x}-\left(x_{\mathrm{g}}-x\right)n_{z}\right]\left\{ \begin{array}{c}
+0\\
+1\\
+0
+\end{array}\right\} +\left[\left(x_{\mathrm{g}}-x\right)n_{y}-\left(y_{\mathrm{g}}-y\right)n_{x}\right]\left\{ \begin{array}{c}
+0\\
+0\\
+1
+\end{array}\right\} =\left\{ \begin{array}{c}
+0\\
+0\\
+0
+\end{array}\right\} 
+\end{equation}
+
+\begin{align}
+\left(y_{\mathrm{g}}-y(\boldsymbol{\xi})\right)n_{z}(\boldsymbol{\xi})-\left(z_{\mathrm{g}}-z(\boldsymbol{\xi})\right)n_{y}(\boldsymbol{\xi}) & =0\\
+\left(z_{\mathrm{g}}-z(\boldsymbol{\xi})\right)n_{x}(\boldsymbol{\xi})-\left(x_{\mathrm{g}}-x(\boldsymbol{\xi})\right)n_{z}(\boldsymbol{\xi}) & =0\\
+\left(x_{\mathrm{g}}-x(\boldsymbol{\xi})\right)n_{y}(\boldsymbol{\xi})-\left(y_{\mathrm{g}}-y(\boldsymbol{\xi})\right)n_{x}(\boldsymbol{\xi}) & =0
+\end{align}
+
+\end{document}
