@@ -40,7 +40,7 @@ mutable struct Mesh
 end
 
 
-mutable struct Grid
+struct Grid
     AABB_min::Vector{Float64}
     AABB_max::Vector{Float64}
     N::Vector{Int64}
@@ -69,7 +69,7 @@ mutable struct Grid
     end
 end
 
-mutable struct LinkedList
+mutable struct LinkedList # rozdělení pravidelné sítě na regiony
     grid::Grid
     head::Vector{Int64}
     next::Vector{Int64}
@@ -154,21 +154,18 @@ function generateGridPoints(grid::Grid)::Matrix{Float64}
     return X
 end
 
-function extractSurfaceTriangularMesh(
-    mesh::Mesh,
-    ρₙ::Vector{Float64},
-)::Mesh
+function extractSurfaceTriangularMesh(mesh::Mesh, ρₙ::Vector{Float64})::Mesh
     X = mesh.X
     IEN = mesh.IEN
     INE = mesh.INE
     ISN = mesh.ISN
-    nsd = mesh.nsd
-    nel = mesh.nel
-    nes = mesh.nes
-    nsn = mesh.nsn
+    nsd = mesh.nsd # number of special dimension
+    nel = mesh.nel # number of elements
+    nes = mesh.nes # number of element segments (edges, faces)
+    nsn = mesh.nsn # number of segment nodes (kolik má stěna uzlů)
 
     X_new = Vector{Vector{Float64}}()
-    push!(X_new, vec(X[:,1]))
+    push!(X_new, vec(X[:, 1]))
 
     IEN_new = Vector{Vector{Int64}}()
 
@@ -289,14 +286,14 @@ function evalSignedDiscancesOnTriangularMesh(mesh::Mesh, grid::Grid)
     xp = zeros(nsd, ngp)
 
     for el = 1:nel
-        Xt = X[:, IEN[:, el]]
-        Xt_min = minimum(Xt, dims = 2) .- δ
+        Xt = X[:, IEN[:, el]] # souřadnice trojúhelníku
+        Xt_min = minimum(Xt, dims = 2) .- δ # trojúhelník vložený do BB a přifouknu o deltu
         Xt_max = maximum(Xt, dims = 2) .+ δ
 
-        I_min = floor.(N .* (Xt_min .- AABB_min) ./ (AABB_max .- AABB_min))
+        I_min = floor.(N .* (Xt_min .- AABB_min) ./ (AABB_max .- AABB_min)) # index oddílu
         I_max = floor.(N .* (Xt_max .- AABB_min) ./ (AABB_max .- AABB_min))
 
-        for j = 1:nsd
+        for j = 1:nsd # pokud jsem nepřetekl do mínusu nebo za max
             if (I_min[j] < 0)
                 I_min[j] = 0
             end
@@ -309,13 +306,13 @@ function evalSignedDiscancesOnTriangularMesh(mesh::Mesh, grid::Grid)
         x₂ = Xt[:, 2]
         x₃ = Xt[:, 3]
 
-        Et = Vector{Vector{Float64}}()
+        Et = Vector{Vector{Float64}}() # vektory hran trojúhelníku
         push!(Et, Xt[:, 2] - Xt[:, 1])
         push!(Et, Xt[:, 3] - Xt[:, 2])
         push!(Et, Xt[:, 1] - Xt[:, 3])
 
-        n = cross(Et[1], Et[2])
-        n = n / norm(n)
+        n = cross(Et[1], Et[2]) # normála
+        n = n / norm(n) # jednotková normála
 
         Is = Iterators.product(
             I_min[1]:I_max[1],
@@ -323,7 +320,9 @@ function evalSignedDiscancesOnTriangularMesh(mesh::Mesh, grid::Grid)
             I_min[3]:I_max[3],
         )
         for I ∈ Is
-            i = Int(I[3] * (N[1]+1) * (N[2]+1) + I[2] * (N[1]+1) + I[1] + 1)
+            i = Int(
+                I[3] * (N[1] + 1) * (N[2] + 1) + I[2] * (N[1] + 1) + I[1] + 1,
+            )
             v = head[i]
             while v != -1
                 x = points[:, v]
@@ -341,9 +340,10 @@ function evalSignedDiscancesOnTriangularMesh(mesh::Mesh, grid::Grid)
                 n_max, i_max = findmax(abs.(n))
                 A[i_max, :] = [1.0 1.0 1.0]
                 b[i_max] = 1.0
-                λ = A \ b
+                λ = A \ b # baricentrické souřadnice
 
                 xₚ = zeros(nsd)
+                # kam jsem se promítl?
                 isFace = false
                 isEdge = false
                 isVertex = false
@@ -361,13 +361,14 @@ function evalSignedDiscancesOnTriangularMesh(mesh::Mesh, grid::Grid)
                         L = norm(Et[j])
                         xᵥ = Xt[:, j]
                         P = dot(x - xᵥ, Et[j] / L)
-                        if (P >= 0 && P <= L)
+                        if (P >= 0 && P <= L) # pohybuji se na intervalu hrany
                             xₚ = xᵥ + (Et[j] / L) * P
                             n_edge = EPN[el][j]
                             dist_tmp = sign(dot(x - xₚ, n_edge)) * norm(x - xₚ)
 
                             if (abs(dist_tmp) < abs(dist[v]))
                                 dist[v] = dist_tmp
+                                # isEdge = true
                                 isVertex = true
                                 xp[:, v] = xₚ
                             end
@@ -393,7 +394,7 @@ function evalSignedDiscancesOnTriangularMesh(mesh::Mesh, grid::Grid)
     # dist = marchingCubes(dist, N.+1, big)
 
     for i = 1:length(dist)
-        if (abs(dist[i]) > norm(grid.cell_size) )
+        if (abs(dist[i]) > norm(grid.cell_size))
             dist[i] = sign(dist[i]) * norm(grid.cell_size)
         end
     end
@@ -437,8 +438,8 @@ function evalSignedDiscances(
         ρₑ_min = minimum(ρₑ)
         ρₑ_max = maximum(ρₑ)
         if (ρₑ_min >= ρₜ)
-continue
-            # commonEls = []
+            continue # PRO PŘESKAKUJE HRANIČNÍ ELEMENTY (pouze pro ladění kodu)
+            commonEls = []
             for sg = 1:nes
                 commonEls = INE[IEN[mesh.ISN[sg][1], el]]
                 for a = 2:nsn
@@ -446,7 +447,7 @@ continue
                     commonEls = commonEls[idx]
                 end
 
-# Mám vnější segment a chci jeho pseudonormály,...
+                # Mám vnější segment a chci jeho pseudonormály,...
 
                 if (length(commonEls) == 1) # is a part of the outer boundary of the body
                     Xs = X[:, IEN[ISN[sg], el]]
@@ -457,29 +458,45 @@ continue
 
 
                         As = IEN[ISN[sg][a], el]
-                        adj_els = INE[ As ]
+                        adj_els = INE[As]
                         for adj_el in adj_els
                             common_adj_els = []
                             for adj_sg = 1:nes
-                                common_adj_els = INE[IEN[mesh.ISN[adj_sg][1], adj_el]]
+                                common_adj_els =
+                                    INE[IEN[mesh.ISN[adj_sg][1], adj_el]]
                                 for b = 2:nsn
-                                    idx = findall(in(INE[IEN[ISN[adj_sg][b], adj_el]]), common_adj_els)
+                                    idx = findall(
+                                        in(INE[IEN[ISN[adj_sg][b], adj_el]]),
+                                        common_adj_els,
+                                    )
                                     common_adj_els = common_adj_els[idx]
                                 end
 
-                                if (length(common_adj_els) == 1 && in(As, IEN[mesh.ISN[adj_sg], adj_el]) )
+                                if (
+                                    length(common_adj_els) == 1 &&
+                                    in(As, IEN[mesh.ISN[adj_sg], adj_el])
+                                )
                                     # println("Adjacent element")
 
                                     adj_Xs = X[:, IEN[ISN[adj_sg], adj_el]]
                                     adj_Xc = mean(adj_Xs, dims = 2)
 
-                                    as = indexin(As, IEN[mesh.ISN[adj_sg], adj_el])
-                                    a_prev = ((as+nsn-1-1)%nsn)+1
-                                    a_next = ((as+nsn+1-1)%nsn)+1
+                                    as = indexin(
+                                        As,
+                                        IEN[mesh.ISN[adj_sg], adj_el],
+                                    )
+                                    a_prev = ((as + nsn - 1 - 1) % nsn) + 1
+                                    a_next = ((as + nsn + 1 - 1) % nsn) + 1
 
-                                    x_prev = X[:, IEN[mesh.ISN[adj_sg][a_prev], adj_el] ]
-                                    xs = X[:, IEN[mesh.ISN[adj_sg][as], adj_el] ]
-                                    x_next = X[:, IEN[mesh.ISN[adj_sg][a_next], adj_el] ]
+                                    x_prev = X[
+                                        :,
+                                        IEN[mesh.ISN[adj_sg][a_prev], adj_el],
+                                    ]
+                                    xs = X[:, IEN[mesh.ISN[adj_sg][as], adj_el]]
+                                    x_next = X[
+                                        :,
+                                        IEN[mesh.ISN[adj_sg][a_next], adj_el],
+                                    ]
 
                                     Et = Vector{Vector{Float64}}()
                                     push!(Et, Xt[:, 2] - Xt[:, 1])
@@ -621,8 +638,8 @@ continue
                     # Subdivide quad into two (or four?) triangles
                 end
             end
-        else
-continue
+        else # (ρₑ_min < ρₜ)
+            # continue
             if (ρₑ_max > ρₜ)
                 # println("Hranice prochází elementem...")
 
@@ -631,15 +648,9 @@ continue
                 Xₑ_max = maximum(Xₑ, dims = 2) .+ δ
 
                 I_min =
-                    floor.(
-                        N .* (Xₑ_min .- AABB_min) ./
-                        (AABB_max .- AABB_min),
-                    )
+                    floor.(N .* (Xₑ_min .- AABB_min) ./ (AABB_max .- AABB_min),)
                 I_max =
-                    floor.(
-                        N .* (Xₑ_max .- AABB_min) ./
-                        (AABB_max .- AABB_min),
-                    )
+                    floor.(N .* (Xₑ_max .- AABB_min) ./ (AABB_max .- AABB_min),)
 
                 for j = 1:nsd
                     if (I_min[j] < 0)
@@ -671,9 +682,9 @@ continue
                         Ξ = [0.0, 0.0, 0.0]
                         λ = 1.0
                         Ξ_tol = 1e-2
-                        Ξ_norm = 2*Ξ_tol
+                        Ξ_norm = 2 * Ξ_tol
                         r_tol = 1e-2
-                        r_norm = 2*r_tol
+                        r_norm = 2 * r_tol
                         niter = 100
                         iter = 1
 
@@ -685,47 +696,74 @@ continue
                             dx_dΞ = Xₑ * d¹N_dξ¹
                             dρ_dΞ = d¹N_dξ¹' * ρₑ
 
-                            d²ρ_dΞ² = zeros(Float64,3,3)
-                            for k in 1:length(H)
-                                d²ρ_dΞ² +=  ρₑ[k] * d²N_dξ²[k,:,:]
+                            d²ρ_dΞ² = zeros(Float64, 3, 3)
+                            for k = 1:length(H)
+                                d²ρ_dΞ² += ρₑ[k] * d²N_dξ²[k, :, :]
                             end
 
                             norm_dρ_dΞ = norm(dρ_dΞ)
                             n = dρ_dΞ / norm_dρ_dΞ
 
-                            dn_dΞ = zeros(Float64,3,3)
-                            @einsum dn_dΞ[i,j] := d²ρ_dΞ²[i,j] / norm_dρ_dΞ - (dρ_dΞ[i] * d²ρ_dΞ²[j,k] * dρ_dΞ[k] ) / norm_dρ_dΞ^(3/2)
+                            dn_dΞ = zeros(Float64, 3, 3)
+                            @einsum dn_dΞ[i, j] :=
+                                d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
+                                (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
+                                norm_dρ_dΞ^(3 / 2)
 
-                            dd_dΞ = zeros(Float64,3)
-                            @einsum dd_dΞ[i] := -dx_dΞ[i,k] * n[k] + (x[k] - xₚ[k]) * dn_dΞ[k,i]
+                            dd_dΞ = zeros(Float64, 3)
+                            @einsum dd_dΞ[i] :=
+                                -dx_dΞ[i, k] * n[k] +
+                                (x[k] - xₚ[k]) * dn_dΞ[k, i]
 
 
-                            dL_dΞ = zeros(Float64,3)
-                            @einsum dL_dΞ[i] := dd_dΞ[i] + λ*dρ_dΞ[i]
+                            dL_dΞ = zeros(Float64, 3)
+                            @einsum dL_dΞ[i] := dd_dΞ[i] + λ * dρ_dΞ[i]
 
-                            ρ = H⋅ρₑ
+                            ρ = H ⋅ ρₑ
                             dL_dλ = ρ - ρₜ
 
-                            d²x_dΞ² = zeros(Float64,3,3,3)
-                            @einsum d²x_dΞ²[i,j,k] := Xₑ[i,m] * d²N_dξ²[m,j,k]
+                            d²x_dΞ² = zeros(Float64, 3, 3, 3)
+                            @einsum d²x_dΞ²[i, j, k] :=
+                                Xₑ[i, m] * d²N_dξ²[m, j, k]
 
-                            d³ρ_dΞ³ = zeros(Float64,3,3,3)
-                            for k in 1:length(H)
-                                d³ρ_dΞ³ +=  ρₑ[k] * d³N_dξ³[k,:,:,:]
+                            d³ρ_dΞ³ = zeros(Float64, 3, 3, 3)
+                            for k = 1:length(H)
+                                d³ρ_dΞ³ += ρₑ[k] * d³N_dξ³[k, :, :, :]
                             end
 
-                            d²n_dΞ² = zeros(Float64,3,3,3)
-                            @einsum d²n_dΞ²[i,j,k] := d³ρ_dΞ³[i,j,k] / norm_dρ_dΞ - (d²ρ_dΞ²[i,j] * d²ρ_dΞ²[k,m] * dρ_dΞ[m]) / norm_dρ_dΞ^(3/2) - d²ρ_dΞ²[i,j] * d²ρ_dΞ²[k,m] * dρ_dΞ[m] / norm_dρ_dΞ^(3/2) + dρ_dΞ[i] * (d²ρ_dΞ²[j,m] * d²ρ_dΞ²[m,k] + d³ρ_dΞ³[j,k,m] * dρ_dΞ[m]) / norm_dρ_dΞ^(3/2) + 3 * (dρ_dΞ[i] * dρ_dΞ[m] * d²ρ_dΞ²[m,j] * dρ_dΞ[l] * d²ρ_dΞ²[l,k]) / norm_dρ_dΞ^(5/2)
+                            d²n_dΞ² = zeros(Float64, 3, 3, 3)
+                            @einsum d²n_dΞ²[i, j, k] :=
+                                d³ρ_dΞ³[i, j, k] / norm_dρ_dΞ -
+                                (d²ρ_dΞ²[i, j] * d²ρ_dΞ²[k, m] * dρ_dΞ[m]) /
+                                norm_dρ_dΞ^(3 / 2) -
+                                d²ρ_dΞ²[i, j] * d²ρ_dΞ²[k, m] * dρ_dΞ[m] /
+                                norm_dρ_dΞ^(3 / 2) +
+                                dρ_dΞ[i] * (
+                                    d²ρ_dΞ²[j, m] * d²ρ_dΞ²[m, k] +
+                                    d³ρ_dΞ³[j, k, m] * dρ_dΞ[m]
+                                ) / norm_dρ_dΞ^(3 / 2) +
+                                3 * (
+                                    dρ_dΞ[i] *
+                                    dρ_dΞ[m] *
+                                    d²ρ_dΞ²[m, j] *
+                                    dρ_dΞ[l] *
+                                    d²ρ_dΞ²[l, k]
+                                ) / norm_dρ_dΞ^(5 / 2)
 
-                            d²d_dΞ² = zeros(Float64,3,3)
-                            @einsum d²d_dΞ²[i, j] := -d²x_dΞ²[i,j,k] * n[k] - 2 * dx_dΞ[i,k] * dn_dΞ[k,j] + (x[k] - xₚ[k]) * d²n_dΞ²[k,i,j]
-                            d²L_dΞ² = d²d_dΞ² + d²ρ_dΞ²*λ
+                            d²d_dΞ² = zeros(Float64, 3, 3)
+                            @einsum d²d_dΞ²[i, j] :=
+                                -d²x_dΞ²[i, j, k] * n[k] -
+                                2 * dx_dΞ[i, k] * dn_dΞ[k, j] +
+                                (x[k] - xₚ[k]) * d²n_dΞ²[k, i, j]
+                            d²L_dΞ² = d²d_dΞ² + d²ρ_dΞ² * λ
 
                             d²L_dΞdλ = dρ_dΞ
                             d²L_dλ² = 0.0
 
-                            K = [d²L_dΞ²   d²L_dΞdλ;
-                                 d²L_dΞdλ' d²L_dλ²]
+                            K = [
+                                d²L_dΞ² d²L_dΞdλ
+                                d²L_dΞdλ' d²L_dλ²
+                            ]
                             r = [dL_dΞ; dL_dλ]
                             r_norm = norm(r)
 
@@ -733,19 +771,20 @@ continue
                             (Λ_min, idx_min) = findmin(Λ)
 
                             if (Λ_min < 1.0e-10)
-                               Φ = real.(eigvecs(K))
-                               idx = [1,2,3,4]
-                               deleteat!(idx, idx_min)
-                               Φ = Φ[:,idx]
-                               ΔΞ̃_and_Δλ̃ = 1.0 ./ Λ[idx] .* (Φ'*r)
-                               ΔΞ_and_Δλ = Φ*ΔΞ̃_and_Δλ̃
+                                Φ = real.(eigvecs(K))
+                                idx = [1, 2, 3, 4]
+                                deleteat!(idx, idx_min)
+                                Φ = Φ[:, idx]
+                                ΔΞ̃_and_Δλ̃ = 1.0 ./ Λ[idx] .* (Φ' * r)
+                                ΔΞ_and_Δλ = Φ * ΔΞ̃_and_Δλ̃
                             else
-                               ΔΞ_and_Δλ = K \ -r
+                                ΔΞ_and_Δλ = K \ -r
                             end
 
                             max_abs_Ξ = maximum(abs.(ΔΞ_and_Δλ[1:end-1]))
                             if (max_abs_Ξ > 1.0)
-                                ΔΞ_and_Δλ[1:end-1] = ΔΞ_and_Δλ[1:end-1] / max_abs_Ξ
+                                ΔΞ_and_Δλ[1:end-1] =
+                                    ΔΞ_and_Δλ[1:end-1] / max_abs_Ξ
                             end
 
 
@@ -774,19 +813,19 @@ continue
     end
     # dist = marchingCubes(dist, N.+1, big)
 
-    X = Vector{Float64}(undef,3)
-    Xp = Vector{Float64}(undef,3)
-    for i in 1:size(xp,2)
-        if (sum(abs.(xp[:,i])) > 1.0e-10)
-            X = [X points[:,i]]
-            Xp = [Xp xp[:,i]]
+    X = Vector{Float64}(undef, 3)
+    Xp = Vector{Float64}(undef, 3)
+    for i = 1:size(xp, 2)
+        if (sum(abs.(xp[:, i])) > 1.0e-10)
+            X = [X points[:, i]]
+            Xp = [Xp xp[:, i]]
         end
     end
     X = [X Xp]
-    X = [X[:,i] for i in 1:size(X,2)]
+    X = [X[:, i] for i = 1:size(X, 2)]
 
-    nnp = size(Xp,2)
-    IEN = [[i; i+nnp] for i in 1:nnp]
+    nnp = size(Xp, 2)
+    IEN = [[i; i + nnp] for i = 1:nnp]
 
     exportToVTU("xp.vtu", X, IEN)
 
@@ -798,9 +837,11 @@ continue
     return dist
 end
 
-function exportToVTU(fileName::String,
+function exportToVTU(
+    fileName::String,
     X::Vector{Vector{Float64}},
-    IEN::Vector{Vector{Int64}})
+    IEN::Vector{Vector{Int64}},
+)
 
     nnp = length(X)
     nsd = length(X[1])
@@ -810,55 +851,77 @@ function exportToVTU(fileName::String,
 
     io = open(fileName, "w")
 
-    println(io,"<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\">")
-      println(io,"  <UnstructuredGrid>")
-      println(io,"    <Piece NumberOfPoints=\"",nnp,"\" NumberOfCells=\"",nel,"\">")
+    println(
+        io,
+        "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\">",
+    )
+    println(io, "  <UnstructuredGrid>")
+    println(
+        io,
+        "    <Piece NumberOfPoints=\"",
+        nnp,
+        "\" NumberOfCells=\"",
+        nel,
+        "\">",
+    )
 
-      println(io,"	  <Points>")
-      println(io,"        <DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">")
-      for A in 1:nnp
-          print(io,"          ")
-          for i in 1:nsd
-              if (abs(X[A][i]) < 1.0e-20)
-                  X[A][i] = 0.0
-              end
-              print(io, " ", X[A][i])
-          end
-          print(io, "\n")
-      end
-      println(io,"        </DataArray>")
-      println(io,"	  </Points>")
+    println(io, "	  <Points>")
+    println(
+        io,
+        "        <DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">",
+    )
+    for A = 1:nnp
+        print(io, "          ")
+        for i = 1:nsd
+            if (abs(X[A][i]) < 1.0e-20)
+                X[A][i] = 0.0
+            end
+            print(io, " ", X[A][i])
+        end
+        print(io, "\n")
+    end
+    println(io, "        </DataArray>")
+    println(io, "	  </Points>")
 
-      println(io,"      <Cells>")
-      println(io,"		  <DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">")
+    println(io, "      <Cells>")
+    println(
+        io,
+        "		  <DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">",
+    )
 
-      VTK_CODE = 5
-      for el in 1:nel
-          print(io,"         ")
-          for a in 1:nen
-              print(io, " ", IEN[el][a] -1)
-          end
-          print(io, "\n")
-      end
+    VTK_CODE = 5
+    for el = 1:nel
+        print(io, "         ")
+        for a = 1:nen
+            print(io, " ", IEN[el][a] - 1)
+        end
+        print(io, "\n")
+    end
 
-      println(io,"        </DataArray>")
-      println(io,"        <DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">")
-      for i in nen:nen:nen*nel
-          println(io,"          ",i)
-      end
-      println(io,"        </DataArray>")
-      println(io,"        <DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">")
-      for el in 1:nel
-          println(io,"          ",VTK_CODE)
-      end
-      println(io,"        </DataArray>")
-      println(io,"      </Cells>")
+    println(io, "        </DataArray>")
+    println(
+        io,
+        "        <DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">",
+    )
+    for i = nen:nen:nen*nel
+        println(io, "          ", i)
+    end
+    println(io, "        </DataArray>")
+    println(
+        io,
+        "        <DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">",
+    )
+    for el = 1:nel
+        println(io, "          ", VTK_CODE)
+    end
+    println(io, "        </DataArray>")
+    println(io, "      </Cells>")
 
-      println(io,"    </Piece>")
-      println(io,"  </UnstructuredGrid>")
-      println(io,"</VTKFile>")
+    println(io, "    </Piece>")
+    println(io, "  </UnstructuredGrid>")
+    println(io, "</VTKFile>")
 
-      close(io)
+    close(io)
 end
 
 function exportStructuredPointsToVTK(
@@ -908,26 +971,34 @@ function exportStructuredPointsToVTK(
     close(io)
 end
 
-function marchingCubes(dists::Vector{Float64}, Nv::Vector{Int64}, big::Float64)::Vector{Float64}
+function marchingCubes(
+    dists::Vector{Float64},
+    Nv::Vector{Int64},
+    big::Float64,
+)::Vector{Float64}
 
-    idx = findall(x-> x < 0.0, dists)
+    idx = findall(x -> x < 0.0, dists)
     while true
         if isempty(idx)
             break
         end
         idx_new = Vector{Int64}()
         sameSign = false
-        for I = idx
-            I₁ = mod(mod(I-1, Nv[1]*Nv[2])+1-1, Nv[1])+1
-            I₂ = Int(ceil((mod(I-1, Nv[1]*Nv[2])+1)/Nv[1]))
-            I₃ = Int(ceil(I / (Nv[1]*Nv[2])))
+        for I in idx
+            I₁ = mod(mod(I - 1, Nv[1] * Nv[2]) + 1 - 1, Nv[1]) + 1
+            I₂ = Int(ceil((mod(I - 1, Nv[1] * Nv[2]) + 1) / Nv[1]))
+            I₃ = Int(ceil(I / (Nv[1] * Nv[2])))
             for i = I₁-1:I₁+1
                 for j = I₂-1:I₂+1
                     for k = I₃-1:I₃+1
-                        if minimum([i,j,k]) <= 0 || minimum(Nv-[i,j,k]) < 0
+                        if minimum([i, j, k]) <= 0 ||
+                           minimum(Nv - [i, j, k]) < 0
                             continue
                         end
-                        I_adj = Int((k-1) .* Nv[1].*Nv[2] .+ (j-1) .* Nv[1] .+ (i-1) .+ 1)
+                        I_adj = Int(
+                            (k - 1) .* Nv[1] .* Nv[2] .+ (j - 1) .* Nv[1] .+
+                            (i - 1) .+ 1,
+                        )
 
                         if (sign(dists[I_adj]) == sign(dists[I]))
                             sameSign = true
@@ -950,7 +1021,7 @@ function marchingCubes(dists::Vector{Float64}, Nv::Vector{Int64}, big::Float64):
 
 
 
-    idx = findall(x-> x > 0.0, dists)
+    idx = findall(x -> x > 0.0, dists)
     while true
         if isempty(idx)
             break
@@ -958,17 +1029,21 @@ function marchingCubes(dists::Vector{Float64}, Nv::Vector{Int64}, big::Float64):
         idx_new = Vector{Int64}()
 
         sameSign = false
-        for I = idx
-            I₁ = mod(mod(I-1, Nv[1]*Nv[2])+1-1, Nv[1])+1
-            I₂ = Int(ceil((mod(I-1, Nv[1]*Nv[2])+1)/Nv[1]))
-            I₃ = Int(ceil(I / (Nv[1]*Nv[2])))
+        for I in idx
+            I₁ = mod(mod(I - 1, Nv[1] * Nv[2]) + 1 - 1, Nv[1]) + 1
+            I₂ = Int(ceil((mod(I - 1, Nv[1] * Nv[2]) + 1) / Nv[1]))
+            I₃ = Int(ceil(I / (Nv[1] * Nv[2])))
             for i = I₁-1:I₁+1
                 for j = I₂-1:I₂+1
                     for k = I₃-1:I₃+1
-                        if minimum([i,j,k]) <= 0 || minimum(Nv-[i,j,k]) < 0
+                        if minimum([i, j, k]) <= 0 ||
+                           minimum(Nv - [i, j, k]) < 0
                             continue
                         end
-                        I_adj = Int((k-1) .* Nv[1].*Nv[2] .+ (j-1) .* Nv[1] .+ (i-1) .+ 1)
+                        I_adj = Int(
+                            (k - 1) .* Nv[1] .* Nv[2] .+ (j - 1) .* Nv[1] .+
+                            (i - 1) .+ 1,
+                        )
 
                         if (sign(dists[I_adj]) == sign(dists[I]))
                             sameSign = true
@@ -993,7 +1068,7 @@ function marchingCubes(dists::Vector{Float64}, Nv::Vector{Int64}, big::Float64):
 end
 
 function marchingCubesssss()
-# Kazdému vrcholu nastavit 0/1 podle toho, zda je < nebo >
+    # Kazdému vrcholu nastavit 0/1 podle toho, zda je < nebo >
     edgeTable = [
         0,
         265,
@@ -1522,190 +1597,214 @@ function sfce(Ξ::Vector{Float64})
     ξ₃ = Ξ[3]
 
     N = Array{Float64}(undef, 8)
-    N[1] = -1/8*(ξ₁-1)*(ξ₂-1)*(ξ₃-1)
-    N[2] =  1/8*(ξ₁+1)*(ξ₂-1)*(ξ₃-1)
-    N[3] = -1/8*(ξ₁+1)*(ξ₂+1)*(ξ₃-1)
-    N[4] =  1/8*(ξ₁-1)*(ξ₂+1)*(ξ₃-1)
+    N[1] = -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1)
+    N[2] = 1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1)
+    N[3] = -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1)
+    N[4] = 1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1)
 
-    N[5] =  1/8*(ξ₁-1)*(ξ₂-1)*(ξ₃+1)
-    N[6] = -1/8*(ξ₁+1)*(ξ₂-1)*(ξ₃+1)
-    N[7] =  1/8*(ξ₁+1)*(ξ₂+1)*(ξ₃+1)
-    N[8] = -1/8*(ξ₁-1)*(ξ₂+1)*(ξ₃+1)
+    N[5] = 1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1)
+    N[6] = -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1)
+    N[7] = 1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1)
+    N[8] = -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
 
-    d¹N_dξ¹ = Array{Float64}(undef, 8,3)
-    d¹N_dξ¹[1,:] = [
-    -0.125*(ξ₂ - 1)*(ξ₃ - 1)
-    (0.125 - 0.125*ξ₁)*(ξ₃ - 1)
-    (0.125 - 0.125*ξ₁)*(ξ₂ - 1)]
+    d¹N_dξ¹ = Array{Float64}(undef, 8, 3)
+    d¹N_dξ¹[1, :] = [
+        -0.125 * (ξ₂ - 1) * (ξ₃ - 1)
+        (0.125 - 0.125 * ξ₁) * (ξ₃ - 1)
+        (0.125 - 0.125 * ξ₁) * (ξ₂ - 1)
+    ]
 
-    d¹N_dξ¹[2,:] = [
-    0.125*(ξ₂ - 1)*(ξ₃ - 1)
-    (0.125*ξ₁ + 0.125)*(ξ₃ - 1)
-    (0.125*ξ₁ + 0.125)*(ξ₂ - 1)]
+    d¹N_dξ¹[2, :] = [
+        0.125 * (ξ₂ - 1) * (ξ₃ - 1)
+        (0.125 * ξ₁ + 0.125) * (ξ₃ - 1)
+        (0.125 * ξ₁ + 0.125) * (ξ₂ - 1)
+    ]
 
-    d¹N_dξ¹[3,:] = [
-    -0.125*(ξ₂ + 1)*(ξ₃ - 1)
-    (-0.125*ξ₁ - 0.125)*(ξ₃ - 1)
-    (-0.125*ξ₁ - 0.125)*(ξ₂ + 1)]
+    d¹N_dξ¹[3, :] = [
+        -0.125 * (ξ₂ + 1) * (ξ₃ - 1)
+        (-0.125 * ξ₁ - 0.125) * (ξ₃ - 1)
+        (-0.125 * ξ₁ - 0.125) * (ξ₂ + 1)
+    ]
 
-    d¹N_dξ¹[4,:] = [
-    0.125*(ξ₂ + 1)*(ξ₃ - 1)
-    (0.125*ξ₁ - 0.125)*(ξ₃ - 1)
-    (0.125*ξ₁ - 0.125)*(ξ₂ + 1)]
+    d¹N_dξ¹[4, :] = [
+        0.125 * (ξ₂ + 1) * (ξ₃ - 1)
+        (0.125 * ξ₁ - 0.125) * (ξ₃ - 1)
+        (0.125 * ξ₁ - 0.125) * (ξ₂ + 1)
+    ]
 
-    d¹N_dξ¹[5,:] = [
-    0.125*(ξ₂ - 1)*(ξ₃ + 1)
-    (0.125*ξ₁ - 0.125)*(ξ₃ + 1)
-    (0.125*ξ₁ - 0.125)*(ξ₂ - 1)]
+    d¹N_dξ¹[5, :] = [
+        0.125 * (ξ₂ - 1) * (ξ₃ + 1)
+        (0.125 * ξ₁ - 0.125) * (ξ₃ + 1)
+        (0.125 * ξ₁ - 0.125) * (ξ₂ - 1)
+    ]
 
-    d¹N_dξ¹[6,:] = [
-    -0.125*(ξ₂ - 1)*(ξ₃ + 1)
-    (-0.125*ξ₁ - 0.125)*(ξ₃ + 1)
-    (-0.125*ξ₁ - 0.125)*(ξ₂ - 1)]
+    d¹N_dξ¹[6, :] = [
+        -0.125 * (ξ₂ - 1) * (ξ₃ + 1)
+        (-0.125 * ξ₁ - 0.125) * (ξ₃ + 1)
+        (-0.125 * ξ₁ - 0.125) * (ξ₂ - 1)
+    ]
 
-    d¹N_dξ¹[7,:] = [
-    0.125*(ξ₂ + 1)*(ξ₃ + 1)
-    (0.125*ξ₁ + 0.125)*(ξ₃ + 1)
-    (0.125*ξ₁ + 0.125)*(ξ₂ + 1)]
+    d¹N_dξ¹[7, :] = [
+        0.125 * (ξ₂ + 1) * (ξ₃ + 1)
+        (0.125 * ξ₁ + 0.125) * (ξ₃ + 1)
+        (0.125 * ξ₁ + 0.125) * (ξ₂ + 1)
+    ]
 
-    d¹N_dξ¹[8,:] = [
-    -0.125*(ξ₂ + 1)*(ξ₃ + 1)
-    (0.125 - 0.125*ξ₁)*(ξ₃ + 1)
-    (0.125 - 0.125*ξ₁)*(ξ₂ + 1)]
-
-
-
-    d²N_dξ² = Array{Float64}(undef, 8,3,3)
-    d²N_dξ²[1,:,:] = [
-    0   0.125*(1 - ξ₃)  0.125*(1 - ξ₂)
-    0.125*(1 - ξ₃)  0   0.125*(1 - ξ₁)
-    0.125*(1 - ξ₂)  0.125*(1 - ξ₁)  0]
-
-    d²N_dξ²[2,:,:] = [
-    0   0.125*(ξ₃ - 1)  0.125*(ξ₂ - 1)
-    0.125*(ξ₃ - 1)  0   0.125*(ξ₁ + 1)
-    0.125*(ξ₂ - 1)  0.125*(ξ₁ + 1)  0]
-
-    d²N_dξ²[3,:,:] = [
-    0   0.125*(1 - ξ₃)  -0.125*(ξ₂ + 1)
-    0.125*(1 - ξ₃)  0   -0.125*(ξ₁ + 1)
-    -0.125*(ξ₂ + 1) -0.125*(ξ₁ + 1) 0]
-
-    d²N_dξ²[4,:,:] = [
-    0   0.125*(ξ₃ - 1)  0.125*(ξ₂ + 1)
-    0.125*(ξ₃ - 1)  0   0.125*(ξ₁ - 1)
-    0.125*(ξ₂ + 1)  0.125*(ξ₁ - 1)  0]
-
-    d²N_dξ²[5,:,:] = [
-    0   0.125*(ξ₃ + 1)  0.125*(ξ₂ - 1)
-    0.125*(ξ₃ + 1)  0   0.125*(ξ₁ - 1)
-    0.125*(ξ₂ - 1)  0.125*(ξ₁ - 1)  0]
-
-    d²N_dξ²[6,:,:] = [
-    0   -0.125*(ξ₃ + 1) 0.125*(1 - ξ₂)
-    -0.125*(ξ₃ + 1) 0   -0.125*(ξ₁ + 1)
-    0.125*(1 - ξ₂)  -0.125*(ξ₁ + 1) 0]
-
-    d²N_dξ²[7,:,:] = [
-    0   0.125*(ξ₃ + 1)  0.125*(ξ₂ + 1)
-    0.125*(ξ₃ + 1)  0   0.125*(ξ₁ + 1)
-    0.125*(ξ₂ + 1)  0.125*(ξ₁ + 1)  0]
-
-    d²N_dξ²[8,:,:] = [
-    0   -0.125*(ξ₃ + 1) -0.125*(ξ₂ + 1)
-    -0.125*(ξ₃ + 1) 0   0.125*(1 - ξ₁)
-    -0.125*(ξ₂ + 1) 0.125*(1 - ξ₁)  0]
+    d¹N_dξ¹[8, :] = [
+        -0.125 * (ξ₂ + 1) * (ξ₃ + 1)
+        (0.125 - 0.125 * ξ₁) * (ξ₃ + 1)
+        (0.125 - 0.125 * ξ₁) * (ξ₂ + 1)
+    ]
 
 
 
-    d³N_dξ³ = Array{Float64}(undef, 8,3,3,3)
-    d³N_dξ³[1,:,:,:] = [
-    0   0   0;
-    0   0   -0.125000000000000;
-    0   -0.125000000000000  0;;;
-    0   0   -0.125000000000000;
-    0   0   0;
-    -0.125000000000000  0   0;;;
-    0   -0.125000000000000  0;
-    -0.125000000000000  0   0;
-    0   0   0]
+    d²N_dξ² = Array{Float64}(undef, 8, 3, 3)
+    d²N_dξ²[1, :, :] = [
+        0 0.125*(1-ξ₃) 0.125*(1-ξ₂)
+        0.125*(1-ξ₃) 0 0.125*(1-ξ₁)
+        0.125*(1-ξ₂) 0.125*(1-ξ₁) 0
+    ]
 
-    d³N_dξ³[2,:,:,:] = [
-    0   0   0;
-    0   0   0.125000000000000;
-    0   0.125000000000000   0;;;
-    0   0   0.125000000000000;
-    0   0   0;
-    0.125000000000000   0   0;;;
-    0   0.125000000000000   0;
-    0.125000000000000   0   0;
-    0   0   0]
+    d²N_dξ²[2, :, :] = [
+        0 0.125*(ξ₃-1) 0.125*(ξ₂-1)
+        0.125*(ξ₃-1) 0 0.125*(ξ₁+1)
+        0.125*(ξ₂-1) 0.125*(ξ₁+1) 0
+    ]
 
-    d³N_dξ³[3,:,:,:] = [
-    0   0   0;
-    0   0   -0.125000000000000;
-    0   -0.125000000000000  0;;;
-    0   0   -0.125000000000000;
-    0   0   0;
-    -0.125000000000000  0   0;;;
-    0   -0.125000000000000  0;
-    -0.125000000000000  0   0;
-    0   0   0]
+    d²N_dξ²[3, :, :] = [
+        0 0.125*(1-ξ₃) -0.125*(ξ₂+1)
+        0.125*(1-ξ₃) 0 -0.125*(ξ₁+1)
+        -0.125*(ξ₂+1) -0.125*(ξ₁+1) 0
+    ]
 
-    d³N_dξ³[4,:,:,:] = [
-0   0   0;
-0   0   0.125000000000000;
-0   0.125000000000000   0;;;
-0   0   0.125000000000000;
-0   0   0;
-0.125000000000000   0   0;;;
-0   0.125000000000000   0;
-0.125000000000000   0   0;
-0   0   0]
+    d²N_dξ²[4, :, :] = [
+        0 0.125*(ξ₃-1) 0.125*(ξ₂+1)
+        0.125*(ξ₃-1) 0 0.125*(ξ₁-1)
+        0.125*(ξ₂+1) 0.125*(ξ₁-1) 0
+    ]
 
-d³N_dξ³[5,:,:,:] = [
-0   0   0;
-0   0   0.125000000000000;
-0   0.125000000000000   0;;;
-0   0   0.125000000000000;
-0   0   0;
-0.125000000000000   0   0;;;
-0   0.125000000000000   0;
-0.125000000000000   0   0;
-0   0   0]
+    d²N_dξ²[5, :, :] = [
+        0 0.125*(ξ₃+1) 0.125*(ξ₂-1)
+        0.125*(ξ₃+1) 0 0.125*(ξ₁-1)
+        0.125*(ξ₂-1) 0.125*(ξ₁-1) 0
+    ]
 
-d³N_dξ³[6,:,:,:] = [
-0   0   0;
-0   0   -0.125000000000000;
-0   -0.125000000000000  0;;;
-0   0   -0.125000000000000;
-0   0   0;
--0.125000000000000  0   0;;;
-0   -0.125000000000000  0;
--0.125000000000000  0   0;
-0   0   0]
+    d²N_dξ²[6, :, :] = [
+        0 -0.125*(ξ₃+1) 0.125*(1-ξ₂)
+        -0.125*(ξ₃+1) 0 -0.125*(ξ₁+1)
+        0.125*(1-ξ₂) -0.125*(ξ₁+1) 0
+    ]
 
-d³N_dξ³[7,:,:,:] = [
-0   0   0;
-0   0   0.125000000000000;
-0   0.125000000000000   0;;;
-0   0   0.125000000000000;
-0   0   0;
-0.125000000000000   0   0;;;
-0   0.125000000000000   0;
-0.125000000000000   0   0;
-0   0   0]
+    d²N_dξ²[7, :, :] = [
+        0 0.125*(ξ₃+1) 0.125*(ξ₂+1)
+        0.125*(ξ₃+1) 0 0.125*(ξ₁+1)
+        0.125*(ξ₂+1) 0.125*(ξ₁+1) 0
+    ]
 
-d³N_dξ³[8,:,:,:] = [
-0   0   0;
-0   0   -0.125000000000000;
-0   -0.125000000000000  0;;;
-0   0   -0.125000000000000;
-0   0   0;
--0.125000000000000  0   0;;;
-0   -0.125000000000000  0;
--0.125000000000000  0   0;
-0   0   0]
+    d²N_dξ²[8, :, :] = [
+        0 -0.125*(ξ₃+1) -0.125*(ξ₂+1)
+        -0.125*(ξ₃+1) 0 0.125*(1-ξ₁)
+        -0.125*(ξ₂+1) 0.125*(1-ξ₁) 0
+    ]
+
+
+
+    d³N_dξ³ = Array{Float64}(undef, 8, 3, 3, 3)
+    d³N_dξ³[1, :, :, :] = [
+        0 0 0
+        0 0 -0.125000000000000
+        0 -0.125000000000000 0
+        0 0 -0.125000000000000
+        0 0 0
+        -0.125000000000000 0 0
+        0 -0.125000000000000 0
+        -0.125000000000000 0 0
+        0 0 0
+    ]
+
+    d³N_dξ³[2, :, :, :] = [
+        0 0 0
+        0 0 0.125000000000000
+        0 0.125000000000000 0
+        0 0 0.125000000000000
+        0 0 0
+        0.125000000000000 0 0
+        0 0.125000000000000 0
+        0.125000000000000 0 0
+        0 0 0
+    ]
+
+    d³N_dξ³[3, :, :, :] = [
+        0 0 0
+        0 0 -0.125000000000000
+        0 -0.125000000000000 0
+        0 0 -0.125000000000000
+        0 0 0
+        -0.125000000000000 0 0
+        0 -0.125000000000000 0
+        -0.125000000000000 0 0
+        0 0 0
+    ]
+
+    d³N_dξ³[4, :, :, :] = [
+        0 0 0
+        0 0 0.125000000000000
+        0 0.125000000000000 0
+        0 0 0.125000000000000
+        0 0 0
+        0.125000000000000 0 0
+        0 0.125000000000000 0
+        0.125000000000000 0 0
+        0 0 0
+    ]
+
+    d³N_dξ³[5, :, :, :] = [
+        0 0 0
+        0 0 0.125000000000000
+        0 0.125000000000000 0
+        0 0 0.125000000000000
+        0 0 0
+        0.125000000000000 0 0
+        0 0.125000000000000 0
+        0.125000000000000 0 0
+        0 0 0
+    ]
+
+    d³N_dξ³[6, :, :, :] = [
+        0 0 0
+        0 0 -0.125000000000000
+        0 -0.125000000000000 0
+        0 0 -0.125000000000000
+        0 0 0
+        -0.125000000000000 0 0
+        0 -0.125000000000000 0
+        -0.125000000000000 0 0
+        0 0 0
+    ]
+
+    d³N_dξ³[7, :, :, :] = [
+        0 0 0
+        0 0 0.125000000000000
+        0 0.125000000000000 0
+        0 0 0.125000000000000
+        0 0 0
+        0.125000000000000 0 0
+        0 0.125000000000000 0
+        0.125000000000000 0 0
+        0 0 0
+    ]
+
+    d³N_dξ³[8, :, :, :] = [
+        0 0 0
+        0 0 -0.125000000000000
+        0 -0.125000000000000 0
+        0 0 -0.125000000000000
+        0 0 0
+        -0.125000000000000 0 0
+        0 -0.125000000000000 0
+        -0.125000000000000 0 0
+        0 0 0
+    ]
 
     return N, d¹N_dξ¹, d²N_dξ², d³N_dξ³
 end
