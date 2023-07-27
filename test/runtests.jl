@@ -23,8 +23,7 @@ using JLD
 
     # mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh, ρₙ)
     # save("taskName" * "_triangular_mesh.jld", "mesh", mesh)
-
-    mesh = load("taskName" * "_triangular_mesh.jld", "mesh")
+    mesh = load("taskName" * "_triangular_mesh.jld", "mesh") # načtení chapadla (stl)
 
     # X = [mesh.X[:,i] for i in 1:size(mesh.X,2)]
     # IEN = [mesh.IEN[:,i] for i in 1:size(mesh.IEN,2)]
@@ -36,8 +35,8 @@ using JLD
 
     ρₜ = 0.5
 
-    sdf_dists = Rho2sdf.evalSignedDiscancesOnTriangularMesh(mesh, sdf_grid)
-    # sdf_dists = Rho2sdf.evalSignedDiscances(mesh, sdf_grid, ρₙ , ρₜ)
+    # sdf_dists = Rho2sdf.evalSignedDiscancesOnTriangularMesh(mesh, sdf_grid)
+    sdf_dists = Rho2sdf.evalSignedDiscances(mesh, sdf_grid, ρₙ , ρₜ)
 
     Rho2sdf.exportStructuredPointsToVTK(taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
 
