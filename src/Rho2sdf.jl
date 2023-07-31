@@ -5,23 +5,23 @@ using Statistics
 using DelimitedFiles
 using Einsum
 
-mutable struct Mesh
-    X::Matrix{Float64}
-    IEN::Matrix{Int64}
-    INE::Vector{Vector{Int64}}
-    ISN::Vector{Vector{Int64}}
-    nsd::Int64
-    nnp::Int64
-    nen::Int64
-    nel::Int64
-    nes::Int64
-    nsn::Int64
+struct Mesh
+    X::Matrix{Float64} # vector of nodes positions
+    IEN::Matrix{Int64} # ID element -> ID nodes
+    INE::Vector{Vector{Int64}} # ID node -> ID elements
+    ISN::Vector{Vector{Int64}} # connectivity face - edges
+    nsd::Int64 # number of spacial dimensions
+    nnp::Int64 # number of all points
+    nen::Int64 # number of element nodes
+    nel::Int64 # number of all elements
+    nes::Int64 # number of element segments (faces)
+    nsn::Int64 # number of face nodes
 
     function Mesh(X::Vector{Vector{Float64}}, IEN::Vector{Vector{Int64}})
         IEN = reduce(hcat, IEN)
         INE = nodeToElementConnectivity(X, IEN)
         ISN = [
-            [1, 4, 3, 2],
+            [1, 4, 3, 2], # nodes define face 1
             [1, 2, 6, 5],
             [2, 3, 7, 6],
             [3, 4, 8, 7],
@@ -156,13 +156,13 @@ end
 
 function extractSurfaceTriangularMesh(mesh::Mesh, ρₙ::Vector{Float64})::Mesh
     X = mesh.X
-    IEN = mesh.IEN
-    INE = mesh.INE
-    ISN = mesh.ISN
+    IEN = mesh.IEN # ID element -> nodes
+    INE = mesh.INE # ID node -> ID elements
+    ISN = mesh.ISN # connectivity face - edges
     nsd = mesh.nsd # number of special dimension
     nel = mesh.nel # number of elements
-    nes = mesh.nes # number of element segments (edges, faces)
-    nsn = mesh.nsn # number of segment nodes (kolik má stěna uzlů)
+    nes = mesh.nes # number of element segments (faces) 6
+    nsn = mesh.nsn # number of segment nodes (kolik má stěna uzlů) 4
 
     X_new = Vector{Vector{Float64}}()
     push!(X_new, vec(X[:, 1]))
@@ -173,19 +173,17 @@ function extractSurfaceTriangularMesh(mesh::Mesh, ρₙ::Vector{Float64})::Mesh
         ρₑ = ρₙ[IEN[:, el]]
 
         commonEls = []
-        for sg = 1:nes
+        for sg = 1:nes # 1:6 je face součástí pouze jednoho elementu?
             commonEls = INE[IEN[mesh.ISN[sg][1], el]]
-            for a = 2:nsn
+            for a = 2:nsn # 2:4
                 idx = findall(in(INE[IEN[ISN[sg][a], el]]), commonEls)
                 commonEls = commonEls[idx]
             end
 
             if (length(commonEls) == 1) # is a part of the outer boundary of the body
 
-
-
                 Xs = X[:, IEN[ISN[sg], el]]
-                Xc = mean(Xs, dims = 2)
+                Xc = mean(Xs, dims = 2) # center of the outside face
 
                 for a = 1:nsn
 
@@ -948,25 +946,25 @@ function exportStructuredPointsToVTK(
     dim_x = dim[1]
     dim_y = dim[2]
     dim_z = dim[3]
-    write(io, "DIMENSIONS $dim_x $dim_y $dim_z\n")
+    write(io, "DIMENSIONS $dim_x $dim_y $dim_z\n") # dimenze pravidelné sítě
 
     spacing_x = spacing[1]
     spacing_y = spacing[2]
     spacing_z = spacing[3]
-    write(io, "SPACING $spacing_x $spacing_y $spacing_z\n")
+    write(io, "SPACING $spacing_x $spacing_y $spacing_z\n") # krok sítě ve 3 směrech
 
     org_x = org[1]
     org_y = org[2]
     org_z = org[3]
-    write(io, "ORIGIN $org_x $org_y $org_z\n\n")
+    write(io, "ORIGIN $org_x $org_y $org_z\n\n") # souřadnice počátku
 
     n = prod(dim)
-    write(io, "POINT_DATA $n\n")
-    write(io, "SCALARS $valLabel float 1\n")
-    write(io, "LOOKUP_TABLE default\n")
+    write(io, "POINT_DATA $n\n") # počet uzlů pravidelné sítě
+    write(io, "SCALARS $valLabel float 1\n") # druh hodnoty v uzlech (vzdálenost)
+    write(io, "LOOKUP_TABLE default\n") # ??
 
     for val ∈ vals
-        write(io, "$val\n")
+        write(io, "$val\n") # hodnota vzdálenostní funkce v jednotlivých bodech
     end
     close(io)
 end

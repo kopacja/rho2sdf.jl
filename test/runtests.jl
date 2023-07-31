@@ -1,3 +1,4 @@
+# using REPLVim; @async REPLVim.serve()
 using Test
 using Rho2sdf
 using MAT
@@ -9,6 +10,7 @@ using JLD
 
     taskName = "chapadlo"
 
+    # Data from Matlab:
     data = matread(taskName * ".mat")
     rho = vec(data["rho"])
     mesh = data["msh"]
@@ -17,13 +19,14 @@ using JLD
     IEN = convert(Array{Int64}, mesh["IEN"] .+ 1)
     IEN = [IEN[:, i] for i = 1:size(IEN, 2)]
 
+    # input data propertis (mesh, density)
     mesh = Rho2sdf.Mesh(X, IEN)
-    ρₙ = Rho2sdf.elementToNodalValues(mesh, rho)
+    ρₙ = Rho2sdf.elementToNodalValues(mesh, rho) # nodal values calculation (AVERAGE!! -> least squares)
 
 
-    # mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh, ρₙ)
+    mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh, ρₙ)
     # save("taskName" * "_triangular_mesh.jld", "mesh", mesh)
-    mesh = load("taskName" * "_triangular_mesh.jld", "mesh") # načtení chapadla (stl)
+    # mesh = load("taskName" * "_triangular_mesh.jld", "mesh") # načtení chapadla (stl)
 
     # X = [mesh.X[:,i] for i in 1:size(mesh.X,2)]
     # IEN = [mesh.IEN[:,i] for i in 1:size(mesh.IEN,2)]
@@ -35,8 +38,8 @@ using JLD
 
     ρₜ = 0.5
 
-    # sdf_dists = Rho2sdf.evalSignedDiscancesOnTriangularMesh(mesh, sdf_grid)
-    sdf_dists = Rho2sdf.evalSignedDiscances(mesh, sdf_grid, ρₙ , ρₜ)
+    sdf_dists = Rho2sdf.evalSignedDiscancesOnTriangularMesh(mesh, sdf_grid)
+    # sdf_dists = Rho2sdf.evalSignedDiscances(mesh, sdf_grid, ρₙ , ρₜ)
 
     Rho2sdf.exportStructuredPointsToVTK(taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
 
