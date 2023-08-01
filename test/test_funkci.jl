@@ -20,8 +20,10 @@ IEN_new = Vector{Vector{Int64}}()
     commonEls = []
     # for sg = 1:nes # 1:6 je face součástí pouze jednoho elementu?
     sg = 1
-        commonEls = INE[IEN[mesh.ISN[sg][1], el]]
-IEN[mesh.ISN[sg][1], el]
+        commonEls = INE[IEN[mesh.ISN[sg][1], el]] # ID elementu
+        IEN[mesh.ISN[sg][1], el] # ID uzlu
+mesh.ISN[sg][1]
+ISN[sg][1]
         for a = 2:nsn # 2:4
             idx = findall(in(INE[IEN[ISN[sg][a], el]]), commonEls)
             commonEls = commonEls[idx]
