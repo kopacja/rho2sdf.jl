@@ -159,7 +159,7 @@ function extractSurfaceTriangularMesh(mesh::Mesh, ρₙ::Vector{Float64})::Mesh
     IEN = mesh.IEN # ID element -> nodes
     INE = mesh.INE # ID node -> ID elements
     ISN = mesh.ISN # connectivity face - edges
-    nsd = mesh.nsd # number of special dimension
+    # nsd = mesh.nsd # number of special dimension
     nel = mesh.nel # number of elements
     nes = mesh.nes # number of element segments (faces) 6
     nsn = mesh.nsn # number of segment nodes (kolik má stěna uzlů) 4
@@ -170,8 +170,7 @@ function extractSurfaceTriangularMesh(mesh::Mesh, ρₙ::Vector{Float64})::Mesh
     IEN_new = Vector{Vector{Int64}}()
 
     for el = 1:nel
-        ρₑ = ρₙ[IEN[:, el]]
-
+        # ρₑ = ρₙ[IEN[:, el]]
         commonEls = []
         for sg = 1:nes # 1:6 je face součástí pouze jednoho elementu?
             commonEls = INE[IEN[mesh.ISN[sg][1], el]]
@@ -198,7 +197,7 @@ function extractSurfaceTriangularMesh(mesh::Mesh, ρₙ::Vector{Float64})::Mesh
 
                     for i = 1:3
                         a = findfirst(x -> norm(x - Xt[i]) < 1.0e-5, X_new)
-                        if (a == nothing)
+                        if (a === nothing)
                             push!(X_new, Xt[i])
                             IEN_el[i] = length(X_new)
                         else
