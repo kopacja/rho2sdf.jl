@@ -173,7 +173,7 @@ function extractSurfaceTriangularMesh(mesh::Mesh, ρₙ::Vector{Float64})::Mesh
         # ρₑ = ρₙ[IEN[:, el]]
         commonEls = []
         for sg = 1:nes # 1:6 je face součástí pouze jednoho elementu?
-            commonEls = INE[IEN[mesh.ISN[sg][1], el]]
+            commonEls = INE[IEN[ISN[sg][1], el]]
             for a = 2:nsn # 2:4
                 idx = findall(in(INE[IEN[ISN[sg][a], el]]), commonEls)
                 commonEls = commonEls[idx]
