@@ -21,11 +21,11 @@ using JLD
     IEN = [IEN[:, i] for i in axes(IEN, 2)] # Vector{Vector{Int64}}
 
     # input data propertis (mesh, density)
-    mesh = Rho2sdf.Mesh(X, IEN)  
+    mesh = Rho2sdf.Mesh(X, IEN)
     ρₙ = Rho2sdf.elementToNodalValues(mesh, rho) # nodal values calculation (AVERAGE!! -> least squares)
 
-    # face triangular mesh from 
-    mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh, ρₙ) # přepsání X a IEN (pro trojúhelníky)
+    # face triangular mesh from
+    mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh, ρₙ) # přepsání X a IEN (pro trojúhelníky) smazat rho
 
     # save("taskName" * "_triangular_mesh.jld", "mesh", mesh)
     # mesh = load("taskName" * "_triangular_mesh.jld", "mesh") # načtení chapadla (stl)
