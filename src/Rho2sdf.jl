@@ -174,7 +174,7 @@ function extractSurfaceTriangularMesh(mesh::Mesh, ρₙ::Vector{Float64})::Mesh
         commonEls = []
         for sg = 1:nes # 1:6 je face součástí pouze jednoho elementu?
             commonEls = INE[IEN[ISN[sg][1], el]]
-            for a = 2:nsn # 2:4
+            for a = 2:nsn # 2:4 prověření dalších uzlů danné stěny
                 idx = findall(in(INE[IEN[ISN[sg][a], el]]), commonEls)
                 commonEls = commonEls[idx]
             end
@@ -687,9 +687,9 @@ function evalSignedDiscances(
 
                         while (Ξ_norm ≥ Ξ_tol && iter ≤ niter)# || r_norm ≥ r_tol)
 
-                            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
+                            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ) # tvarové funkce a jejich derivace
 
-                            xₚ = Xₑ * H
+                            xₚ = Xₑ * H # Xₑ je souřadnice uzlu -> lokální souřadnice <-1,1>
                             dx_dΞ = Xₑ * d¹N_dξ¹
                             dρ_dΞ = d¹N_dξ¹' * ρₑ
 
@@ -702,10 +702,10 @@ function evalSignedDiscances(
                             n = dρ_dΞ / norm_dρ_dΞ
 
                             dn_dΞ = zeros(Float64, 3, 3)
-                            @einsum dn_dΞ[i, j] :=
+                            @einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
                                 d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
-                                (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
-                                norm_dρ_dΞ^(3 / 2)
+                                (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) / 
+                                norm_dρ_dΞ^(3 / 2) # nemá to být pouze na ^3?
 
                             dd_dΞ = zeros(Float64, 3)
                             @einsum dd_dΞ[i] :=

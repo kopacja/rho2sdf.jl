@@ -1,5 +1,8 @@
 using Statistics: mean
 
+    # face triangular mesh from 
+    # mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh, ρₙ) # přepsání X a IEN (pro trojúhelníky)
+
 X = mesh.X
 IEN = mesh.IEN # ID element -> nodes
 INE = mesh.INE # ID node -> ID elements
@@ -20,14 +23,17 @@ IEN_new = Vector{Vector{Int64}}()
     commonEls = []
     # for sg = 1:nes # 1:6 je face součástí pouze jednoho elementu?
     sg = 1
-        commonEls = INE[IEN[mesh.ISN[sg][1], el]] # ID elementu
+        commonEls = INE[IEN[ISN[sg][1], el]] # ID elementu
         IEN[mesh.ISN[sg][1], el] # ID uzlu
 mesh.ISN[sg][1]
 ISN[sg][1]
-        for a = 2:nsn # 2:4
+        # for a = 2:nsn # 2:4
+        a = 4
             idx = findall(in(INE[IEN[ISN[sg][a], el]]), commonEls)
+            INE[IEN[ISN[sg][a], el]]
+
             commonEls = commonEls[idx]
-        end
+        # end
 
         if (length(commonEls) == 1) # is a part of the outer boundary of the body
 
@@ -63,3 +69,14 @@ ISN[sg][1]
 
 IEN_new
 X_new
+
+
+A = [1 2; 3 4]
+
+B = [7 8; 9 11]
+
+C = [2 31; 50 5]
+
+(A * B) * C
+
+A * (B * C)
