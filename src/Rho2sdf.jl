@@ -674,7 +674,7 @@ function evalSignedDiscances(
                     while v != -1
                         x = points[:, v]
 
-                        xₚ = [0.0, 0.0, 0.0]
+                        xₚ = [0.0, 0.0, 0.0] # odhad?
                         n = [0.0, 0.0, 0.0]
                         Ξ = [0.0, 0.0, 0.0]
                         λ = 1.0
@@ -689,7 +689,7 @@ function evalSignedDiscances(
 
                             H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ) # tvarové funkce a jejich derivace
 
-                            xₚ = Xₑ * H # Xₑ je souřadnice uzlu -> lokální souřadnice <-1,1>
+                            xₚ = Xₑ * H # Xₑ je souřadnice uzlů, H tvarové funkce -> souřadnice bodu KONTROLA!!
                             dx_dΞ = Xₑ * d¹N_dξ¹
                             dρ_dΞ = d¹N_dξ¹' * ρₑ
 
@@ -697,36 +697,37 @@ function evalSignedDiscances(
                             for k = 1:length(H)
                                 d²ρ_dΞ² += ρₑ[k] * d²N_dξ²[k, :, :]
                             end
+                            
+                            d³ρ_dΞ³ = zeros(Float64, 3, 3, 3)
+                            for k = 1:length(H)
+                                d³ρ_dΞ³ += ρₑ[k] * d³N_dξ³[k, :, :, :]
+                            end
 
-                            norm_dρ_dΞ = norm(dρ_dΞ)
-                            n = dρ_dΞ / norm_dρ_dΞ
+                            norm_dρ_dΞ = norm(dρ_dΞ) # ok
+                            n = dρ_dΞ / norm_dρ_dΞ # ok
 
                             dn_dΞ = zeros(Float64, 3, 3)
                             @einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
                                 d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
                                 (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) / 
-                                norm_dρ_dΞ^3 
+                                norm_dρ_dΞ^3  # ok
 
                             dd_dΞ = zeros(Float64, 3)
                             @einsum dd_dΞ[i] :=
                                 -dx_dΞ[i, k] * n[k] +
-                                (x[k] - xₚ[k]) * dn_dΞ[k, i]
+                                (x[k] - xₚ[k]) * dn_dΞ[k, i] # ok
 
 
                             dL_dΞ = zeros(Float64, 3)
-                            @einsum dL_dΞ[i] := dd_dΞ[i] + λ * dρ_dΞ[i]
+                            @einsum dL_dΞ[i] := dd_dΞ[i] + λ * dρ_dΞ[i] # ok
 
-                            ρ = H ⋅ ρₑ
-                            dL_dλ = ρ - ρₜ
+                            ρ = H ⋅ ρₑ # hustota v bodě
+                            dL_dλ = ρ - ρₜ # ok
 
                             d²x_dΞ² = zeros(Float64, 3, 3, 3)
                             @einsum d²x_dΞ²[i, j, k] :=
-                                Xₑ[i, m] * d²N_dξ²[m, j, k]
+                                Xₑ[i, m] * d²N_dξ²[m, j, k] # ok
 
-                            d³ρ_dΞ³ = zeros(Float64, 3, 3, 3)
-                            for k = 1:length(H)
-                                d³ρ_dΞ³ += ρₑ[k] * d³N_dξ³[k, :, :, :]
-                            end
 
                             d²n_dΞ² = zeros(Float64, 3, 3, 3)
                             @einsum d²n_dΞ²[i, j, k] :=
@@ -745,7 +746,7 @@ function evalSignedDiscances(
                                     d²ρ_dΞ²[m, j] *
                                     dρ_dΞ[l] *
                                     d²ρ_dΞ²[l, k]
-                                ) / norm_dρ_dΞ^5
+                                ) / norm_dρ_dΞ^5 # ok
 
                             d²d_dΞ² = zeros(Float64, 3, 3)
                             @einsum d²d_dΞ²[i, j] :=
