@@ -705,7 +705,7 @@ function evalSignedDiscances(
                             @einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
                                 d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
                                 (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) / 
-                                norm_dρ_dΞ^(3 / 2) # nemá to být pouze na ^3?
+                                norm_dρ_dΞ^3 
 
                             dd_dΞ = zeros(Float64, 3)
                             @einsum dd_dΞ[i] :=
@@ -732,20 +732,20 @@ function evalSignedDiscances(
                             @einsum d²n_dΞ²[i, j, k] :=
                                 d³ρ_dΞ³[i, j, k] / norm_dρ_dΞ -
                                 (d²ρ_dΞ²[i, j] * d²ρ_dΞ²[k, m] * dρ_dΞ[m]) /
-                                norm_dρ_dΞ^(3 / 2) -
+                                norm_dρ_dΞ^3 -
                                 d²ρ_dΞ²[i, j] * d²ρ_dΞ²[k, m] * dρ_dΞ[m] /
-                                norm_dρ_dΞ^(3 / 2) +
+                                norm_dρ_dΞ^3 +
                                 dρ_dΞ[i] * (
                                     d²ρ_dΞ²[j, m] * d²ρ_dΞ²[m, k] +
                                     d³ρ_dΞ³[j, k, m] * dρ_dΞ[m]
-                                ) / norm_dρ_dΞ^(3 / 2) +
+                                ) / norm_dρ_dΞ^3 +
                                 3 * (
                                     dρ_dΞ[i] *
                                     dρ_dΞ[m] *
                                     d²ρ_dΞ²[m, j] *
                                     dρ_dΞ[l] *
                                     d²ρ_dΞ²[l, k]
-                                ) / norm_dρ_dΞ^(5 / 2)
+                                ) / norm_dρ_dΞ^5
 
                             d²d_dΞ² = zeros(Float64, 3, 3)
                             @einsum d²d_dΞ²[i, j] :=
