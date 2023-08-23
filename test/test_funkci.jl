@@ -1,3 +1,4 @@
+# using REPLVim; @async REPLVim.serve()
 using Statistics: mean
 
     # face triangular mesh from 
@@ -70,6 +71,7 @@ ISN[sg][1]
 IEN_new
 X_new
 
+using Einsum
 
 A = [1 2; 3 4]
 
@@ -77,6 +79,19 @@ B = [7 8; 9 11]
 
 C = [2 31; 50 5]
 
-(A * B) * C
+A = [50 5]'
+B = [9 11]'
+C = [1 2; 3 4]
+@einsum D[i,j]:= A[i,k]*B[k,j]
+@einsum D[i,j]:= B[i,k]*A[k,j]
 
-A * (B * C)
+@einsum E[i,j]:= A[i,k]*B[k,j]
+
+51^(-3)
+1/(51^3)
+
+@einsum E[i,j]:= A[i]*B[k]*C[k,j]
+@einsum E[i,j]:= A[i]*B[k]*C[j,k]
+@einsum E[i,j]:= A[i]*B[j]*C[j,k]
+@einsum E[i,j]:= A[i]*C[j,k]*B[k]
+@einsum E[i,j]:= A[i]*C[j,k]*B[k]
