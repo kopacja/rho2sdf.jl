@@ -4,6 +4,8 @@ using LinearAlgebra
 using Statistics
 using DelimitedFiles
 using Einsum
+using BenchmarkTools
+using ProgressMeter
 
 struct Mesh
     X::Matrix{Float64} # vector of nodes positions
