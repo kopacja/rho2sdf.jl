@@ -764,9 +764,62 @@ function evalSignedDiscances(
                                 d²L_dΞ² d²L_dΞdλ
                                 d²L_dΞdλ' d²L_dλ²
                             ]
-                            r = [dL_dΞ; dL_dλ]
-                            r_norm = norm(r)
+                            r = [dL_dΞ; dL_dλ] # r1 ... r4 vyčíslím v bode xi_temp
+                            # r(xi_tem + )
+                            ########################################
+                            println("el:",el)
+                            Ξ_tmp = zeros(Float64,4) # bod pro linearizaci ξ₁,ξ₂,ξ₃,λ
+                            K_diff = zeros(Float64,4,4)
+                            h = 1e-6    
+                            sign = [1 -1]
+                            ϵ = [h -h]
+                            for kk in 1:4
+                                K_diff_col = zeros(Float64,4)
+                                for ll in 1:2
+                                    ΔΞ_tmp = zeros(Float64,4)
+                                    ΔΞ_tmp[kk] = ϵ[ll]
 
+                                    H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ_tmp + ΔΞ_tmp)
+
+                                    xₚ = Xₑ * H
+                                    dx_dΞ = Xₑ * d¹N_dξ¹
+
+                                    dρ_dΞ = d¹N_dξ¹' * ρₑ
+
+                                    d²ρ_dΞ² = zeros(Float64,3,3)
+                                    for m in 1:length(H)
+                                        d²ρ_dΞ² +=  ρₑ[m] * d²N_dξ²[m,:,:]
+                                    end
+
+
+                                    norm_dρ_dΞ = norm(dρ_dΞ)
+                                    n = dρ_dΞ / norm_dρ_dΞ
+
+                                    dn_dΞ = zeros(Float64,3,3)
+                                    @einsum dn_dΞ[i,j] := d²ρ_dΞ²[i,j] / norm_dρ_dΞ - (dρ_dΞ[i] * d²ρ_dΞ²[j,k] * dρ_dΞ[k] ) / norm_dρ_dΞ^(3/2)
+                                    
+                                    dd_dΞ = zeros(Float64,3)
+                                    @einsum dd_dΞ[i] := -dx_dΞ[i,k] * n[k] + (x[k] - xₚ[k]) * dn_dΞ[k,i]
+
+                                    dL_dΞ = zeros(Float64,3)
+                                    @einsum dL_dΞ[i] := dd_dΞ[i] + (Ξ_tmp[end]+ΔΞ_tmp[end])*dρ_dΞ[i]
+                                    
+                                    ρ = H⋅ρₑ
+                                    dL_dλ = ρ - ρₜ
+
+                                    r_tmp = [dL_dΞ; dL_dλ] 
+                                    
+                                    K_diff_col = K_diff_col + sign[ll] .* r_tmp
+                                end
+                                K_diff[kk,:] =  K_diff_col ./ (2*h)
+                            end
+                            # println("K:",K)
+                            # println("K_diff:",K_diff)
+                            K = K_diff
+                            ########################################
+                            println("el:",el)
+
+                            r_norm = norm(r)
                             Λ = real.(eigvals(K))
                             (Λ_min, idx_min) = findmin(Λ)
 
