@@ -25,7 +25,7 @@ using JLD
     ρₙ = Rho2sdf.elementToNodalValues(mesh, rho) # nodal values calculation (AVERAGE!! -> least squares)
 
     # face triangular mesh from
-    mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh, ρₙ) # přepsání X a IEN (pro trojúhelníky) smazat rho
+    # mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh, ρₙ) # přepsání X a IEN (pro trojúhelníky) smazat rho
 
     # save("taskName" * "_triangular_mesh.jld", "mesh", mesh)
     # mesh = load("taskName" * "_triangular_mesh.jld", "mesh") # načtení chapadla (stl)
@@ -40,8 +40,8 @@ using JLD
 
     ρₜ = 0.5
 
-    sdf_dists = Rho2sdf.evalSignedDiscancesOnTriangularMesh(mesh, sdf_grid) # Vector{Float64}
-    # sdf_dists = Rho2sdf.evalSignedDiscances(mesh, sdf_grid, ρₙ , ρₜ)
+    # sdf_dists = Rho2sdf.evalSignedDiscancesOnTriangularMesh(mesh, sdf_grid) # Vector{Float64}
+    sdf_dists = Rho2sdf.evalSignedDiscances(mesh, sdf_grid, ρₙ , ρₜ)
 
     Rho2sdf.exportStructuredPointsToVTK(taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
 
