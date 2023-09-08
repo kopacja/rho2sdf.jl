@@ -1,6 +1,7 @@
 # using REPLVim; @async REPLVim.serve()
 using Test
 using Rho2sdf
+using Rho2sdf.ShapeFunctions
 using MAT
 using SymPy
 using LinearAlgebra
