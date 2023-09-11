@@ -3,6 +3,7 @@ using Test
 using Rho2sdf
 using Rho2sdf.ShapeFunctions
 using Rho2sdf.GenerateMesh
+using Rho2sdf.Derivatives
 using MAT
 using SymPy
 using LinearAlgebra
@@ -31,14 +32,14 @@ using JLD
 
 
     ## Face triangular mesh:
-    mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh, ρₙ) # přepsání X a IEN (pro trojúhelníky) smazat rho
+    # mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh, ρₙ) # přepsání X a IEN (pro trojúhelníky) smazat rho
 
-    save("taskName" * "_triangular_mesh.jld", "mesh", mesh)
-    mesh = load("taskName" * "_triangular_mesh.jld", "mesh") # načtení chapadla (stl)
+    # save("taskName" * "_triangular_mesh.jld", "mesh", mesh)
+    # mesh = load("taskName" * "_triangular_mesh.jld", "mesh") # načtení chapadla (stl)
 
-    X = [mesh.X[:,i] for i in 1:size(mesh.X,2)]
-    IEN = [mesh.IEN[:,i] for i in 1:size(mesh.IEN,2)]
-    Rho2sdf.exportToVTU("triChapadlo.vtu", X, IEN)
+    # X = [mesh.X[:,i] for i in 1:size(mesh.X,2)]
+    # IEN = [mesh.IEN[:,i] for i in 1:size(mesh.IEN,2)]
+    # Rho2sdf.exportToVTU("triChapadlo.vtu", X, IEN)
 
     ## Grid:
     X_min, X_max = Rho2sdf.getMesh_AABB(mesh.X) # vec, vec
@@ -46,11 +47,11 @@ using JLD
     sdf_grid = Rho2sdf.Grid(X_min, X_max, N) # cartesian grid
    
     ## SFD from triangular mesh:
-    sdf_dists = Rho2sdf.evalSignedDiscancesOnTriangularMesh(mesh, sdf_grid) # Vector{Float64}
+    # sdf_dists = Rho2sdf.evalSignedDiscancesOnTriangularMesh(mesh, sdf_grid) # Vector{Float64}
     
     ## SDF from densities:
-    # ρₜ = 0.5
-    # sdf_dists = Rho2sdf.evalSignedDiscances(mesh, sdf_grid, ρₙ , ρₜ)
+    ρₜ = 0.5
+    sdf_dists = Rho2sdf.evalSignedDiscances(mesh, sdf_grid, ρₙ , ρₜ)
 
     ## Data export to VTK:
     # Rho2sdf.DataProcessing.exportStructuredPointsToVTK(taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
