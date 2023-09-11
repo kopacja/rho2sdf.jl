@@ -11,6 +11,9 @@ using ProgressMeter
 include("ShapeFunctions/ShapeFunctions.jl")
 using .ShapeFunctions
 
+include("GenerateMesh/GenerateMesh.jl")
+using .GenerateMesh
+
 struct Mesh
     X::Matrix{Float64} # vector of nodes positions
     IEN::Matrix{Int64} # ID element -> ID nodes
