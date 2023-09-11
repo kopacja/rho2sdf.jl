@@ -1,3 +1,4 @@
 test/chapadlo_sdf.vtk
 Manifest.toml
 *.toml
+*.jld
