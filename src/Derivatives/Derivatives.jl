@@ -83,9 +83,9 @@ function AnalyticalDerivations(
         -d²x_dΞ²[i, j, k] * n[k] -
         2 * dx_dΞ[i, k] * dn_dΞ[k, j] +
         (x[k] - xₚ[k]) * d²n_dΞ²[k, i, j]
-    # d²L_dΞ² = d²d_dΞ² #+ d²ρ_dΞ² * λ
-    d²L_dΞ² = d²ρ_dΞ² * λ
 
+    # d²L_dΞ² = d²d_dΞ² + d²ρ_dΞ² * λ
+    d²L_dΞ² = d²ρ_dΞ² * λ
     d²L_dΞdλ = dρ_dΞ
     d²L_dλ² = 0.0
 
@@ -100,10 +100,10 @@ end
 
 
 function NumericalDerivations(
-Ξ::Vector{Float64},
-    λ::Float64,
+    Ξ::Vector{Float64},
     Xₑ::Matrix{Float64},# Vector{Float64} ??
     ρₑ::Vector{Float64}, # Float64 ??
+    λ::Float64,
     ρₜ::Float64,
     x::Vector{Float64}, # ?!? co to je?
 )
@@ -138,13 +138,13 @@ function NumericalDerivations(
             n = dρ_dΞ / norm_dρ_dΞ
 
             dn_dΞ = zeros(Float64, 3, 3)
-            @einsum dn_dΞ[i, j] := d²ρ_dΞ²[i, j] / norm_dρ_dΞ - (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) / norm_dρ_dΞ^(3 / 2)
+            @einsum dn_dΞ[i, j] := d²ρ_dΞ²[i, j] / norm_dρ_dΞ - (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) / norm_dρ_dΞ^3
 
             dd_dΞ = zeros(Float64, 3)
             @einsum dd_dΞ[i] := -dx_dΞ[i, k] * n[k] + (x[k] - xₚ[k]) * dn_dΞ[k, i]
 
             dL_dΞ = zeros(Float64, 3)
-            # @einsum dL_dΞ[i] := dd_dΞ[i] #+ (Ξ_tmp[end]+ΔΞ_tmp[end])*dρ_dΞ[i]
+            # @einsum dL_dΞ[i] := dd_dΞ[i] + (Ξ_tmp[end]+ΔΞ_tmp[end])*dρ_dΞ[i]
             @einsum dL_dΞ[i] := (Ξ_tmp[end] + ΔΞ_tmp[end]) * dρ_dΞ[i]
 
             ρ = H ⋅ ρₑ
@@ -158,7 +158,7 @@ function NumericalDerivations(
     end
 
 
-    return K, r
+    return K_diff
 end
 
 
