@@ -115,11 +115,11 @@ function NumericalDerivations(
     sign = [1 -1]
     ϵ = [h -h]
 
-    for kk in 1:4
+    for m in 1:4
         K_diff_col = zeros(Float64, 4)
-        for ll in 1:2
+        for p in 1:2 # = length(ϵ)
             ΔΞ_tmp = zeros(Float64, 4)
-            ΔΞ_tmp[kk] = ϵ[ll]
+            ΔΞ_tmp[m] = ϵ[p]
 
             H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ_tmp + ΔΞ_tmp)
 
@@ -129,8 +129,8 @@ function NumericalDerivations(
             dρ_dΞ = d¹N_dξ¹' * ρₑ
 
             d²ρ_dΞ² = zeros(Float64, 3, 3)
-            for m in 1:length(H)
-                d²ρ_dΞ² += ρₑ[m] * d²N_dξ²[m, :, :]
+            for q in 1:length(H)
+                d²ρ_dΞ² += ρₑ[q] * d²N_dξ²[q, :, :]
             end
 
 
@@ -152,9 +152,9 @@ function NumericalDerivations(
 
             r_tmp = [dL_dΞ; dL_dλ]
 
-            K_diff_col = K_diff_col + sign[ll] .* r_tmp
+            K_diff_col = K_diff_col + sign[p] .* r_tmp
         end
-        K_diff[kk, :] = K_diff_col ./ (2 * h)
+        K_diff[m, :] = K_diff_col ./ (2 * h)
     end
 
 
