@@ -49,7 +49,8 @@ function AnalyticalDerivations(
 
 
     dL_dΞ = zeros(Float64, 3)
-    @einsum dL_dΞ[i] := dd_dΞ[i] + λ * dρ_dΞ[i] # ok
+    @einsum dL_dΞ[i] := dd_dΞ[i] + λ * dρ_dΞ[i] # ok = dd_dΞ + λ * dρ_dΞ (alternativní zápis)
+    # @einsum dL_dΞ[i] := λ * dρ_dΞ[i] # ok
 
     ρ = H ⋅ ρₑ # hustota v bodě
     dL_dλ = ρ - ρₜ # ok
@@ -84,8 +85,8 @@ function AnalyticalDerivations(
         2 * dx_dΞ[i, k] * dn_dΞ[k, j] +
         (x[k] - xₚ[k]) * d²n_dΞ²[k, i, j]
 
-    # d²L_dΞ² = d²d_dΞ² + d²ρ_dΞ² * λ
-    d²L_dΞ² = d²ρ_dΞ² * λ
+    # d²L_dΞ² = d²d_dΞ² + λ .* d²ρ_dΞ²
+    d²L_dΞ² = λ .* d²ρ_dΞ²
     d²L_dΞdλ = dρ_dΞ
     d²L_dλ² = 0.0
 
@@ -149,9 +150,11 @@ function NumericalDerivations(
         ### stejné ###
             
             # dL_dΞ = zeros(Float64, 3)
-            # @einsum dL_dΞ[i] := dd_dΞ[i] + (Ξ_tmp[end]+ΔΞ_tmp[end])*dρ_dΞ[i]
+            ΔΞ_Ξ_tmp = Ξ_tmp[end] + ΔΞ_tmp[end]
+            # @einsum dL_dΞ[i] := dd_dΞ[i] + ΔΞ_Ξ_tmp *dρ_dΞ[i]
+            # dL_dΞ = dd_dΞ + ΔΞ_Ξ_tmp .* dρ_dΞ
             ##### @einsum dL_dΞ[i] := (Ξ_tmp[end] + ΔΞ_tmp[end]) * dρ_dΞ[i] # ZDE JE CHYBA!!
-            dL_dΞ = dρ_dΞ .* (Ξ_tmp[end] + ΔΞ_tmp[end])
+            dL_dΞ = dρ_dΞ .* ΔΞ_Ξ_tmp
 
             ρ = H ⋅ ρₑ
             dL_dλ = ρ - ρₜ
