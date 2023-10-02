@@ -162,8 +162,10 @@ function NumericalDerivations(
             r_tmp = [dL_dΞ; dL_dλ]
 
             K_diff_col = K_diff_col + sign[p] .* r_tmp
+            println("K_diff_col:", sign[p] .* r_tmp)
         end
         K_diff[m, :] = K_diff_col ./ (2 * h)
+        println("K_diff:", K_diff)
     end
 
 
