@@ -71,7 +71,7 @@ ISN[sg][1]
 IEN_new
 X_new
 
-using Einsum
+using Einsum, LinearAlgebra
 
 A = [1 2; 3 4]
 
@@ -95,3 +95,104 @@ C = [1 2; 3 4]
 @einsum E[i,j]:= A[i]*B[j]*C[j,k]
 @einsum E[i,j]:= A[i]*C[j,k]*B[k]
 @einsum E[i,j]:= A[i]*C[j,k]*B[k]
+
+
+K_diff_col = zeros(Float64, 4)
+K_diff_col +1.
+
+sign = [1 -1]
+n = 2
+sign[n]
+
+A = [0.75, 1.0, 0.875, 0.625, 0.5, 1.0, 0.8333333333333334, 0.375]
+B = [0.124999875, 0.124999875, 0.124999875, 0.124999875, 0.125000125, 0.125000125, 0.125000125, 0.125000125]
+using Einsum, LinearAlgebra, Kronecker
+A'*B
+A ⋅ B
+
+
+@einsum E[i,j]:= C[i,j]*A[i] * 0.3
+@einsum E[i,j]:= C[i,j]*A[i]
+
+
+dρ_dΞ = [9, 11]
+norm_dρ_dΞ = norm(dρ_dΞ) # ok
+d²ρ_dΞ² = [17 23; 3 5]
+
+dn_dΞ = zeros(Float64, 2, 2)
+@einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
+        d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
+        (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
+        norm_dρ_dΞ^3
+        
+        @einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
+        (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
+        norm_dρ_dΞ^3
+
+@tensor begin
+    xx[i, j] :=  dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]
+end
+
+xx ./norm_dρ_dΞ^3
+
+@tensor begin
+    dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
+    d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
+    xx[j, i] / norm_dρ_dΞ^3
+end
+
+dn_dΞ = # dve tečky když matice neni alokovaná
+    d²ρ_dΞ² ./ norm_dρ_dΞ -
+    xx ./ norm_dρ_dΞ^3
+
+
+dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
+                d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
+                (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
+                norm_dρ_dΞ^3  # ok
+
+
+
+d³ρ_dΞ³ = Array{Float64}(undef, 2,2,2)
+d³ρ_dΞ³[1, :, :] = [0.1 0.6; 0.4 0.9]
+d³ρ_dΞ³[2, :, :] = [0.3 0.5; 0.7 1.2]
+
+
+
+@einsum d²n_dΞ²[i, j, k] :=
+        d³ρ_dΞ³[i, j, k] / norm_dρ_dΞ -
+        (d²ρ_dΞ²[i, j] * d²ρ_dΞ²[k, m] * dρ_dΞ[m]) /
+        norm_dρ_dΞ^3 -
+        d²ρ_dΞ²[i, j] * d²ρ_dΞ²[k, m] * dρ_dΞ[m] /
+        norm_dρ_dΞ^3 +
+        dρ_dΞ[i] * (
+            d²ρ_dΞ²[j, m] * d²ρ_dΞ²[m, k] +
+            d³ρ_dΞ³[j, k, m] * dρ_dΞ[m]
+        ) / norm_dρ_dΞ^3 +
+        3 * (
+            dρ_dΞ[i] *
+            dρ_dΞ[m] *
+            d²ρ_dΞ²[m, j] *
+            dρ_dΞ[l] *
+            d²ρ_dΞ²[l, k]
+        ) / norm_dρ_dΞ^5 # ok
+
+@tensor begin
+    d²n_dΞ²[i, j, k] :=
+    d³ρ_dΞ³[i, j, k] / norm_dρ_dΞ -
+    (d²ρ_dΞ²[i, j] * d²ρ_dΞ²[k, m] * dρ_dΞ[m]) /
+    norm_dρ_dΞ^3 -
+    d²ρ_dΞ²[i, j] * d²ρ_dΞ²[k, m] * dρ_dΞ[m] /
+    norm_dρ_dΞ^3 +
+    dρ_dΞ[i] * (
+        d²ρ_dΞ²[j, m] * d²ρ_dΞ²[m, k] +
+        d³ρ_dΞ³[j, k, m] * dρ_dΞ[m]
+    ) / norm_dρ_dΞ^3 +
+    3 * (
+        dρ_dΞ[i] *
+        dρ_dΞ[m] *
+        d²ρ_dΞ²[m, j] *
+        dρ_dΞ[l] *
+        d²ρ_dΞ²[l, k]
+    ) / norm_dρ_dΞ^5
+end
