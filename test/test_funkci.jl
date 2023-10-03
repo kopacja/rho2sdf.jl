@@ -71,8 +71,7 @@ ISN[sg][1]
 IEN_new
 X_new
 
-using Einsum, LinearAlgebra
-
+using Einsum, LinearAlgebra, TensorOperations
 A = [1 2; 3 4]
 
 B = [7 8; 9 11]
@@ -106,15 +105,18 @@ sign[n]
 
 A = [0.75, 1.0, 0.875, 0.625, 0.5, 1.0, 0.8333333333333334, 0.375]
 B = [0.124999875, 0.124999875, 0.124999875, 0.124999875, 0.125000125, 0.125000125, 0.125000125, 0.125000125]
-using Einsum, LinearAlgebra, Kronecker
-A'*B
-A ⋅ B
+using Einsum, LinearAlgebra, TensorOperations
+A'*B == A ⋅ B
 
 
 @einsum E[i,j]:= C[i,j]*A[i] * 0.3
 @einsum E[i,j]:= C[i,j]*A[i]
 
 
+
+
+
+using Einsum, LinearAlgebra, TensorOperations
 dρ_dΞ = [9, 11]
 norm_dρ_dΞ = norm(dρ_dΞ) # ok
 d²ρ_dΞ² = [17 23; 3 5]
@@ -124,32 +126,47 @@ dn_dΞ = zeros(Float64, 2, 2)
         d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
         (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
         norm_dρ_dΞ^3
-        
-        @einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
-        (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
-        norm_dρ_dΞ^3
+
+@einsum xx_e[i, j] :=  dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]
 
 @tensor begin
-    xx[i, j] :=  dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]
+    xx_t[i, j] :=  dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]
 end
-
-xx ./norm_dρ_dΞ^3
+xx_e == xx_t
 
 @tensor begin
     dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
     d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
-    xx[j, i] / norm_dρ_dΞ^3
+    xx_t[i, j] / norm_dρ_dΞ^3
 end
+
+@einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
+    d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
+    xx_t[i, j] / norm_dρ_dΞ^3
 
 dn_dΞ = # dve tečky když matice neni alokovaná
     d²ρ_dΞ² ./ norm_dρ_dΞ -
     xx ./ norm_dρ_dΞ^3
 
 
-dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
-                d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
-                (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
-                norm_dρ_dΞ^3  # ok
+
+
+
+    @einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
+    d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
+    (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
+    norm_dρ_dΞ^3
+
+    @einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
+    d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
+    xx_t[i, j] / norm_dρ_dΞ^3
+
+
+
+ 
+
+
+
 
 
 
@@ -196,3 +213,19 @@ d³ρ_dΞ³[2, :, :] = [0.3 0.5; 0.7 1.2]
         d²ρ_dΞ²[l, k]
     ) / norm_dρ_dΞ^5
 end
+
+dx_dΞ = [0.1 0.6; 0.4 0.9]
+n = [0.3, 0.11]
+dn_dΞ = [11 6; 14 91]
+x = [7, 5]
+xₚ = [13, 19]
+
+dd_dΞ = zeros(Float64, 3)
+    @einsum dd_dΞ[i] :=
+        -dx_dΞ[i, k] * n[k] +
+        (x[k] - xₚ[k]) * dn_dΞ[k, i] # ok
+
+        dd_dΞ = zeros(Float64, 3)
+    @tensor dd_dΞ[i] :=
+            -dx_dΞ[i, k] * n[k] +
+            (x[k] - xₚ[k]) * dn_dΞ[k, i] # ok
