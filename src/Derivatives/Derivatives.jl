@@ -6,6 +6,7 @@ using Einsum
 using Statistics
 using LinearAlgebra
 using Rho2sdf.ShapeFunctions
+
 include("Single_derivatives.jl")
 
 
@@ -52,15 +53,17 @@ function AnalyticalDerivations(
     #     (x[k] - xₚ[k]) * dn_dΞ[k, i] # ok pro Tensors a Einsum
 
 
-    dL_dΞ = zeros(Float64, 3)
-    @einsum dL_dΞ[i] := dd_dΞ[i] + λ * dρ_dΞ[i] # ok = dd_dΞ + λ * dρ_dΞ (alternativní zápis)
+    # dL_dΞ = zeros(Float64, 3)
+    # @einsum dL_dΞ[i] := dd_dΞ[i] + λ * dρ_dΞ[i] # ok = dd_dΞ + λ * dρ_dΞ (alternativní zápis)
+    dL_dΞ = dd_dΞ + λ .* dρ_dΞ 
 
     ρ = H ⋅ ρₑ # hustota v bodě
     dL_dλ = ρ - ρₜ # ok
 
-    d²x_dΞ² = zeros(Float64, 3, 3, 3)
-    @einsum d²x_dΞ²[i, j, k] :=
-        Xₑ[i, m] * d²N_dξ²[m, j, k] # ok
+    d²x_dΞ² = d²x_dΞ²_compute(Xₑ, d²N_dξ²)
+    # d²x_dΞ² = zeros(Float64, 3, 3, 3)
+    # @einsum d²x_dΞ²[i, j, k] :=
+    #     Xₑ[i, m] * d²N_dξ²[m, j, k] # ok
 
      d²n_dΞ² = d²n_dΞ²_compute(d³ρ_dΞ³, norm_dρ_dΞ, d²ρ_dΞ², dρ_dΞ)
     # d²n_dΞ² = zeros(Float64, 3, 3, 3)
@@ -80,14 +83,15 @@ function AnalyticalDerivations(
     #         d²ρ_dΞ²[l, k]
     #     ) / norm_dρ_dΞ^5 # ok
 
-    d²d_dΞ² = zeros(Float64, 3, 3)
-    @einsum d²d_dΞ²[i, j] :=
-        -d²x_dΞ²[i, j, k] * n[k] -
-        2 * dx_dΞ[i, k] * dn_dΞ[k, j] +
-        (x[k] - xₚ[k]) * d²n_dΞ²[k, i, j]
+    d²d_dΞ² = d²d_dΞ²_compute(x, xₚ, d²x_dΞ², n, dx_dΞ, dn_dΞ, d²n_dΞ²)
+    # d²d_dΞ² = zeros(Float64, 3, 3)
+    # @einsum d²d_dΞ²[i, j] :=
+    #     -d²x_dΞ²[i, j, k] * n[k] -
+    #     2 * dx_dΞ[i, k] * dn_dΞ[k, j] +
+    #     (x[k] - xₚ[k]) * d²n_dΞ²[k, i, j]
 
-    # d²L_dΞ² = d²d_dΞ² + λ .* d²ρ_dΞ²
-    d²L_dΞ² = λ .* d²ρ_dΞ²
+    d²L_dΞ² = d²d_dΞ² + λ .* d²ρ_dΞ²
+    # d²L_dΞ² = λ .* d²ρ_dΞ²
     d²L_dΞdλ = dρ_dΞ
     d²L_dλ² = 0.0
 
@@ -138,24 +142,26 @@ function NumericalDerivations(
             norm_dρ_dΞ = norm(dρ_dΞ)
             n = dρ_dΞ / norm_dρ_dΞ
 
-            dn_dΞ = zeros(Float64, 3, 3)
-            @einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
-                d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
-                (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
-                norm_dρ_dΞ^3  # ok
-
-            dd_dΞ = zeros(Float64, 3)
-            @einsum dd_dΞ[i] :=
-                -dx_dΞ[i, k] * n[k] +
-                (x[k] - xₚ[k]) * dn_dΞ[k, i] # ok
+            dn_dΞ = dn_dΞ_compute(d²ρ_dΞ², norm_dρ_dΞ, dρ_dΞ)
+            # dn_dΞ = zeros(Float64, 3, 3)
+            # @einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
+            #     d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
+            #     (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
+            #     norm_dρ_dΞ^3  # ok
+            
+            dd_dΞ = dd_dΞ_compute(dx_dΞ, n, x, xₚ, dn_dΞ)
+            # dd_dΞ = zeros(Float64, 3)
+            # @einsum dd_dΞ[i] :=
+            #     -dx_dΞ[i, k] * n[k] +
+            #     (x[k] - xₚ[k]) * dn_dΞ[k, i] # ok
         ### stejné ###
             
             # dL_dΞ = zeros(Float64, 3)
             ΔΞ_Ξ_tmp = Ξ_tmp[end] + ΔΞ_tmp[end]
             # @einsum dL_dΞ[i] := dd_dΞ[i] + ΔΞ_Ξ_tmp *dρ_dΞ[i]
-            # dL_dΞ = dd_dΞ + ΔΞ_Ξ_tmp .* dρ_dΞ
             ##### @einsum dL_dΞ[i] := (Ξ_tmp[end] + ΔΞ_tmp[end]) * dρ_dΞ[i] # ZDE JE CHYBA!!
-            dL_dΞ = dρ_dΞ .* ΔΞ_Ξ_tmp
+            dL_dΞ = dd_dΞ + ΔΞ_Ξ_tmp .* dρ_dΞ
+            # dL_dΞ = dρ_dΞ .* ΔΞ_Ξ_tmp
 
             ρ = H ⋅ ρₑ
             dL_dλ = ρ - ρₜ
