@@ -22,12 +22,13 @@ function AnalyticalDerivations(
     H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ) # tvarové funkce a jejich derivace
     (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
 
-    xₚ = Xₑ * H # Xₑ je souřadnice uzlů, H tvarové funkce -> souřadnice bodu KONTROLA!!
-    dx_dΞ = Xₑ * d¹N_dξ¹
-    
-
     norm_dρ_dΞ = norm(dρ_dΞ) # ok
     n = dρ_dΞ / norm_dρ_dΞ # ok
+
+    xₚ = Xₑ * H # Xₑ je souřadnice uzlů, H tvarové funkce -> souřadnice bodu KONTROLA!!
+
+    ### 1. Derivace ###
+    dx_dΞ = Xₑ * d¹N_dξ¹ # ok
 
     dn_dΞ = dn_dΞ_compute(d²ρ_dΞ², norm_dρ_dΞ, dρ_dΞ) # ok
 
@@ -40,12 +41,14 @@ function AnalyticalDerivations(
     ρ = H ⋅ ρₑ # hustota v bodě
     dL_dλ = ρ - ρₜ # ok
 
+    ### 2. Derivace ###
     d²x_dΞ² = d²x_dΞ²_compute(Xₑ, d²N_dξ²) # ok
 
     d²n_dΞ² = d²n_dΞ²_compute(d³ρ_dΞ³, norm_dρ_dΞ, d²ρ_dΞ², dρ_dΞ) # ok
-    
+
     d²d_dΞ² = d²d_dΞ²_compute(x, xₚ, d²x_dΞ², n, dx_dΞ, dn_dΞ, d²n_dΞ²) # ok 
-   
+
+    ### Lagrange ###
     d²L_dΞ² = d²d_dΞ² + λ .* d²ρ_dΞ²
     # d²L_dΞ² = λ .* d²ρ_dΞ²
     d²L_dΞdλ = dρ_dΞ
@@ -84,26 +87,21 @@ function NumericalDerivations(
             ΔΞ_tmp[m] = ϵ[p]
 
             H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ_tmp + ΔΞ_tmp)
-            # (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
-
-        ### stejné ###
-            xₚ = Xₑ * H
-            dx_dΞ = Xₑ * d¹N_dξ¹
-            dρ_dΞ = d¹N_dξ¹' * ρₑ
-
-            d²ρ_dΞ² = zeros(Float64, 3, 3)
-            for q in 1:length(H)
-                d²ρ_dΞ² += ρₑ[q] * d²N_dξ²[q, :, :]
-            end
+            (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ_tmp + ΔΞ_tmp)
 
             norm_dρ_dΞ = norm(dρ_dΞ)
             n = dρ_dΞ / norm_dρ_dΞ
 
+            xₚ = Xₑ * H
+
+            ### 1. Derivace ###
+            dx_dΞ = Xₑ * d¹N_dξ¹ # ok
+
             dn_dΞ = dn_dΞ_compute(d²ρ_dΞ², norm_dρ_dΞ, dρ_dΞ)
-            
+
             dd_dΞ = dd_dΞ_compute(dx_dΞ, n, x, xₚ, dn_dΞ)
-        ### stejné ###
-            
+
+            ### Lagrange ###
             # dL_dΞ = zeros(Float64, 3)
             ΔΞ_Ξ_tmp = Ξ_tmp[end] + ΔΞ_tmp[end]
             # @einsum dL_dΞ[i] := dd_dΞ[i] + ΔΞ_Ξ_tmp *dρ_dΞ[i]
@@ -122,7 +120,6 @@ function NumericalDerivations(
         K_diff[m, :] = K_diff_col ./ (2 * h)
         println("K_diff:", K_diff)
     end
-
 
     return K_diff
 end
