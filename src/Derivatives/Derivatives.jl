@@ -12,84 +12,40 @@ include("Single_derivatives.jl")
 
 function AnalyticalDerivations(
     Ξ::Vector{Float64},
-    Xₑ::Matrix{Float64},# Vector{Float64} ??
-    ρₑ::Vector{Float64}, # Float64 ??
+    Xₑ::Matrix{Float64}, # Souřadnice uzlů jednoho elementu
+    ρₑ::Vector{Float64}, # Uzlové hustoty
     λ::Float64,
-    ρₜ::Float64,
-    x::Vector{Float64}, # ?!? co to je?
+    ρₜ::Float64, # hraniční hustota
+    x::Vector{Float64}, # uzly pravidelné sítě
 )
 
     H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ) # tvarové funkce a jejich derivace
+    (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
 
     xₚ = Xₑ * H # Xₑ je souřadnice uzlů, H tvarové funkce -> souřadnice bodu KONTROLA!!
     dx_dΞ = Xₑ * d¹N_dξ¹
-    dρ_dΞ = d¹N_dξ¹' * ρₑ
-
-    d²ρ_dΞ² = zeros(Float64, 3, 3)
-    for k = 1:length(H)
-        d²ρ_dΞ² += ρₑ[k] * d²N_dξ²[k, :, :]
-    end
-
-    d³ρ_dΞ³ = zeros(Float64, 3, 3, 3)
-    for k = 1:length(H)
-        d³ρ_dΞ³ += ρₑ[k] * d³N_dξ³[k, :, :, :]
-    end
+    
 
     norm_dρ_dΞ = norm(dρ_dΞ) # ok
     n = dρ_dΞ / norm_dρ_dΞ # ok
 
-    dn_dΞ = dn_dΞ_compute(d²ρ_dΞ², norm_dρ_dΞ, dρ_dΞ)
-    # dn_dΞ = zeros(Float64, 3, 3)
-    # @einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
-    #     d²ρ_dΞ²[i, j] / norm_dρ_dΞ - # ověřena práce se skalárem -> OK
-    #     (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
-    #     norm_dρ_dΞ^3  # ok
+    dn_dΞ = dn_dΞ_compute(d²ρ_dΞ², norm_dρ_dΞ, dρ_dΞ) # ok
 
+    dd_dΞ = dd_dΞ_compute(dx_dΞ, n, x, xₚ, dn_dΞ) # ok
 
-    dd_dΞ = dd_dΞ_compute(dx_dΞ, n, x, xₚ, dn_dΞ)
-    # dd_dΞ = zeros(Float64, 3)
-    # @einsum dd_dΞ[i] :=
-    #     -dx_dΞ[i, k] * n[k] +
-    #     (x[k] - xₚ[k]) * dn_dΞ[k, i] # ok pro Tensors a Einsum
-
-
-    # dL_dΞ = zeros(Float64, 3)
-    # @einsum dL_dΞ[i] := dd_dΞ[i] + λ * dρ_dΞ[i] # ok = dd_dΞ + λ * dρ_dΞ (alternativní zápis)
-    dL_dΞ = dd_dΞ + λ .* dρ_dΞ 
+    dL_dΞ = zeros(Float64, 3)
+    @einsum dL_dΞ[i] = dd_dΞ[i] + λ * dρ_dΞ[i] # ok = dd_dΞ + λ * dρ_dΞ (alternativní zápis)
+    # dL_dΞ = dd_dΞ + λ .* dρ_dΞ 
 
     ρ = H ⋅ ρₑ # hustota v bodě
     dL_dλ = ρ - ρₜ # ok
 
-    d²x_dΞ² = d²x_dΞ²_compute(Xₑ, d²N_dξ²)
-    # d²x_dΞ² = zeros(Float64, 3, 3, 3)
-    # @einsum d²x_dΞ²[i, j, k] :=
-    #     Xₑ[i, m] * d²N_dξ²[m, j, k] # ok
+    d²x_dΞ² = d²x_dΞ²_compute(Xₑ, d²N_dξ²) # ok
 
-     d²n_dΞ² = d²n_dΞ²_compute(d³ρ_dΞ³, norm_dρ_dΞ, d²ρ_dΞ², dρ_dΞ)
-    # d²n_dΞ² = zeros(Float64, 3, 3, 3)
-    # @einsum d²n_dΞ²[i, j, k] :=
-    #     d³ρ_dΞ³[i, j, k] / norm_dρ_dΞ -
-    #     (d²ρ_dΞ²[i, j] * d²ρ_dΞ²[k, m] * dρ_dΞ[m]) /
-    #     norm_dρ_dΞ^3 -
-    #     dρ_dΞ[i] * (
-    #         d²ρ_dΞ²[j, m] * d²ρ_dΞ²[m, k] +
-    #         d³ρ_dΞ³[j, k, m] * dρ_dΞ[m]
-    #     ) / norm_dρ_dΞ^3 +
-    #     3 * (
-    #         dρ_dΞ[i] *
-    #         dρ_dΞ[m] *
-    #         d²ρ_dΞ²[m, j] *
-    #         dρ_dΞ[l] *
-    #         d²ρ_dΞ²[l, k]
-    #     ) / norm_dρ_dΞ^5 # ok
-
-    d²d_dΞ² = d²d_dΞ²_compute(x, xₚ, d²x_dΞ², n, dx_dΞ, dn_dΞ, d²n_dΞ²)
-    # d²d_dΞ² = zeros(Float64, 3, 3)
-    # @einsum d²d_dΞ²[i, j] :=
-    #     -d²x_dΞ²[i, j, k] * n[k] -
-    #     2 * dx_dΞ[i, k] * dn_dΞ[k, j] +
-    #     (x[k] - xₚ[k]) * d²n_dΞ²[k, i, j]
-
+    d²n_dΞ² = d²n_dΞ²_compute(d³ρ_dΞ³, norm_dρ_dΞ, d²ρ_dΞ², dρ_dΞ) # ok
+    
+    d²d_dΞ² = d²d_dΞ²_compute(x, xₚ, d²x_dΞ², n, dx_dΞ, dn_dΞ, d²n_dΞ²) # ok 
+   
     d²L_dΞ² = d²d_dΞ² + λ .* d²ρ_dΞ²
     # d²L_dΞ² = λ .* d²ρ_dΞ²
     d²L_dΞdλ = dρ_dΞ
@@ -128,6 +84,7 @@ function NumericalDerivations(
             ΔΞ_tmp[m] = ϵ[p]
 
             H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ_tmp + ΔΞ_tmp)
+            # (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
 
         ### stejné ###
             xₚ = Xₑ * H
@@ -143,17 +100,8 @@ function NumericalDerivations(
             n = dρ_dΞ / norm_dρ_dΞ
 
             dn_dΞ = dn_dΞ_compute(d²ρ_dΞ², norm_dρ_dΞ, dρ_dΞ)
-            # dn_dΞ = zeros(Float64, 3, 3)
-            # @einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
-            #     d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
-            #     (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
-            #     norm_dρ_dΞ^3  # ok
             
             dd_dΞ = dd_dΞ_compute(dx_dΞ, n, x, xₚ, dn_dΞ)
-            # dd_dΞ = zeros(Float64, 3)
-            # @einsum dd_dΞ[i] :=
-            #     -dx_dΞ[i, k] * n[k] +
-            #     (x[k] - xₚ[k]) * dn_dΞ[k, i] # ok
         ### stejné ###
             
             # dL_dΞ = zeros(Float64, 3)
