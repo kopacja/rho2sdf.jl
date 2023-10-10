@@ -28,7 +28,6 @@ using JLD
     mesh = Rho2sdf.Mesh(X, IEN)
     # (mesh, rho) = GenerateMesh.MeshInformations(data)
     ρₙ = Rho2sdf.elementToNodalValues(mesh, rho) # nodal values calculation (AVERAGE!! -> least squares)
-    ρₙ = GenerateMesh.DenseInNodes(mesh, rho)
     # ρₙ = GenerateMesh.elementToNodalValues(mesh, rho) # nodal values calculation (AVERAGE!! -> least squares)
 
 
