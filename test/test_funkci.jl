@@ -13,219 +13,236 @@ nel = mesh.nel # number of elements
 nes = mesh.nes # number of element segments (faces) 6
 nsn = mesh.nsn # number of segment nodes (kolik má stěna uzlů) 4
 
-X_new = Vector{Vector{Float64}}()
-push!(X_new, vec(X[:, 1]))
 
-IEN_new = Vector{Vector{Int64}}()
+            
+using Statistics
+            mesh.INE
+            mesh.IEN
+            mesh.nnp
+            mesh.nel
 
-# for el = 1:nel
-    el = 1
-    # ρₑ = ρₙ[IEN[:, el]]
-    commonEls = []
-    # for sg = 1:nes # 1:6 je face součástí pouze jednoho elementu?
-    sg = 1
-        commonEls = INE[IEN[ISN[sg][1], el]] # ID elementu
-        IEN[mesh.ISN[sg][1], el] # ID uzlu
-mesh.ISN[sg][1]
-ISN[sg][1]
-        # for a = 2:nsn # 2:4
-        a = 4
-            idx = findall(in(INE[IEN[ISN[sg][a], el]]), commonEls)
-            INE[IEN[ISN[sg][a], el]]
+            EN_x = zeros(Float64, size(mesh.IEN))
 
-            commonEls = commonEls[idx]
-        # end
-
-        if (length(commonEls) == 1) # is a part of the outer boundary of the body
-
-            Xs = X[:, IEN[ISN[sg], el]]
-            Xc = mean(Xs, dims=2) # center of the outside face
-
-            for a = 1:nsn
-
-                IEN_el = zeros(Int64, 3)
-
-                x₁ = vec(Xs[:, a])
-                x₂ = vec(Xs[:, (a%nsn)+1])
-                x₃ = vec(Xc)
-
-                Xt = [x₁, x₂, x₃]
-                # Xt = reduce(hcat, Xt)
-
-                for i = 1:3
-                    a = findfirst(x -> norm(x - Xt[i]) < 1.0e-5, X_new)
-                    if (a === nothing)
-                        push!(X_new, Xt[i])
-                        IEN_el[i] = length(X_new)
-                    else
-                        IEN_el[i] = a[1]
-                    end
-                end
-                push!(IEN_new, IEN_el)
-            end # a = 1:nsn
-        end # if (length(commonEls) == 1)
-    # end # sg
-
-# end # el
-
-IEN_new
-X_new
-
-using Einsum, LinearAlgebra, TensorOperations
-A = [1 2; 3 4]
-
-B = [7 8; 9 11]
-
-C = [2 31; 50 5]
-
-A = [50 5]'
-B = [9 11]'
-C = [1 2; 3 4]
-@einsum D[i,j]:= A[i,k]*B[k,j]
-@einsum D[i,j]:= B[i,k]*A[k,j]
-
-@einsum E[i,j]:= A[i,k]*B[k,j]
-
-51^(-3)
-1/(51^3)
-
-@einsum E[i,j]:= A[i]*B[k]*C[k,j]
-@einsum E[i,j]:= A[i]*B[k]*C[j,k]
-@einsum E[i,j]:= A[i]*B[j]*C[j,k]
-@einsum E[i,j]:= A[i]*C[j,k]*B[k]
-@einsum E[i,j]:= A[i]*C[j,k]*B[k]
-
-
-K_diff_col = zeros(Float64, 4)
-K_diff_col +1.
-
-sign = [1 -1]
-n = 2
-sign[n]
-
-A = [0.75, 1.0, 0.875, 0.625, 0.5, 1.0, 0.8333333333333334, 0.375]
-B = [0.124999875, 0.124999875, 0.124999875, 0.124999875, 0.125000125, 0.125000125, 0.125000125, 0.125000125]
-using Einsum, LinearAlgebra, TensorOperations
-A'*B == A ⋅ B
-
-
-@einsum E[i,j]:= C[i,j]*A[i] * 0.3
-@einsum E[i,j]:= C[i,j]*A[i]
-
-
-
-
-
-using Einsum, LinearAlgebra, TensorOperations
-dρ_dΞ = [9, 11]
-norm_dρ_dΞ = norm(dρ_dΞ) # ok
-d²ρ_dΞ² = [17 23; 3 5]
-
-dn_dΞ = zeros(Float64, 2, 2)
-@einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
-        d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
-        (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
-        norm_dρ_dΞ^3
-
-@einsum xx_e[i, j] :=  dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]
-
-@tensor begin
-    xx_t[i, j] :=  dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]
+            # Geometric centres of elements (GPs for first order elements)
+mutable struct NodalCoordinatesInElement{T<:Array}
+    x::T
+    y::T
+    z::T
 end
-xx_e == xx_t
-
-@tensor begin
-    dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
-    d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
-    xx_t[i, j] / norm_dρ_dΞ^3
+function nodeToElementConnectivity(
+    X::Vector{Vector{Float64}},
+    IEN::Matrix{Int64},
+)::Vector{Vector{Int64}}
+    INE = [Vector{Int64}() for _ = 1:length(X)]
+    for el = 1:size(IEN, 2)
+        for i = 1:size(IEN, 1)
+            push!(INE[IEN[i, el]], el)
+        end
+    end
+    return INE
 end
 
-@einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
-    d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
-    xx_t[i, j] / norm_dρ_dΞ^3
+function NodePosition3D(mesh::Mesh)
+    table = size(mesh.IEN)
+    EN_x = zeros(Float64, table) #počet ele = počet Gausspointů
+    EN_y = zeros(Float64, table)
+    EN_z = zeros(Float64, table)
 
-dn_dΞ = # dve tečky když matice neni alokovaná
-    d²ρ_dΞ² ./ norm_dρ_dΞ -
-    xx ./ norm_dρ_dΞ^3
+    for i = 1:(length(mesh.IEN[:, 1]))
+        for j = 1:(length(mesh.IEN[1, :]))
+            ID_n = Int(mesh.IEN[i, j])
+            x = mesh.X[1, ID_n]
+            y = mesh.X[2, ID_n]
+            z = mesh.X[3, ID_n]
+            EN_x[i, j] = x
+            EN_y[i, j] = y
+            EN_z[i, j] = z
+        end
+    end
+    EN = NodalCoordinatesInElement(EN_x, EN_y, EN_z)
 
-
-
-
-
-    @einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
-    d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
-    (dρ_dΞ[i] * d²ρ_dΞ²[j, k] * dρ_dΞ[k]) /
-    norm_dρ_dΞ^3
-
-    @einsum dn_dΞ[i, j] := # dve tečky když matice neni alokovaná
-    d²ρ_dΞ²[i, j] / norm_dρ_dΞ -
-    xx_t[i, j] / norm_dρ_dΞ^3
-
-
-
- 
-
-
-
-
-
-
-d³ρ_dΞ³ = Array{Float64}(undef, 2,2,2)
-d³ρ_dΞ³[1, :, :] = [0.1 0.6; 0.4 0.9]
-d³ρ_dΞ³[2, :, :] = [0.3 0.5; 0.7 1.2]
-
-
-
-@einsum d²n_dΞ²[i, j, k] :=
-        d³ρ_dΞ³[i, j, k] / norm_dρ_dΞ -
-        (d²ρ_dΞ²[i, j] * d²ρ_dΞ²[k, m] * dρ_dΞ[m]) /
-        norm_dρ_dΞ^3 -
-        d²ρ_dΞ²[i, j] * d²ρ_dΞ²[k, m] * dρ_dΞ[m] /
-        norm_dρ_dΞ^3 +
-        dρ_dΞ[i] * (
-            d²ρ_dΞ²[j, m] * d²ρ_dΞ²[m, k] +
-            d³ρ_dΞ³[j, k, m] * dρ_dΞ[m]
-        ) / norm_dρ_dΞ^3 +
-        3 * (
-            dρ_dΞ[i] *
-            dρ_dΞ[m] *
-            d²ρ_dΞ²[m, j] *
-            dρ_dΞ[l] *
-            d²ρ_dΞ²[l, k]
-        ) / norm_dρ_dΞ^5 # ok
-
-@tensor begin
-    d²n_dΞ²[i, j, k] :=
-    d³ρ_dΞ³[i, j, k] / norm_dρ_dΞ -
-    (d²ρ_dΞ²[i, j] * d²ρ_dΞ²[k, m] * dρ_dΞ[m]) /
-    norm_dρ_dΞ^3 -
-    d²ρ_dΞ²[i, j] * d²ρ_dΞ²[k, m] * dρ_dΞ[m] /
-    norm_dρ_dΞ^3 +
-    dρ_dΞ[i] * (
-        d²ρ_dΞ²[j, m] * d²ρ_dΞ²[m, k] +
-        d³ρ_dΞ³[j, k, m] * dρ_dΞ[m]
-    ) / norm_dρ_dΞ^3 +
-    3 * (
-        dρ_dΞ[i] *
-        dρ_dΞ[m] *
-        d²ρ_dΞ²[m, j] *
-        dρ_dΞ[l] *
-        d²ρ_dΞ²[l, k]
-    ) / norm_dρ_dΞ^5
+    return EN #Výstupem jsou tři pole - souřadnice uzlů daného elementu (pozice řádku = ID elemetu)
 end
 
-dx_dΞ = [0.1 0.6; 0.4 0.9]
-n = [0.3, 0.11]
-dn_dΞ = [11 6; 14 91]
-x = [7, 5]
-xₚ = [13, 19]
+EN = NodePosition3D(mesh)
+Centre = GeometricCentre(mesh, EN)
 
-dd_dΞ = zeros(Float64, 3)
-    @einsum dd_dΞ[i] :=
-        -dx_dΞ[i, k] * n[k] +
-        (x[k] - xₚ[k]) * dn_dΞ[k, i] # ok
+function GeometricCentre(mesh::Mesh, EN::NodalCoordinatesInElement)
+    Centre = zeros(mesh.nel, length(mesh.X[:, 1]))
+    for i = 1:mesh.nel
+        G_x = mean(EN.x[:, i]) # G_x = dot(EN_x[:, i], N)
+        G_y = mean(EN.y[:, i]) # G_y = dot(EN_y[:, i], N)
+        G_z = mean(EN.z[:, i]) # G_z = dot(EN_z[:, i], N)
+        Centre[i, :] = [G_x, G_y, G_z]
+    end
+    return Centre
+end
 
-        dd_dΞ = zeros(Float64, 3)
-    @tensor dd_dΞ[i] :=
-            -dx_dΞ[i, k] * n[k] +
-            (x[k] - xₚ[k]) * dn_dΞ[k, i] # ok
+#######################################################xx
+# Filter for 2 a 3 nodes
+function FilterForNodalDensity(
+    i::Int,
+    Centre::Matrix,
+    mesh::Mesh,
+    ρ::Vector,
+)
+    L = zeros(length(mesh.INE[i]))
+
+    for j = 1:length(mesh.INE[i])
+        L[j] = norm(mesh.X[:, i] - Centre[mesh.INE[i][j], :])
+    end
+    Lmax = maximum(L) * 1.2
+    dm = 0.0
+    deleni = 0.0
+    for j = 1:length(mesh.INE[i])
+        dm += ρ[Int((mesh.INE[i])[j])] * (1 - L[j] / Lmax)
+        deleni += (1 - L[j] / Lmax)
+    end
+    return DN = dm / deleni
+end
+
+function NodalDensityLeastSquares(
+    i::Int,
+    Centre::Matrix,
+    mesh::Mesh,
+    ρ::Vector,
+)
+    A = zeros(length(mesh.INE[i]), length(Centre[1, :]) + 1)
+    b = zeros(length(mesh.INE[i]))
+    for j = 1:length(mesh.INE[i])
+        A[j, :] = [1; Centre[Int((mesh.INE[i])[j]), :]]
+        b[j] = ρ[Int((mesh.INE[i])[j])]
+    end
+    λ, ϕ = eigen(A'A)
+    lam = LamReduction(λ)
+    if length(lam) > 1
+        Λ = Diagonal(lam)
+    else
+        Λ = lam
+    end
+
+    if Λ == []
+        DN = 0.
+        if mean(abs.(b)) != 0.0
+            println("nenulový vektor b", b)
+        end
+    else
+        poz = length(λ) - length(lam) + 1
+        b1 = ϕ' * (A' * b)
+        x1 = Λ \ b1[poz:length(b1)]
+        if poz > 1
+            zero = zeros(poz - 1)
+            x2 = vcat(zero, x1)
+        else
+            x2 = x1
+        end
+        x = ϕ * x2
+        DN = dot(vcat(1, mesh.X[:, i]), x)
+        # DN = KeepRange(DN)
+    end
+    # DN = KeepRange(DN)
+    return DN
+end
+
+function LamReduction(λ::Vector)
+    lam = []
+    εₘ₁ = 1.e7
+    εₘ₂ = 3.e3
+    ε₁ = abs(maximum(λ) / minimum(λ))
+    ε₂ = abs(maximum(λ) / λ[2])
+    ε₃ = abs(maximum(λ) / λ[3])
+    if εₘ₁ > ε₁ && εₘ₂ > ε₂
+        lam = λ
+    elseif εₘ₁ < ε₁ && εₘ₂ > ε₂
+        lam = λ[2:length(λ)]
+    elseif εₘ₁ < ε₁ && εₘ₂ < ε₂
+        if εₘ₂ > ε₃
+            lam = λ[3:length(λ)]
+        else
+            lam = λ[4:length(λ)]
+        end
+    else
+        print("problem")
+    end
+    return lam
+end
+
+function DenseInNodes(
+    mesh::Mesh, 
+    ρ::Vector,
+)
+    EN = NodePosition3D(mesh)
+    Centre = GeometricCentre(mesh, EN)
+
+    dense_nodes = zeros(Float64, mesh.nnp) # počet uzlů
+    for i = 1:mesh.nnp #cyklus přes uzly (od ID_1)
+        No1E = length(mesh.INE[i])
+        if No1E == 1 # Uzel patří k jednomu elementu (rohy)
+            dense_nodes[i] = ρ[Int((mesh.INE[i])[1])]
+        elseif No1E > 1 && No1E < 4
+            dense_nodes[i] = FilterForNodalDensity(i, Centre, mesh, ρ)
+        elseif No1E > 3 # Více elementů (4) -> lze fitovat
+            # println("iter:", i)
+            dense_nodes[i] = NodalDensityLeastSquares(i, Centre, mesh, ρ)
+            # println("dense:", dense_nodes[i])
+        end
+    end
+    return dense_nodes
+end
+ρₙ = DenseInNodes(mesh, rho)
+
+i = 103
+
+No1E = length(mesh.INE[i])
+# function NodalDensityLeastSquares(
+#     i::Int,
+#     Centre::Matrix,
+#     mesh::Mesh,
+#     ρ::Vector,
+# )
+ρ = rho
+    A = zeros(length(mesh.INE[i]), length(Centre[1, :]) + 1)
+    b = zeros(length(mesh.INE[i]))
+    for j = 1:length(mesh.INE[i])
+        A[j, :] = [1; Centre[Int((mesh.INE[i])[j]), :]]
+        b[j] = ρ[Int((mesh.INE[i])[j])]
+    end
+    A
+    b
+    λ, ϕ = eigen(A'A)
+    lam = LamReduction(λ)
+    if length(lam) > 1
+        Λ = Diagonal(lam)
+    else
+        Λ = lam
+    end
+
+    if Λ == []
+        DN = 0.
+    else
+        poz = length(λ) - length(lam) + 1
+        b1 = ϕ' * (A' * b)
+        x1 = Λ \ b1[poz:length(b1)]
+        if poz > 1
+            zero = zeros(poz - 1)
+            x2 = vcat(zero, x1)
+        else
+            x2 = x1
+        end
+        x = ϕ * x2
+        DN = dot(vcat(1, mesh.X[:, i]), x)
+        # DN = KeepRange(DN)
+    end
+    return DN
+# end
+length(Centre[1, :])
+x1 = Λ \ b1[poz:length(b1)]
+Λ
+b1
+
+mesh.nsd
+using Statistics
+mean( ρₙ1) # 0.33419822802064064
+mean( ρₙ)   # 0.3346920885971201 rozšířen 
+            # 0.3343107382914267 víc mean
+
