@@ -15,22 +15,16 @@ using JLD
 
     # # Data from Matlab:
     data = matread(taskName * ".mat")
-    # # data = matread("test/" * taskName * ".mat")
-    # rho = vec(data["rho"])
-    # mesh = data["msh"]
-    # X = mesh["X"] # Matrix
-    # X = [X[:, i] for i in axes(X,2)]
-    # IEN = convert(Array{Int64}, mesh["IEN"] .+ 1) # Matrix
-    # IEN = [IEN[:, i] for i in axes(IEN, 2)] # Vector{Vector{Int64}}
+    # data = matread("test/" * taskName * ".mat")
+    
     (X, IEN, rho) = GenerateMesh.MeshInformations(data)
 
     # # input data propertis (mesh, density)
     mesh = Rho2sdf.Mesh(X, IEN)
-    # (mesh, rho) = GenerateMesh.MeshInformations(data)
-    ρₙ = Rho2sdf.elementToNodalValues(mesh, rho) # nodal values calculation (AVERAGE!! -> least squares)
+    
+    # ρₙₒ = Rho2sdf.elementToNodalValues(mesh, rho) # nodal values calculation (AVERAGE!! -> least squares)
     ρₙ = GenerateMesh.DenseInNodes(mesh, rho)
-    # ρₙ = GenerateMesh.elementToNodalValues(mesh, rho) # nodal values calculation (AVERAGE!! -> least squares)
-
+    # exit()
 
     ## Face triangular mesh:
     # mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh, ρₙ) # přepsání X a IEN (pro trojúhelníky) smazat rho
