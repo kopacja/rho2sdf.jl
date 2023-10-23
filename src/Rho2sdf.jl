@@ -17,40 +17,6 @@ using .GenerateMesh
 include("Derivatives/Derivatives.jl")
 using .Derivatives
 
-struct Mesh
-    X::Matrix{Float64} # vector of nodes positions
-    IEN::Matrix{Int64} # ID element -> ID nodes
-    INE::Vector{Vector{Int64}} # ID node -> ID elements
-    ISN::Vector{Vector{Int64}} # connectivity face - edges
-    nsd::Int64 # number of spacial dimensions
-    nnp::Int64 # number of all points
-    nen::Int64 # number of element nodes
-    nel::Int64 # number of all elements
-    nes::Int64 # number of element segments (faces)
-    nsn::Int64 # number of face nodes
-
-    function Mesh(X::Vector{Vector{Float64}}, IEN::Vector{Vector{Int64}})
-        IEN = reduce(hcat, IEN)
-        INE = nodeToElementConnectivity(X, IEN)
-        ISN = [
-            [1, 4, 3, 2], # nodes define face 1
-            [1, 2, 6, 5],
-            [2, 3, 7, 6],
-            [3, 4, 8, 7],
-            [4, 1, 5, 8],
-            [5, 6, 7, 8],
-        ]
-        X = reduce(hcat, X)
-        nsd = size(X, 1)
-        nnp = size(X, 2)
-        nen = size(IEN, 1)
-        nel = size(IEN, 2)
-        nes = length(ISN)
-        nsn = length(ISN[1])
-        return new(X, IEN, INE, ISN, nsd, nnp, nen, nel, nes, nsn)
-    end
-end
-
 
 struct Grid
     AABB_min::Vector{Float64}
@@ -114,36 +80,6 @@ mutable struct LinkedList # rozdělení pravidelné sítě na regiony
     end
 end
 
-function nodeToElementConnectivity(
-    X::Vector{Vector{Float64}},
-    IEN::Matrix{Int64},
-)::Vector{Vector{Int64}}
-    INE = [Vector{Int64}() for _ = 1:length(X)]
-    for el = 1:size(IEN, 2)
-        for i = 1:size(IEN, 1)
-            push!(INE[IEN[i, el]], el)
-        end
-    end
-    return INE
-end
-
-function elementToNodalValues(
-    mesh::Mesh,
-    elVals::Vector{Float64},
-)::Vector{Float64}
-    nodalVals = zeros(Float64, mesh.nnp)
-
-    for A = 1:mesh.nnp
-        count = 0
-        for el in mesh.INE[A]
-            nodalVals[A] += elVals[el]
-            count += 1
-        end
-        nodalVals[A] /= count
-    end
-
-    return nodalVals
-end
 
 function getMesh_AABB(X::Matrix{Float64})
     X_min = vec(minimum(X, dims = 2))
