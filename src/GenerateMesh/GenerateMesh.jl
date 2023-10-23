@@ -182,9 +182,11 @@ function NodalDensityLeastSquares(
     mesh::Mesh,
     ρ::Vector,
 )
-    A = zeros(length(mesh.INE[i]), length(Centre[1, :]) + 1)
-    b = zeros(length(mesh.INE[i]))
-    for j = 1:length(mesh.INE[i])
+    nnp_i = length(mesh.INE[i])
+
+    A = zeros(nnp_i, mesh.nsd + 1)
+    b = zeros(nnp_i)
+    for j = 1:nnp_i
         A[j, :] = [1; Centre[Int((mesh.INE[i])[j]), :]]
         b[j] = ρ[Int((mesh.INE[i])[j])]
     end
@@ -195,18 +197,22 @@ function NodalDensityLeastSquares(
     else
         Λ = lam
     end
-    poz = length(λ) - length(lam) + 1
-    b1 = ϕ' * (A' * b)
-    x1 = Λ \ b1[poz:length(b1)]
-    if poz > 1
-        zero = zeros(poz - 1)
-        x2 = vcat(zero, x1)
+    if Λ == []
+        DN = mean(b)
     else
-        x2 = x1
+        poz = length(λ) - length(lam) + 1
+        b1 = ϕ' * (A' * b)
+        x1 = Λ \ b1[poz:length(b1)]
+        if poz > 1
+            zero = zeros(poz - 1)
+            x2 = vcat(zero, x1)
+        else
+            x2 = x1
+        end
+        x = ϕ * x2
+        DN = dot([1; mesh.X[:, i]], x)
+        # DN = KeepRange(dot([1; mesh.X[:, i]], x))
     end
-    x = ϕ * x2
-    DN = dot(vcat(1, mesh.X[:, i]), x)
-    # DN = KeepRange(DN)
     return DN
 end
 
@@ -214,7 +220,7 @@ end
 function LamReduction(λ::Vector)
     lam = []
     εₘ₁ = 1.e7
-    εₘ₂ = 3.e3
+    εₘ₂ = 3.e4
     ε₁ = abs(maximum(λ) / minimum(λ))
     ε₂ = abs(maximum(λ) / λ[2])
     ε₃ = abs(maximum(λ) / λ[3])
@@ -229,9 +235,21 @@ function LamReduction(λ::Vector)
             lam = λ[4:length(λ)]
         end
     else
-        print("problem")
+        println("poblem with eigenvalues")
+        println("The ratio between the first and last eigenvalue: ", ε₁, "  allowed ratio: ", εₘ₁)
+        println("The ratio between the second and last eigenvalue: ", ε₂, "  allowed ratio: ", εₘ₂)
+        println("-> compute mean instead :(")
     end
     return lam
+end
+
+function KeepRange(DN::Float64)
+    if DN < 0
+        DN = 0.0
+    elseif DN > 1
+        DN = 1
+    end
+    return DN
 end
 
 end
