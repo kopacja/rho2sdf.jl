@@ -26,6 +26,7 @@ using JLD
     ρₙ = GenerateMesh.DenseInNodes(mesh, rho)
     # exit()
 
+
     ## Face triangular mesh:
     # mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh, ρₙ) # přepsání X a IEN (pro trojúhelníky) smazat rho
 

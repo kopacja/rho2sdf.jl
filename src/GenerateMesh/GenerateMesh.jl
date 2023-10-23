@@ -1,11 +1,13 @@
 module GenerateMesh
 
+
 export MeshInformations, elementToNodalValues, Mesh
 
 using Statistics
 using LinearAlgebra
 
 # include("NodalDensities.jl")
+
 
 
 function MeshInformations(data::Any)
@@ -19,6 +21,7 @@ function MeshInformations(data::Any)
 
     return (X, IEN, rho)
 end
+
 
 struct Mesh
     X::Matrix{Float64} # vector of nodes positions
@@ -68,5 +71,6 @@ function nodeToElementConnectivity(
 end
 
 include("NodalDensities.jl")
+
 end
 
