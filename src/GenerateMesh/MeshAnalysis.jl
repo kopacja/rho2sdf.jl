@@ -11,7 +11,7 @@ function MeshInformations(data::Any)
 end
 
 
-struct Mesh
+mutable struct Mesh
     X::Matrix{Float64} # vector of nodes positions
     IEN::Matrix{Int64} # ID element -> ID nodes
     INE::Vector{Vector{Int64}} # ID node -> ID elements

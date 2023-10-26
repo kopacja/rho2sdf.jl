@@ -1,3 +1,7 @@
+# function PartOfModel()
+#     return println(pwd())
+# end
+
 function LoadTxt(cesta::String)
     file = open("$cesta", "r")
     array = []
@@ -12,31 +16,45 @@ function LoadTxt(cesta::String)
     return array
 end
 
-IDes = LoadTxt("data/Vtupni_data/elementy_trubky.txt")
-posun = mod(length(IDes),15) + 3
-IDes = IDes[(151+posun):length(IDes)]
 
-function PartOfModel(IDes::Vector, X::Matrix, IEN::Matrix, ρ::Matrix)
-    IENᵣ = zeros(length(IEN[:, 1]), length(IDes))
-    ρₙ = zeros(length(IDes), 1)
+function PartOfModel(
+    mesh::Mesh,
+    ρ::Vector,
+    name::String)
+    println(pwd())
+    IDes = LoadTxt(name)
 
-    for i = 1:length(IDes)
-        IENᵣ[:, i] = IEN[:, IDes[i]]
-        ρₙ[i,1] = ρ[IDes[i]]
+    posun = mod(length(IDes),15) + 3
+    IDes = IDes[(151+posun):length(IDes)]
+    nelr = length(IDes)
+
+    IENᵣ = zeros(length(mesh.IEN[:, 1]), nelr)
+    ρₙ = zeros(nelr)
+
+    for i = 1:nelr
+        IENᵣ[:, i] = mesh.IEN[:, IDes[i]]
+        ρₙ[i] = ρ[IDes[i]]
     end # kontrolováno
     uIENₙ = unique(vec(IENᵣ))
-    Xₙ = zeros(length(X[:, 1]) + 1, length(uIENₙ))
+    Xₙ = zeros(length(mesh.X[:, 1]) + 1, length(uIENₙ))
 
     IENₙ = zeros(size(IENᵣ))
     for i = 1:length(uIENₙ)
-        Xₙ[:, i] = vcat(uIENₙ[i], X[:, Int(uIENₙ[i])]) # ok
+        Xₙ[:, i] = vcat(uIENₙ[i], mesh.X[:, Int(uIENₙ[i])]) # ok
 
         RidN = findall(isequal(uIENₙ[i]), IENᵣ)
         IENₙ[RidN] .= i
     end
-    # return [Xₙ[2:4,:], IENₙ, ρₙ]
-    return [Xₙ[2:4,:], IENₙ, ρₙ]
+    Xᵣ = Xₙ[2:4,:]
+    mesh.X = Xᵣ
+    mesh.IEN = IENₙ
+    # mesh.INE = nodeToElementConnectivity(Xₙ[2:4,:], IENₙ)
+    # mesh.nsd = size(Xᵣ, 1)
+    # mesh.nnp = size(Xᵣ, 2)
+    # mesh.nen = size(IENₙ, 1)
+    # mesh.nel = size(IENₙ, 2)
+    return [mesh, ρₙ]
 end
 
 # (Xₙ, IENₙ, ρₙ) = PartOfModel(IDes, X, IEN, ρ)
-(X, IEN, ρ) = PartOfModel(IDes, X, IEN, ρ)
+# (mesh, ρ) = PartOfModel(mesh, IDes, ρ)
