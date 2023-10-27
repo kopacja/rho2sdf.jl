@@ -48,11 +48,11 @@ function PartOfModel(
     Xᵣ = Xₙ[2:4,:]
     mesh.X = Xᵣ
     mesh.IEN = IENₙ
-    # mesh.INE = nodeToElementConnectivity(Xₙ[2:4,:], IENₙ)
-    # mesh.nsd = size(Xᵣ, 1)
-    # mesh.nnp = size(Xᵣ, 2)
-    # mesh.nen = size(IENₙ, 1)
-    # mesh.nel = size(IENₙ, 2)
+    mesh.INE = nodeToElementConnectivity(Xₙ[2:4,:], IENₙ)
+    mesh.nsd = size(Xᵣ, 1)
+    mesh.nnp = size(Xᵣ, 2)
+    mesh.nen = size(IENₙ, 1)
+    mesh.nel = size(IENₙ, 2)
     return [mesh, ρₙ]
 end
 

@@ -24,6 +24,7 @@ mutable struct Mesh
     nsn::Int64 # number of face nodes
 
     function Mesh(X::Vector{Vector{Float64}}, IEN::Vector{Vector{Int64}})
+        X = reduce(hcat, X)
         IEN = reduce(hcat, IEN)
         INE = nodeToElementConnectivity(X, IEN)
         ISN = [
@@ -34,7 +35,6 @@ mutable struct Mesh
             [4, 1, 5, 8],
             [5, 6, 7, 8],
         ]
-        X = reduce(hcat, X)
         nsd = size(X, 1)
         nnp = size(X, 2)
         nen = size(IEN, 1)
@@ -46,10 +46,10 @@ mutable struct Mesh
 end
 
 function nodeToElementConnectivity(
-    X::Vector{Vector{Float64}},
-    IEN::Matrix{Int64},
-)::Vector{Vector{Int64}}
-    INE = [Vector{Int64}() for _ = 1:length(X)]
+    X::Matrix,
+    IEN::Matrix,
+)
+    INE = [Vector{Int64}() for _ = 1:size(X, 2)]
     for el = 1:size(IEN, 2)
         for i = 1:size(IEN, 1)
             push!(INE[IEN[i, el]], el)

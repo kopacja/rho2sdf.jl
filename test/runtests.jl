@@ -16,11 +16,14 @@ using JLD
     # # Data from Matlab:
     data = matread(taskName * ".mat")
     # data = matread("test/" * taskName * ".mat")
+    part_name = "elementy_trubky.txt"
+    # part_name = "test/elementy_trubky.txt"
     
     (X, IEN, rho) = GenerateMesh.MeshInformations(data)
 
     # # input data propertis (mesh, density)
     mesh = GenerateMesh.Mesh(X, IEN)
+    (mesh, rho) = GenerateMesh.PartOfModel(mesh, rho, part_name)
     
     # ρₙₒ = Rho2sdf.elementToNodalValues(mesh, rho) # nodal values calculation (AVERAGE!! -> least squares)
     ρₙ = GenerateMesh.DenseInNodes(mesh, rho)
