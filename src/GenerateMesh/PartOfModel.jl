@@ -21,14 +21,14 @@ function PartOfModel(
     mesh::Mesh,
     ρ::Vector,
     name::String)
-    println(pwd())
+    
     IDes = LoadTxt(name)
 
     posun = mod(length(IDes),15) + 3
     IDes = IDes[(151+posun):length(IDes)]
     nelr = length(IDes)
 
-    IENᵣ = zeros(length(mesh.IEN[:, 1]), nelr)
+    IENᵣ = zeros(mesh.nen, nelr)
     ρₙ = zeros(nelr)
 
     for i = 1:nelr
@@ -38,7 +38,7 @@ function PartOfModel(
     uIENₙ = unique(vec(IENᵣ))
     Xₙ = zeros(length(mesh.X[:, 1]) + 1, length(uIENₙ))
 
-    IENₙ = zeros(size(IENᵣ))
+    IENₙ = zeros(Int, size(IENᵣ))
     for i = 1:length(uIENₙ)
         Xₙ[:, i] = vcat(uIENₙ[i], mesh.X[:, Int(uIENₙ[i])]) # ok
 
