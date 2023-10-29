@@ -2,7 +2,7 @@
 using Test
 using Rho2sdf
 using Rho2sdf.ShapeFunctions
-using Rho2sdf.GenerateMesh
+using Rho2sdf.MeshGrid
 using Rho2sdf.Derivatives
 using MAT
 using SymPy
@@ -19,14 +19,14 @@ using JLD
     part_name = "elementy_trubky.txt"
     # part_name = "test/elementy_trubky.txt"
     
-    (X, IEN, rho) = GenerateMesh.MeshInformations(data)
+    (X, IEN, rho) = MeshGrid.MeshInformations(data)
 
     # # input data propertis (mesh, density)
-    mesh = GenerateMesh.Mesh(X, IEN)
-    (mesh, rho) = GenerateMesh.PartOfModel(mesh, rho, part_name)
+    mesh = MeshGrid.Mesh(X, IEN)
+    (mesh, rho) = MeshGrid.PartOfModel(mesh, rho, part_name)
     
-    ρₙ = GenerateMesh.DenseInNodes(mesh, rho) # LSQ
-    # ρₙ = GenerateMesh.elementToNodalValues(mesh, rho) # average
+    ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
+    # ρₙ = MeshGrid.elementToNodalValues(mesh, rho) # average
     # exit()
 
 
@@ -41,9 +41,9 @@ using JLD
     # Rho2sdf.exportToVTU("triChapadlo.vtu", X, IEN)
 
     ## Grid:
-    X_min, X_max = Rho2sdf.getMesh_AABB(mesh.X) # vec, vec
+    X_min, X_max = MeshGrid.getMesh_AABB(mesh.X) # vec, vec
     N = [300, 300, 300]
-    sdf_grid = Rho2sdf.Grid(X_min, X_max, N) # cartesian grid
+    sdf_grid = MeshGrid.Grid(X_min, X_max, N) # cartesian grid
    
     ## SFD from triangular mesh:
     # sdf_dists = Rho2sdf.evalSignedDiscancesOnTriangularMesh(mesh, sdf_grid) # Vector{Float64}
@@ -52,6 +52,7 @@ using JLD
     ρₜ = 0.5
     sdf_dists = Rho2sdf.evalSignedDiscances(mesh, sdf_grid, ρₙ , ρₜ)
 
+    exit()
     ## Data export to VTK:
     # Rho2sdf.DataProcessing.exportStructuredPointsToVTK(taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
     Rho2sdf.exportStructuredPointsToVTK("trubka_" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
