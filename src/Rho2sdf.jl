@@ -377,8 +377,8 @@ function evalSignedDiscances(
     dist = big * ones(ngp)
     xp = zeros(nsd, ngp)
 
-    # for el = 1:nel
-    for el = 415
+    for el = 1:nel
+    # for el = 415
         ρₑ = ρₙ[IEN[:, el]]
 
         ρₑ_min = minimum(ρₑ)
@@ -645,7 +645,7 @@ function evalSignedDiscances(
                             # if (round.(K, digits=4))=! (round.(K_diff, digits=4))
                                 println("K:",K)
                                 println("K_diff:",K_diff)
-                                sleep(50)
+                                # sleep(50)
                             # end
                             ########################################
 
