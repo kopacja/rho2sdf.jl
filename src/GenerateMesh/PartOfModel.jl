@@ -22,21 +22,21 @@ function PartOfModel(
     ρ::Vector,
     name::String)
     
-    IDes = LoadTxt(name)
+    IDe = LoadTxt(name)
 
-    posun = mod(length(IDes),15) + 3
-    IDes = IDes[(151+posun):length(IDes)]
-    nelr = length(IDes)
+    # Reduce length:
+    IDer = IDe[165:length(IDe)]
+    nelr = length(IDer)
 
     IENᵣ = zeros(mesh.nen, nelr)
     ρₙ = zeros(nelr)
 
     for i = 1:nelr
-        IENᵣ[:, i] = mesh.IEN[:, IDes[i]]
-        ρₙ[i] = ρ[IDes[i]]
+        IENᵣ[:, i] = mesh.IEN[:, IDer[i]]
+        ρₙ[i] = ρ[IDer[i]]
     end # kontrolováno
     uIENₙ = unique(vec(IENᵣ))
-    Xₙ = zeros(length(mesh.X[:, 1]) + 1, length(uIENₙ))
+    Xₙ = zeros(mesh.nsd + 1, length(uIENₙ))
 
     IENₙ = zeros(Int, size(IENᵣ))
     for i = 1:length(uIENₙ)
