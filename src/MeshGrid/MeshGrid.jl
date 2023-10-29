@@ -9,6 +9,7 @@ using LinearAlgebra
 include("MeshInformations.jl")
 include("PartOfModel.jl")
 include("NodalDensities.jl")
+include("SurfaceTriangularMesh.jl")
 include("Grid.jl")
 
 
