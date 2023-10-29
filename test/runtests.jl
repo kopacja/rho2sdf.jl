@@ -25,8 +25,8 @@ using JLD
     mesh = GenerateMesh.Mesh(X, IEN)
     (mesh, rho) = GenerateMesh.PartOfModel(mesh, rho, part_name)
     
-    # ρₙₒ = Rho2sdf.elementToNodalValues(mesh, rho) # nodal values calculation (AVERAGE!! -> least squares)
-    ρₙ = GenerateMesh.DenseInNodes(mesh, rho)
+    ρₙ = GenerateMesh.DenseInNodes(mesh, rho) # LSQ
+    # ρₙ = GenerateMesh.elementToNodalValues(mesh, rho) # average
     # exit()
 
 
@@ -54,6 +54,7 @@ using JLD
 
     ## Data export to VTK:
     # Rho2sdf.DataProcessing.exportStructuredPointsToVTK(taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
+    Rho2sdf.exportStructuredPointsToVTK("trubka_" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
 
 
 
