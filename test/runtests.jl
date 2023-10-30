@@ -4,6 +4,7 @@ using Rho2sdf
 using Rho2sdf.ShapeFunctions
 using Rho2sdf.MeshGrid
 using Rho2sdf.SignedDistances
+using Rho2sdf.ExportData
 using MAT
 using SymPy
 using LinearAlgebra
@@ -31,14 +32,14 @@ using JLD
 
 
     ## Face triangular mesh:
-    # mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh) 
+    mesh = MeshGrid.extractSurfaceTriangularMesh(mesh) 
 
     # save("taskName" * "_triangular_mesh.jld", "mesh", mesh)
     # mesh = load("taskName" * "_triangular_mesh.jld", "mesh") # načtení chapadla (stl)
 
     # X = [mesh.X[:,i] for i in 1:size(mesh.X,2)]
     # IEN = [mesh.IEN[:,i] for i in 1:size(mesh.IEN,2)]
-    # Rho2sdf.exportToVTU("triChapadlo.vtu", X, IEN)
+    # ExportData.exportToVTU("triChapadlo.vtu", X, IEN)
 
     ## Grid:
     X_min, X_max = MeshGrid.getMesh_AABB(mesh.X) # vec, vec
@@ -48,14 +49,14 @@ using JLD
     ## SFD from triangular mesh:
     # sdf_dists = SignedDistances.evalSignedDiscancesOnTriangularMesh(mesh, sdf_grid) # Vector{Float64}
     
+    # exit()
     ## SDF from densities:
     ρₜ = 0.5
     sdf_dists = SignedDistances.evalSignedDiscances(mesh, sdf_grid, ρₙ , ρₜ)
 
     # exit()
     ## Data export to VTK:
-    # Rho2sdf.DataProcessing.exportStructuredPointsToVTK(taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
-    Rho2sdf.exportStructuredPointsToVTK("trubka_" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
+    ExportData.exportStructuredPointsToVTK("trubka_" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
 
 
 
