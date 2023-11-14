@@ -50,7 +50,7 @@ using JLD
     
     ## SDF from densities:
     ρₜ = 0.5
-    sdf_dists = SignedDistances.evalSignedDiscances(mesh, sdf_grid, ρₙ , ρₜ)
+    sdf_dists = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ , ρₜ)
 
     # exit()
     ## Data export to VTK:
