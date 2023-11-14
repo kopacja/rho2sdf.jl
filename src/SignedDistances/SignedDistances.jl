@@ -200,22 +200,22 @@ function evalSignedDiscancesOnTriangularMesh(mesh::Mesh, grid::Grid)
     return dist
 end
 
-function evalSignedDiscances(
+function evalSignedDistances(
     mesh::Mesh,
     grid::Grid,
     ρₙ::Vector{Float64},
     ρₜ::Float64,
 )
 
-    points = generateGridPoints(grid)
-    linkedList = LinkedList(grid, points)
+    points = generateGridPoints(grid) # uzly pravidelné mřížky
+    linkedList = LinkedList(grid, points) # pro rychlé vyhledávání
 
-    head = linkedList.head
-    next = linkedList.next
-    N = linkedList.grid.N
-    AABB_min = linkedList.grid.AABB_min
-    AABB_max = linkedList.grid.AABB_max
-    δ = 5.1 * grid.cell_size
+    head = linkedList.head # ID pravidelné bunky (pozice), index bodu z points
+    next = linkedList.next # vel délky points, další uzly pro danou bunku, když -1 tak už další není
+    N = linkedList.grid.N # počet buněk ve směru xyz
+    AABB_min = linkedList.grid.AABB_min # bod boxu (minimum v xyz)
+    AABB_max = linkedList.grid.AABB_max # bod boxu (maximum v xyz)
+    δ = 5.1 * grid.cell_size # offset (přifouknutí celého boxu)
     X = mesh.X
     IEN = mesh.IEN
     INE = mesh.INE
@@ -225,21 +225,22 @@ function evalSignedDiscances(
     nes = mesh.nes
     nsn = mesh.nsn
 
-    ngp = grid.ngp
+    ngp = grid.ngp # počet vrcholu prav sítě
     big = 1.0e10
-    dist = big * ones(ngp)
-    xp = zeros(nsd, ngp)
+    dist = big * ones(ngp) # inicializace dist fieldu
+    xp = zeros(nsd, ngp) # souřadnice bodů vrcholů (3xngp)
 
     for el = 1:nel
+        println("el:", el)
     # for el = 415
         ρₑ = ρₙ[IEN[:, el]]
 
         ρₑ_min = minimum(ρₑ)
         ρₑ_max = maximum(ρₑ)
-        if (ρₑ_min >= ρₜ)
-            continue # PRO PŘESKAKUJE HRANIČNÍ ELEMENTY (pouze pro ladění kodu)
+        if (ρₑ_min >= ρₜ) # hranice elementem neprochází
+            # continue # PRO PŘESKAKUJE HRANIČNÍ ELEMENTY (pouze pro ladění kodu)
             commonEls = []
-            for sg = 1:nes
+            for sg = 1:nes # je to hraniční element?
                 commonEls = INE[IEN[mesh.ISN[sg][1], el]]
                 for a = 2:nsn
                     idx = findall(in(INE[IEN[ISN[sg][a], el]]), commonEls)
@@ -252,15 +253,15 @@ function evalSignedDiscances(
                     Xs = X[:, IEN[ISN[sg], el]]
                     Xc = mean(Xs, dims = 2)
 
-                    for a = 1:nsn
+                    for a = 1:nsn # cyklus přes uzly segmentu (face)
 
 
 
-                        As = IEN[ISN[sg][a], el]
-                        adj_els = INE[As]
+                        As = IEN[ISN[sg][a], el] # globální číslo uzlu
+                        adj_els = INE[As] # všechny elementy které jsou součástí tohoto uzlu
                         for adj_el in adj_els
                             common_adj_els = []
-                            for adj_sg = 1:nes
+                            for adj_sg = 1:nes # cyklus přes sousední stěny elementu
                                 common_adj_els =
                                     INE[IEN[mesh.ISN[adj_sg][1], adj_el]]
                                 for b = 2:nsn
@@ -284,8 +285,9 @@ function evalSignedDiscances(
                                         As,
                                         IEN[mesh.ISN[adj_sg], adj_el],
                                     )
-                                    a_prev = ((as + nsn - 1 - 1) % nsn) + 1
-                                    a_next = ((as + nsn + 1 - 1) % nsn) + 1
+
+                                    a_prev = ((as[1] + nsn - 1 - 1) % nsn) + 1
+                                    a_next = ((as[1] + nsn + 1 - 1) % nsn) + 1
 
                                     x_prev = X[
                                         :,
@@ -296,6 +298,9 @@ function evalSignedDiscances(
                                         :,
                                         IEN[mesh.ISN[adj_sg][a_next], adj_el],
                                     ]
+
+                                    Xt = [x_prev, xs, x_next]
+                                    Xt = reduce(hcat, Xt)
 
                                     Et = Vector{Vector{Float64}}()
                                     push!(Et, Xt[:, 2] - Xt[:, 1])
@@ -315,16 +320,17 @@ function evalSignedDiscances(
 
 
 
-                        x₁ = Xs[:, a]
+                        x₁ = Xs[:, a] # trojúhelník
                         x₂ = Xs[:, (a%nsn)+1]
                         x₃ = Xc
 
                         Xt = [x₁, x₂, x₃]
                         Xt = reduce(hcat, Xt)
 
-                        Xt_min = minimum(Xt, dims = 2) .- δ
+                        Xt_min = minimum(Xt, dims = 2) .- δ # hraniční body přifouklého trojúhelníku
                         Xt_max = maximum(Xt, dims = 2) .+ δ
 
+                        # trojúhelník v konstičce a zjišťuji kde se nachází
                         I_min =
                             floor.(
                                 N .* (Xt_min .- AABB_min) ./
@@ -336,6 +342,7 @@ function evalSignedDiscances(
                                 (AABB_max .- AABB_min),
                             )
 
+                        # kontrola indexů (jeslti nelezou přes)
                         for j = 1:nsd
                             if (I_min[j] < 0)
                                 I_min[j] = 0
@@ -345,20 +352,23 @@ function evalSignedDiscances(
                             end
                         end
 
+                        # Hrany trojúhelníku
                         Et = Vector{Vector{Float64}}()
                         push!(Et, Xt[:, 2] - Xt[:, 1])
                         push!(Et, Xt[:, 3] - Xt[:, 2])
                         push!(Et, Xt[:, 1] - Xt[:, 3])
 
+                        # normála trojúhelníka
                         n = cross(Et[1], Et[2])
                         n = n / norm(n)
 
+                        # MeshGrid jako v matlabu
                         Is = Iterators.product(
                             I_min[1]:I_max[1],
                             I_min[2]:I_max[2],
                             I_min[3]:I_max[3],
                         )
-                        for I ∈ Is
+                        for I ∈ Is # bunce přiřadím jedno číslo
                             ii = Int(
                                 I[3] * (N[1] + 1) * (N[2] + 1) +
                                 I[2] * (N[1] + 1) +
@@ -368,7 +378,7 @@ function evalSignedDiscances(
                             v = head[ii]
                             while v != -1
                                 x = points[:, v]
-                                A = [
+                                A = [ # promítám x na trojúhelník
                                     (x₁[2]*n[3]-x₁[3]*n[2]) (x₂[2]*n[3]-x₂[3]*n[2]) (x₃[2]*n[3]-x₃[3]*n[2])
                                     (x₁[3]*n[1]-x₁[1]*n[3]) (x₂[3]*n[1]-x₂[1]*n[3]) (x₃[3]*n[1]-x₃[1]*n[3])
                                     (x₁[1]*n[2]-x₁[2]*n[1]) (x₂[1]*n[2]-x₂[2]*n[1]) (x₃[1]*n[2]-x₃[2]*n[1])
@@ -382,54 +392,55 @@ function evalSignedDiscances(
                                 n_max, i_max = findmax(abs.(n))
                                 A[i_max, :] = [1.0 1.0 1.0]
                                 b[i_max] = 1.0
-                                λ = A \ b
+                                λ = A \ b # baricentrické souřadnice
 
-                                xₚ = zeros(nsd)
+                                xₚ = zeros(nsd) # geometrická projekce
                                 isFace = false
                                 isEdge = false
                                 isVertex = false
                                 if (minimum(λ) >= 0.0) # xₚ is in the triangle el
                                     xₚ = λ[1] * x₁ + λ[2] * x₂ + λ[3] * x₃
                                     dist_tmp = dot(x - xₚ, n)
-                                    if (abs(dist_tmp) < abs(dist[v]))
+                                    if (abs(dist_tmp) < abs(dist[v])) # kontrola vzádlenosti (hledám tu nejkratší)
                                         dist[v] = dist_tmp
                                         isFace = true
                                         xp[:, v] = xₚ
+                                    # end
+                                    else
+                                        for j = 1:3
+                                            L = norm(Et[j])
+                                            xᵥ = Xt[:, j]
+                                            P = dot(x - xᵥ, Et[j] / L)
+                                            if (P >= 0 && P <= L)
+                                                xₚ = xᵥ + (Et[j] / L) * P
+                                                #n_edge = EPN[el][j]
+                                                dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
+
+                                                if (abs(dist_tmp) < abs(dist[v]))
+                                                    dist[v] = dist_tmp
+                                                    isVertex = true
+                                                    xp[:, v] = xₚ
+                                                end
+                                            end
+                                        end
                                     end
-                                    # else
-                                    #     for j = 1:3
-                                    #         L = norm(Et[j])
-                                    #         xᵥ = Xt[:, j]
-                                    #         P = dot(x - xᵥ, Et[j] / L)
-                                    #         if (P >= 0 && P <= L)
-                                    #             xₚ = xᵥ + (Et[j] / L) * P
-                                    #             #n_edge = EPN[el][j]
-                                    #             dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                    #
-                                    #             if (abs(dist_tmp) < abs(dist[v]))
-                                    #                 dist[v] = dist_tmp
-                                    #                 isVertex = true
-                                    #                 xp[:, v] = xₚ
-                                    #             end
-                                    #         end
-                                    #     end
                                 end
-                                # if (isFace == false && isEdge == false)
-                                #     dist_tmp, idx = findmin([
-                                #         norm(x - x₁),
-                                #         norm(x - x₂),
-                                #         norm(x - x₃),
-                                #     ])
-                                #     xₚ = Xt[:, idx]
-                                #     #n_vertex = VPN[IEN[idx, el]]
-                                #     dist_tmp =
-                                #         dist_tmp * sign(dot(x - xₚ, n))
-                                #     if (abs(dist_tmp) < abs(dist[v]))
-                                #         dist[v] = dist_tmp
-                                #         isVertex = true
-                                #         xp[:, v] = xₚ
-                                #     end
-                                # end
+                                if (isFace == false && isEdge == false)
+                                    dist_tmp, idx = findmin([
+                                        norm(x - x₁),
+                                        norm(x - x₂),
+                                        norm(x - x₃),
+                                    ])
+                                    xₚ = Xt[:, idx]
+                                    #n_vertex = VPN[IEN[idx, el]]
+                                    dist_tmp =
+                                        dist_tmp * sign(dot(x - xₚ, n))
+                                    if (abs(dist_tmp) < abs(dist[v]))
+                                        dist[v] = dist_tmp
+                                        isVertex = true
+                                        xp[:, v] = xₚ
+                                    end
+                                end
                                 v = next[v]
                             end
                         end
