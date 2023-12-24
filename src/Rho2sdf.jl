@@ -17,8 +17,8 @@ using .MeshGrid
 include("SignedDistances/SignedDistances.jl")
 using .SignedDistances
 
-include("TestGeometries/TestGeometries.jl")
-using .TestGeometries
+include("PrimitiveGeometries/PrimitiveGeometries.jl")
+using .PrimitiveGeometries
 
 
 function exportToVTU(

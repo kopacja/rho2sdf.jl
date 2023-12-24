@@ -1,4 +1,4 @@
-module TestGeometries
+module PrimitiveGeometries
 
 export  round_down_to_even, TestGeometrySphere
 
@@ -6,7 +6,7 @@ using LinearAlgebra
 using Statistics
 
 
-function round_down_to_even(number::Float64)
+function round_down_to_even(number::Int)
     # Zaokrouhlení dolů na nejbližší celé číslo
     rounded = floor(Int, number)
     # Pokud je číslo sudé, vrátíme ho, jinak odčteme 1 pro dosažení sudého čísla
@@ -17,7 +17,7 @@ function TestGeometrySphere(max_elements::Int64)
     # Inicializace proměnných: poloměr koule, střed a počet uzlů
     radius = 1.0
     center = [0., 0., 0.]
-    n = cbrt(max_elements) 
+    n = max_elements
     delta = 2 * radius / n
     step = Int(round_down_to_even(n)/2)
 
@@ -51,6 +51,27 @@ function TestGeometrySphere(max_elements::Int64)
                 corners = [(i, j, k), (i+1, j, k), (i+1, j+1, k), (i, j+1, k), 
                            (i, j, k+1), (i+1, j, k+1), (i+1, j+1, k+1), (i, j+1, k+1)]
                 
+                # corners = [(i, j, k), (i+1, j, k), (i+1, j, k+1), (i, j, k+1), 
+                #            (i, j+1, k), (i+1, j+1, k), (i+1, j+1, k+1), (i, j+1, k+1)]
+                #
+                # corners = [(i, j, k), (i, j+1, k), (i, j+1, k+1), (i, j, k+1), 
+                #            (i+1, j, k), (i+1, j+1, k), (i+1, j+1, k+1), (i+1, j, k+1)]
+
+                # corners = [(i, j, k), (i+1, j, k), (i+1, j+1, k), (i, j+1, k),
+                #             (i, j, k+1), (i+1, j, k+1), (i+1, j+1, k+1), (i, j+1, k+1)]
+                # corners = [(i, j, k), (i+1, j, k), (i+1, j, k+1), (i, j, k+1),
+                #            (i, j+1, k), (i+1, j+1, k), (i+1, j+1, k+1), (i, j+1, k+1)]
+
+                # corners = [(i, j, k), (i+1, j, k), (i+1, j+1, k), (i, j+1, k),
+                #             (i, j, k+1), (i+1, j, k+1), (i+1, j+1, k+1), (i, j+1, k+1)]
+                # 
+                # corners = [(i, j, k), (i+1, j, k), (i+1, j+1, k), (i, j+1, k), 
+                #            (i, j, k+1), (i+1, j, k+1), (i+1, j+1, k+1), (i, j+1, k+1)]
+                # 
+                # corners = [(i, j, k), (i+1, j, k), (i+1, j+1, k), (i, j+1, k), 
+                #            (i, j, k+1), (i+1, j, k+1), (i+1, j+1, k+1), (i, j+1, k+1)]
+
+
                 if all(c -> c in keys(node_map), corners)
                     element_nodes = [node_map[c] for c in corners]
                     push!(elements, element_nodes)
