@@ -26,6 +26,7 @@ function PartOfModel(
 
     # Reduce length:
     IDer = IDe[165:length(IDe)]
+    # println("IDe", length(IDe))
     nelr = length(IDer)
 
     IENᵣ = zeros(mesh.nen, nelr)

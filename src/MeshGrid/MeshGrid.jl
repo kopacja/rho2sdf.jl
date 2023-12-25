@@ -1,7 +1,7 @@
 module MeshGrid
 
 
-export MeshInformations, elementToNodalValues, Mesh, PartOfModel, Grid, LinkedList, getMesh_AABB, generateGridPoints
+export MeshInformations, elementToNodalValues, Mesh, PartOfModel, Grid, LinkedList, getMesh_AABB, generateGridPoints, extractSurfaceTriangularMesh
 
 using Statistics
 using LinearAlgebra

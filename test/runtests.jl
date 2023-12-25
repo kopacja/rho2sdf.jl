@@ -20,33 +20,31 @@ using JLD
     part_name = "elementy_trubky.txt"
     # part_name = "test/elementy_trubky.txt"
     
-    (X, IEN, rho) = PrimitiveGeometries.TestGeometrySphere(4)
+    (X, IEN, rho) = PrimitiveGeometries.TestGeometrySphere(104)
     # (X, IEN, rho) = MeshGrid.MeshInformations(data)
     
-    # println("size X:",size(X))
-    # println("type X:",typeof(X))
 
-    # # input data propertis (mesh, density)
+    # input data propertis (mesh, density)
     mesh = MeshGrid.Mesh(X, IEN)
     # (mesh, rho) = MeshGrid.PartOfModel(mesh, rho, part_name)
     
 
-    ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
+    # ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
     # ρₙ = MeshGrid.elementToNodalValues(mesh, rho) # average
     # exit()
 
 
     ## Face triangular mesh:
-    # mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh) 
+    mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh) 
 
     # save("taskName" * "_triangular_mesh.jld", "mesh", mesh)
     # mesh = load("taskName" * "_triangular_mesh.jld", "mesh") # načtení chapadla (stl)
 
     X = [mesh.X[:,i] for i in 1:size(mesh.X,2)]
     IEN = [mesh.IEN[:,i] for i in 1:size(mesh.IEN,2)]
-    Rho2sdf.exportToVTU("triKoule.vtu", X, IEN)
-
+    Rho2sdf.exportToVTU("triNoha.vtu", X, IEN)
     exit()
+
     ## Grid:
     X_min, X_max = MeshGrid.getMesh_AABB(mesh.X) # vec, vec
     N = [300, 300, 300]

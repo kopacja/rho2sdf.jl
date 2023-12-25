@@ -48,30 +48,11 @@ function TestGeometrySphere(max_elements::Int64)
     for i in -step:step-1
         for j in -step:step-1
             for k in -step:step-1
-                corners = [(i, j, k), (i+1, j, k), (i+1, j+1, k), (i, j+1, k), 
+                corners = [(i, j, k),   (i+1, j, k),   (i+1, j+1, k),   (i, j+1, k), 
                            (i, j, k+1), (i+1, j, k+1), (i+1, j+1, k+1), (i, j+1, k+1)]
+                # corners = [(i, j, k),   (i+1, j, k),   (i+1, j, k+1),   (i, j, k+1), 
+                #            (i, j+1, k), (i+1, j+1, k), (i+1, j+1, k+1), (i, j+1, k+1)]
                 
-                # corners = [(i, j, k), (i+1, j, k), (i+1, j, k+1), (i, j, k+1), 
-                #            (i, j+1, k), (i+1, j+1, k), (i+1, j+1, k+1), (i, j+1, k+1)]
-                #
-                # corners = [(i, j, k), (i, j+1, k), (i, j+1, k+1), (i, j, k+1), 
-                #            (i+1, j, k), (i+1, j+1, k), (i+1, j+1, k+1), (i+1, j, k+1)]
-
-                # corners = [(i, j, k), (i+1, j, k), (i+1, j+1, k), (i, j+1, k),
-                #             (i, j, k+1), (i+1, j, k+1), (i+1, j+1, k+1), (i, j+1, k+1)]
-                # corners = [(i, j, k), (i+1, j, k), (i+1, j, k+1), (i, j, k+1),
-                #            (i, j+1, k), (i+1, j+1, k), (i+1, j+1, k+1), (i, j+1, k+1)]
-
-                # corners = [(i, j, k), (i+1, j, k), (i+1, j+1, k), (i, j+1, k),
-                #             (i, j, k+1), (i+1, j, k+1), (i+1, j+1, k+1), (i, j+1, k+1)]
-                # 
-                # corners = [(i, j, k), (i+1, j, k), (i+1, j+1, k), (i, j+1, k), 
-                #            (i, j, k+1), (i+1, j, k+1), (i+1, j+1, k+1), (i, j+1, k+1)]
-                # 
-                # corners = [(i, j, k), (i+1, j, k), (i+1, j+1, k), (i, j+1, k), 
-                #            (i, j, k+1), (i+1, j, k+1), (i+1, j+1, k+1), (i, j+1, k+1)]
-
-
                 if all(c -> c in keys(node_map), corners)
                     element_nodes = [node_map[c] for c in corners]
                     push!(elements, element_nodes)
