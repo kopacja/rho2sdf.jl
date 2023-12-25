@@ -11,16 +11,20 @@ using LinearAlgebra
 using JLD
 
 @testset "Rho2sdf.jl" begin
-
+    
+    @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
+    # exit()
+    
     taskName = "chapadlo"
 
     # # Data from Matlab:
-    data = matread(taskName * ".mat")
+    # data = matread(taskName * ".mat")
     # data = matread("test/" * taskName * ".mat")
-    part_name = "elementy_trubky.txt"
+    # part_name = "elementy_trubky.txt"
     # part_name = "test/elementy_trubky.txt"
     
-    (X, IEN, rho) = PrimitiveGeometries.TestGeometrySphere(104)
+    (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("cube", 14)
+    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 14)
     # (X, IEN, rho) = MeshGrid.MeshInformations(data)
     
 
@@ -42,7 +46,7 @@ using JLD
 
     X = [mesh.X[:,i] for i in 1:size(mesh.X,2)]
     IEN = [mesh.IEN[:,i] for i in 1:size(mesh.IEN,2)]
-    Rho2sdf.exportToVTU("triNoha.vtu", X, IEN)
+    Rho2sdf.exportToVTU("triKrychle.vtu", X, IEN)
     exit()
 
     ## Grid:
