@@ -4,3 +4,6 @@ Manifest.toml
 *.jld
 *.csv
 *.vtu
+*.csv
+*.vtu
+*.vtk
