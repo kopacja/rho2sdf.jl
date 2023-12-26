@@ -13,27 +13,27 @@ using JLD
 @testset "Rho2sdf.jl" begin
     
     @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
-    # exit()
+    @time @testset "MeshGridTest" begin include("MeshGridTest/runtests.jl") end
+    exit()
     
-    taskName = "chapadlo"
+    # taskName = "chapadlo"
 
     # # Data from Matlab:
     # data = matread(taskName * ".mat")
     # data = matread("test/" * taskName * ".mat")
     # part_name = "elementy_trubky.txt"
     # part_name = "test/elementy_trubky.txt"
-    
-    (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("cube", 14)
-    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 14)
     # (X, IEN, rho) = MeshGrid.MeshInformations(data)
     
+    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("cube", 14)
+    (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 6)
 
     # input data propertis (mesh, density)
     mesh = MeshGrid.Mesh(X, IEN)
     # (mesh, rho) = MeshGrid.PartOfModel(mesh, rho, part_name)
     
 
-    # ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
+    ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
     # ρₙ = MeshGrid.elementToNodalValues(mesh, rho) # average
     # exit()
 
@@ -41,17 +41,17 @@ using JLD
     ## Face triangular mesh:
     mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh) 
 
-    # save("taskName" * "_triangular_mesh.jld", "mesh", mesh)
-    # mesh = load("taskName" * "_triangular_mesh.jld", "mesh") # načtení chapadla (stl)
+    save("taskName" * "_triangular_mesh.jld", "mesh", mesh)
+    mesh = load("taskName" * "_triangular_mesh.jld", "mesh") # načtení chapadla (stl)
 
     X = [mesh.X[:,i] for i in 1:size(mesh.X,2)]
     IEN = [mesh.IEN[:,i] for i in 1:size(mesh.IEN,2)]
-    Rho2sdf.exportToVTU("triKrychle.vtu", X, IEN)
+    Rho2sdf.exportToVTU("triKoule.vtu", X, IEN)
     exit()
 
     ## Grid:
     X_min, X_max = MeshGrid.getMesh_AABB(mesh.X) # vec, vec
-    N = [300, 300, 300]
+    N = [50, 50, 50]
     sdf_grid = MeshGrid.Grid(X_min, X_max, N) # cartesian grid
    
     ## SFD from triangular mesh:
