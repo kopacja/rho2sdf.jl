@@ -1,6 +1,6 @@
 module SignedDistances
 
-export evalSignedDiscancesOnTriangularMesh, evalSignedDiscances
+export evalSignedDistancesOnTriangularMesh, evalSignedDistances
 
 using Einsum
 using Statistics
@@ -57,7 +57,7 @@ function computePseudoNormals(mesh::Mesh)
     return verticesPseudoNormals, edgesPseudoNormals
 end
 
-function evalSignedDiscancesOnTriangularMesh(mesh::Mesh, grid::Grid)
+function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
 
     points = generateGridPoints(grid)
     linkedList = LinkedList(grid, points)
@@ -231,7 +231,6 @@ function evalSignedDistances(
     xp = zeros(nsd, ngp) # souřadnice bodů vrcholů (3xngp)
 
     for el = 1:nel
-        println("el:", el)
     # for el = 415
         ρₑ = ρₙ[IEN[:, el]]
 
@@ -501,6 +500,7 @@ function evalSignedDistances(
 
                         while (Ξ_norm ≥ Ξ_tol && iter ≤ niter)# || r_norm ≥ r_tol)
                             println("el:",el)
+                            sleep(0.5)
                             ########################################
                             (K, r) = AnalyticalDerivations(Ξ, Xₑ, ρₑ, λ, ρₜ, x)
                             # (K_diff) = NumericalDerivations(Ξ, Xₑ, ρₑ, λ, ρₜ, x)
