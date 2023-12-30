@@ -17,7 +17,7 @@ mutable struct Mesh
     INE::Vector{Vector{Int64}} # ID node -> ID elements
     ISN::Vector{Vector{Int64}} # connectivity face - edges
     nsd::Int64 # number of spacial dimensions
-    nnp::Int64 # number of all points
+    nnp::Int64 # number of all nodes
     nen::Int64 # number of element nodes
     nel::Int64 # number of all elements
     nes::Int64 # number of element segments (faces)
