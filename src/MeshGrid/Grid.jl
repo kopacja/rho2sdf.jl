@@ -1,11 +1,18 @@
+"""
+ToDo:
+cell_size - upravit, tak aby síť byla tvořena z kostek (teď to jsou kvádry)
+
+"""
+
 
 struct Grid
-    AABB_min::Vector{Float64}
-    AABB_max::Vector{Float64}
-    N::Vector{Int64}
-    cell_size::Vector{Float64}
-    ngp::Int64 # Number of Grid Points
+    AABB_min::Vector{Float64}  # Minimum coordinates of the Axis-Aligned Bounding Box (AABB)
+    AABB_max::Vector{Float64}  # Maximum coordinates of the AABB
+    N::Vector{Int64}           # Number of divisions along each axis
+    cell_size::Vector{Float64} # Size of each cell in the grid
+    ngp::Int64                 # Total number of grid points
 
+    # Marginal cells are added around the AABB to provide a buffer zone.
     function Grid(
         AABB_min::Vector{Float64},
         AABB_max::Vector{Float64},
@@ -15,25 +22,31 @@ struct Grid
 
         cell_size = (AABB_max .- AABB_min) ./ N
 
+        # Adjusting the AABB with marginal cells
         AABB_min = AABB_min .- margineCells * cell_size
         AABB_max = AABB_max .+ margineCells * cell_size
 
         AABB_size = AABB_max .- AABB_min
 
-        N = N .+ 2 * margineCells
-        ngp = prod(N .+ 1)
+        # Recalculating grid dimensions and total grid points
+        N = N .+ 2 * margineCells # (2 = both sides)
+        ngp = prod(N .+ 1) # number of grid points
 
         return new(AABB_min, AABB_max, N, cell_size, ngp)
 
     end
 end
 
-mutable struct LinkedList # rozdělení pravidelné sítě na regiony
-    grid::Grid
-    head::Vector{Int64}
-    next::Vector{Int64}
-    N::Vector{Float64}
 
+# Struct for managing a linked list in the context of a grid. (Useful for spatial hashing or similar applications.)
+mutable struct LinkedList # rozdělení pravidelné sítě na regiony
+    grid::Grid           # The grid associated with the linked list
+    head::Vector{Int64}  # Array representing the head of each list
+    next::Vector{Int64}  # Array representing the next element in each list
+    N::Vector{Float64}   # Number of divisions along each axis of the grid
+
+    # Constructor for LinkedList.
+    # Maps points in a 3D space to the corresponding grid cells.
     function LinkedList(grid::Grid, X::Matrix{Float64})
 
         np = size(X, 2) # Number of Points
@@ -44,14 +57,11 @@ mutable struct LinkedList # rozdělení pravidelné sítě na regiony
         head = -1 * ones(Int64, prod(N .+ 1))
         next = -1 * ones(Int64, np)
 
+        # Calculate grid indices for each point
         I = floor.(N .* (X .- AABB_min) ./ (AABB_max .- AABB_min))
-        I =
-            Int.(
-                I[3, :] .* (N[1] + 1) * (N[2] + 1) .+ I[2, :] .* (N[1] + 1) .+
-                I[1, :] .+ 1,
-            )
+        I = Int.(I[3, :] .* (N[1] + 1) * (N[2] + 1) .+ I[2, :] .* (N[1] + 1) .+ I[1, :] .+ 1)
 
-
+        # Construct the linked list
         for i = 1:np
             next[i] = head[I[i]]
             head[I[i]] = i
@@ -62,14 +72,16 @@ mutable struct LinkedList # rozdělení pravidelné sítě na regiony
 end
 
 
+# Function to determine the Axis-Aligned Bounding Box (AABB) of a mesh.
 function getMesh_AABB(X::Matrix{Float64})
     X_min = vec(minimum(X, dims = 2))
     X_max = vec(maximum(X, dims = 2))
     return X_min, X_max
 end
 
+# Generates grid points for a given grid structure.
+# Returns a matrix where each column represents the coordinates of a grid point.
 function generateGridPoints(grid::Grid)::Matrix{Float64}
-
     X = zeros(3, grid.ngp)
     a = 1
     for k = 0:grid.N[3]
@@ -83,4 +95,17 @@ function generateGridPoints(grid::Grid)::Matrix{Float64}
     return X
 end
 
-
+# Paralel version:
+# function generateGridPoints(grid::Grid)::Matrix{Float64}
+#     X = zeros(3, grid.ngp)
+#     a = Atomic{Int}(1)
+#     @threads for k = 0:grid.N[3]
+#         for j = 0:grid.N[2]
+#             for i = 0:grid.N[1]
+#                 idx = atomic_add!(a, 1)
+#                 X[:, idx] = grid.AABB_min .+ grid.cell_size .* [i, j, k]
+#             end
+#         end
+#     end
+#     return X
+# end
