@@ -5,31 +5,64 @@ cell_size - upravit, tak aby síť byla tvořena z kostek (teď to jsou kvádry)
 """
 
 
+# struct Grid
+#     AABB_min::Vector{Float64}  # Minimum coordinates of the Axis-Aligned Bounding Box (AABB)
+#     AABB_max::Vector{Float64}  # Maximum coordinates of the AABB
+#     N::Vector{Int64}           # Number of divisions along each axis
+#     cell_size::Vector{Float64} # Size of each cell in the grid
+#     ngp::Int64                 # Total number of grid points
+
+#     # Marginal cells are added around the AABB to provide a buffer zone.
+#     function Grid(
+#         AABB_min::Vector{Float64},
+#         AABB_max::Vector{Float64},
+#         N::Vector{Int64},
+#         margineCells::Int64 = 3,
+#     )
+
+#         cell_size = (AABB_max .- AABB_min) ./ N
+
+#         # Adjusting the AABB with marginal cells
+#         AABB_min = AABB_min .- margineCells * cell_size
+#         AABB_max = AABB_max .+ margineCells * cell_size
+
+#         AABB_size = AABB_max .- AABB_min
+
+#         # Recalculating grid dimensions and total grid points
+#         N = N .+ 2 * margineCells # (2 = both sides)
+#         ngp = prod(N .+ 1) # number of grid points
+
+#         return new(AABB_min, AABB_max, N, cell_size, ngp)
+
+#     end
+# end
+
 struct Grid
     AABB_min::Vector{Float64}  # Minimum coordinates of the Axis-Aligned Bounding Box (AABB)
     AABB_max::Vector{Float64}  # Maximum coordinates of the AABB
-    N::Vector{Int64}           # Number of divisions along each axis
-    cell_size::Vector{Float64} # Size of each cell in the grid
+    N::Vector{Int64}           # Number of divisions along the longest side (along some axis)
+    cell_size::Float64         # Size of each cell in the grid
     ngp::Int64                 # Total number of grid points
 
     # Marginal cells are added around the AABB to provide a buffer zone.
     function Grid(
         AABB_min::Vector{Float64},
         AABB_max::Vector{Float64},
-        N::Vector{Int64},
+        N_max::Int64,
         margineCells::Int64 = 3,
     )
 
-        cell_size = (AABB_max .- AABB_min) ./ N
+        cell_size = maximum(AABB_max .- AABB_min) ./ N_max
 
         # Adjusting the AABB with marginal cells
         AABB_min = AABB_min .- margineCells * cell_size
         AABB_max = AABB_max .+ margineCells * cell_size
 
-        AABB_size = AABB_max .- AABB_min
+        # N = ceil.((AABB_max .- AABB_min)./cell_size)
+        N = ceil.(Int64, (AABB_max .- AABB_min) / cell_size)
 
         # Recalculating grid dimensions and total grid points
-        N = N .+ 2 * margineCells # (2 = both sides)
+        # N = N .+ 2 * margineCells # (2 = both sides)
         ngp = prod(N .+ 1) # number of grid points
 
         return new(AABB_min, AABB_max, N, cell_size, ngp)

@@ -1,6 +1,6 @@
 module SignedDistances
 
-export evalSignedDistancesOnTriangularMesh, evalSignedDistances, computePseudoNormals1, computePseudoNormals
+export evalSignedDistancesOnTriangularMesh, evalSignedDistances, computePseudoNormals
 
 using Base.Threads
 using Einsum
@@ -13,6 +13,8 @@ using Rho2sdf
 
 include("Derivatives.jl")
 include("PseudoNormals.jl")
+# include("sdfOnTriangularMesh.jl")
+# include("sdfOnDensityField.jl")
 
 
 function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
