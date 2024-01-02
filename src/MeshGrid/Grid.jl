@@ -60,6 +60,8 @@ struct Grid
 
         # N = ceil.((AABB_max .- AABB_min)./cell_size)
         N = ceil.(Int64, (AABB_max .- AABB_min) / cell_size)
+        
+        AABB_max = AABB_min + N .* cell_size
 
         # Recalculating grid dimensions and total grid points
         # N = N .+ 2 * margineCells # (2 = both sides)
@@ -82,7 +84,7 @@ mutable struct LinkedList # rozdělení pravidelné sítě na regiony
     # Maps points in a 3D space to the corresponding grid cells.
     function LinkedList(grid::Grid, X::Matrix{Float64})
 
-        np = size(X, 2) # Number of Points
+        np = grid.ngp # Number of grid points
         N = grid.N
         AABB_min = grid.AABB_min
         AABB_max = grid.AABB_max
