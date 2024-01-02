@@ -94,12 +94,12 @@ mutable struct LinkedList # rozdělení pravidelné sítě na regiony
 
         # Calculate grid indices for each point
         I = floor.(N .* (X .- AABB_min) ./ (AABB_max .- AABB_min))
-        I = Int.(I[3, :] .* (N[1] + 1) * (N[2] + 1) .+ I[2, :] .* (N[1] + 1) .+ I[1, :] .+ 1)
+        Ia = Int.(I[3, :] .* (N[1] + 1) * (N[2] + 1) .+ I[2, :] .* (N[1] + 1) .+ I[1, :] .+ 1)
 
         # Construct the linked list
         for i = 1:np
-            next[i] = head[I[i]]
-            head[I[i]] = i
+            next[i] = head[Ia[i]]
+            head[Ia[i]] = i
         end
 
         return new(grid, head, next, N)
