@@ -1,10 +1,5 @@
-"""
-ToDo:
-cell_size - upravit, tak aby síť byla tvořena z kostek (teď to jsou kvádry)
 
-"""
-
-
+# N = [20, 20, 50]
 # struct Grid
 #     AABB_min::Vector{Float64}  # Minimum coordinates of the Axis-Aligned Bounding Box (AABB)
 #     AABB_max::Vector{Float64}  # Maximum coordinates of the AABB

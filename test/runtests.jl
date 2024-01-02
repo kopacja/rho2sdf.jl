@@ -12,9 +12,9 @@ using JLD
 
 @testset "Rho2sdf.jl" begin
     
-    # @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
-    # @time @testset "MeshGridTest" begin include("MeshGridTest/runtests.jl") end
-#     @time @testset "SignedDistancesTest" begin include("SignedDistancesTest/runtests.jl") end
+    @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
+    @time @testset "MeshGridTest" begin include("MeshGridTest/runtests.jl") end
+    @time @testset "SignedDistancesTest" begin include("SignedDistancesTest/runtests.jl") end
 # end
 # exit()
     
@@ -52,19 +52,13 @@ using JLD
 
     ## Grid:
     X_min, X_max = MeshGrid.getMesh_AABB(mesh.X) # vec, vec
-    # N = [20, 20, 50]
-    # N = [50, 50, 50]
-    N = 50
+    
+    N = 50  #Number of divisions along the longest side (along some axis)
     sdf_grid = MeshGrid.Grid(X_min, X_max, N) # cartesian grid
-    println("AABB_min: ", sdf_grid.AABB_min)
-    println("AABB_max: ", sdf_grid.AABB_max)
-    println("N: ", sdf_grid.N)
-    println("cell_size: ", sdf_grid.cell_size)
-    println("ngp: ", sdf_grid.ngp)
-    exit()
     
     ## SFD from triangular mesh:
     sdf_dists = SignedDistances.evalSignedDistancesOnTriangularMesh(mesh, sdf_grid) # Vector{Float64}
+    exit()
     
     ## SDF from densities:
     ρₜ = 0.5
