@@ -1,11 +1,4 @@
 
-
-
-
-
-
-
-
 function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
 
     points = generateGridPoints(grid)
@@ -127,3 +120,56 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
     return final_dist
 end
 
+###____________
+function generateGridPoints(grid::Grid)
+    # Generates grid points
+    return points = generateGridPoints(grid)
+end
+
+function computeLinkedList(grid, points)
+    # Computes linked list
+    return LinkedList(grid, points)
+end
+
+function initializePseudoNormals()
+    println("Init pseudo normals...")
+    VPN, EPN = computePseudoNormals(mesh)
+    println("...done.")
+    return VPN, EPN
+end
+
+function processElements(grid::Grid, points, linkedList::LinkedList, mesh::Mesh)
+    head = linkedList.head
+    next = linkedList.next
+    N = linkedList.grid.N
+    AABB_min = linkedList.grid.AABB_min
+    AABB_max = linkedList.grid.AABB_max
+    δ = 2.5 * grid.cell_size
+    X = mesh.X
+    IEN = mesh.IEN
+    nsd = mesh.nsd
+    nel = mesh.nel
+    ngp = grid.ngp
+    big = 1.0e10
+    dist = big * ones(ngp)
+    xp = zeros(nsd, ngp)
+    
+    # Process each element
+    for el in 1:nel
+        Xt = X[:, IEN[:, el]]
+        Xt_min = minimum(Xt, dims = 2) .- δ
+        Xt_max = maximum(Xt, dims = 2) .+ δ
+    
+        # Rest of the code for processing each element...
+    end
+end
+
+# Here's a possible way to streamline this code:
+
+# 1. The function `generateGridPoints` and `computeLinkedList` are called with parameters that are not explicitly passed to them. These should be the only parameters of these functions, instead of being global variables in your script. 
+# 2. The `println` calls can be removed from `initializePseudoNormals` as they are side effects and not part of the function's actual computation.
+# 3. The `processElements` function could accept all necessary parameters as arguments instead of referring to them globally, which is considered bad practice in Julia.
+# 4. The code inside `processElements` could be refactored into smaller functions that each perform a specific task (like `computeGridPointsAndLinkedList`, `initializePseudoNormals` and so on). This would make the main function easier to read and maintain. 
+# 5. For loop variables like `el` should follow Julia's conventions of having names of one character.
+# 6. The computation inside loops could be optimized with built-in functions or vectorized operations for better performance. 
+# 7. In some places, the code could use more descriptive variable names. This makes the code easier to read and understand. For example, `Et` might be renamed to `edge_vectors`.
