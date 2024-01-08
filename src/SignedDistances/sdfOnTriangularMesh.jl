@@ -1,80 +1,9 @@
+function barycentricCoordinates(x₁::Vector{Float64},
+  x₂::Vector{Float64},
+  x₃::Vector{Float64},
+  n::Vector{Float64},
+  x::Vector{Float64})
 
-function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
-
-    points = generateGridPoints(grid)
-    linkedList = LinkedList(grid, points)
-
-    println("Init pseudo normals...")
-    VPN, EPN = computePseudoNormals(mesh)
-    println("...done.")
-
-    head = linkedList.head
-    next = linkedList.next
-    N = linkedList.grid.N
-    AABB_min = linkedList.grid.AABB_min
-    AABB_max = linkedList.grid.AABB_max
-    δ = 2.5 * grid.cell_size
-    X = mesh.X
-    IEN = mesh.IEN
-    nsd = mesh.nsd
-    nel = mesh.nel
-
-    ngp = grid.ngp
-    big = 1.0e10
-    dist = big * ones(ngp)
-    xp = zeros(nsd, ngp)
-
-    for el in 1:nel
-        Xt = X[:, IEN[:, el]] # souřadnice trojúhelníku
-        Xt_min = minimum(Xt, dims=2) .- δ # trojúhelník vložený do BB a přifouknu o deltu
-        Xt_max = maximum(Xt, dims=2) .+ δ
-
-        I_min = floor.(N .* (Xt_min .- AABB_min) ./ (AABB_max .- AABB_min)) # index oddílu
-        I_max = floor.(N .* (Xt_max .- AABB_min) ./ (AABB_max .- AABB_min))
-
-        for j in 1:nsd # pokud jsem nepřetekl do mínusu nebo za max
-            if (I_min[j] < 0)
-                I_min[j] = 0
-            end
-            if (I_max[j] >= N[j])
-                I_max[j] = N[j]
-            end
-        end
-
-        x₁, x₂, x₃ = Xt[:, 1], Xt[:, 2], Xt[:, 3]
-        Et = [x₂ - x₁, x₃ - x₂, x₁ - x₃] # vektory hran trojúhelníku
-        n = cross(Et[1], Et[2]) # normála
-        n = n / norm(n) # jednotková normála
-        
-        Is = Iterators.product(I_min[1]:I_max[1], I_min[2]:I_max[2], I_min[3]:I_max[3])
-        for I in Is
-            i = Int(I[3] * (N[1] + 1) * (N[2] + 1) + I[2] * (N[1] + 1) + I[1] + 1)
-            v = head[i]
-            while v != -1
-                x = points[:, v]
-                λ = barycentricCoordinates(x₁, x₂, x₃, n, x)
-                xₚ = λ[1] * x₁ + λ[2] * x₂ + λ[3] * x₃
-                dist_tmp = dot(x - xₚ, n)
-                if (abs(dist_tmp) < abs(dist[v]))
-                    dist[v] = dist_tmp
-                    xp[:, v] = xₚ
-                end
-                v = next[v]
-            end
-        end
-    end
-
-    for i in 1:length(dist)
-        if (abs(dist[i]) > norm(grid.cell_size))
-            dist[i] = sign(dist[i]) * norm(grid.cell_size)
-        end
-    end
-
-    return dist
-end
-
-
-function barycentricCoordinates(x₁, x₂, x₃, n, x)
     A = [
         (x₁[2]*n[3]-x₁[3]*n[2]) (x₂[2]*n[3]-x₂[3]*n[2]) (x₃[2]*n[3]-x₃[3]*n[2])
         (x₁[3]*n[1]-x₁[1]*n[3]) (x₂[3]*n[1]-x₂[1]*n[3]) (x₃[3]*n[1]-x₃[1]*n[3])
@@ -85,91 +14,158 @@ function barycentricCoordinates(x₁, x₂, x₃, n, x)
         x[3] * n[1] - x[1] * n[3],
         x[1] * n[2] - x[2] * n[1],
     ]
+    
+    n_max, i_max = findmax(abs.(n))
+    A[i_max, :] = [1.0 1.0 1.0]
+    b[i_max] = 1.0
+
     return λ = A \ b # baricentrické souřadnice
 end
 
 
-############x
-using Base.Threads
+function calculate_triangle_edges(Xt::Matrix{Float64})
+    Et = Vector{Vector{Float64}}(undef, 3) # Preallocate with undefined values
+    Et[1] = Xt[:, 2] - Xt[:, 1]
+    Et[2] = Xt[:, 3] - Xt[:, 2]
+    Et[3] = Xt[:, 1] - Xt[:, 3]
+    return Et
+end
 
 function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
-    # ... [previous code remains unchanged] ...
 
-    # Create thread-local storage for variables modified inside the loop
-    dists = [big * ones(ngp) for _ in 1:nthreads()]
-    xps = [zeros(nsd, ngp) for _ in 1:nthreads()]
+    points = MeshGrid.generateGridPoints(grid)
+    linkedList = MeshGrid.LinkedList(grid, points)
 
-    @threads for el = 1:nel
-        # Access thread-local variables
-        dist = dists[threadid()]
-        xp = xps[threadid()]
-
-        # ... [rest of the loop code, using thread-local dist and xp] ...
-
-    end
-
-    # Combine results from each thread
-    final_dist = reduce(min, dists)
-
-    for i = 1:length(final_dist)
-        if abs(final_dist[i]) > norm(grid.cell_size)
-            final_dist[i] = sign(final_dist[i]) * norm(grid.cell_size)
-        end
-    end
-
-    return final_dist
-end
-
-###____________
-function generateGridPoints(grid::Grid)
-    # Generates grid points
-    return points = generateGridPoints(grid)
-end
-
-function computeLinkedList(grid, points)
-    # Computes linked list
-    return LinkedList(grid, points)
-end
-
-function initializePseudoNormals()
     println("Init pseudo normals...")
     VPN, EPN = computePseudoNormals(mesh)
     println("...done.")
-    return VPN, EPN
-end
 
-function processElements(grid::Grid, points, linkedList::LinkedList, mesh::Mesh)
     head = linkedList.head
     next = linkedList.next
-    N = linkedList.grid.N
+    N = linkedList.grid.N  # Number of divisions along each axis of the grid
     AABB_min = linkedList.grid.AABB_min
     AABB_max = linkedList.grid.AABB_max
     δ = 2.5 * grid.cell_size
     X = mesh.X
     IEN = mesh.IEN
+    # INE = mesh.INE
     nsd = mesh.nsd
     nel = mesh.nel
+
     ngp = grid.ngp
     big = 1.0e10
+    # dists = [big * ones(ngp) for _ in 1:nthreads()]
+    # xps = [zeros(nsd, ngp) for _ in 1:nthreads()]
     dist = big * ones(ngp)
     xp = zeros(nsd, ngp)
-    
-    # Process each element
-    for el in 1:nel
-        Xt = X[:, IEN[:, el]]
-        Xt_min = minimum(Xt, dims = 2) .- δ
-        Xt_max = maximum(Xt, dims = 2) .+ δ
-    
-        # Rest of the code for processing each element...
+
+    for el = 1:nel
+    # @threads for el = 1:nel
+        # Access thread-local variables
+        # dist = dists[threadid()]
+        # xp = xps[threadid()]
+
+        Xt = X[:, IEN[:, el]] # coordinates of the vertices of the triangle
+        
+        # Triangle inside AABB 
+        Xt_min = minimum(Xt, dims = 2) .- δ # bottom left corner coord
+        Xt_max = maximum(Xt, dims = 2) .+ δ # top righ corner coord
+        
+        # Mini AABB for triangle:
+        I_min = floor.(N .* (Xt_min .- AABB_min) ./ (AABB_max .- AABB_min)) # Triangle location (index) within the grid
+        I_max = floor.(N .* (Xt_max .- AABB_min) ./ (AABB_max .- AABB_min)) # Triangle location (index) within the grid
+
+        for j = 1:nsd # am I inside AABB?
+            if (I_min[j] < 0)
+                I_min[j] = 0
+            end
+            if (I_max[j] >= N[j])
+                I_max[j] = N[j]
+            end
+        end
+
+        x₁, x₂, x₃ = Xt[:, 1], Xt[:, 2], Xt[:, 3] # coordinates of nodes of the triangle
+
+        Et = calculate_triangle_edges(Xt)
+
+        n = cross(Et[1], Et[2]) # norm of triangle
+        n = n / norm(n) # unit norm
+
+        Is = Iterators.product( # step range of mini AABB
+            I_min[1]:I_max[1],
+            I_min[2]:I_max[2],
+            I_min[3]:I_max[3],
+        )
+        for I ∈ Is
+            i = Int(
+                I[3] * (N[1] + 1) * (N[2] + 1) + I[2] * (N[1] + 1) + I[1] + 1,
+            )
+            v = head[i]
+            while v != -1
+                x = points[:, v]
+                λ = barycentricCoordinates(x₁, x₂, x₃, n, x)
+        
+                xₚ = zeros(nsd)
+                # kam jsem se promítl?
+                isFace = false
+                isEdge = false
+                isVertex = false
+                if (minimum(λ) >= 0.0) # xₚ is in the triangle el
+                    xₚ = λ[1] * x₁ + λ[2] * x₂ + λ[3] * x₃
+                    dist_tmp = dot(x - xₚ, n)
+                    if (abs(dist_tmp) < abs(dist[v]))
+                        dist[v] = dist_tmp
+                        isFace = true
+                        xp[:, v] = xₚ
+                    end
+                else
+
+                    for j = 1:3
+                        L = norm(Et[j])
+                        xᵥ = Xt[:, j]
+                        P = dot(x - xᵥ, Et[j] / L)
+                        if (P >= 0 && P <= L) # pohybuji se na intervalu hrany
+                            xₚ = xᵥ + (Et[j] / L) * P
+                            n_edge = EPN[el][j]
+                            dist_tmp = sign(dot(x - xₚ, n_edge)) * norm(x - xₚ)
+
+                            if (abs(dist_tmp) < abs(dist[v]))
+                                dist[v] = dist_tmp
+                                # isEdge = true
+                                isVertex = true
+                                xp[:, v] = xₚ
+                            end
+                        end
+                    end
+                end
+                if (isFace == false && isEdge == false)
+                    dist_tmp, idx =
+                        findmin([norm(x - x₁), norm(x - x₂), norm(x - x₃)])
+                    xₚ = Xt[:, idx]
+                    n_vertex = VPN[IEN[idx, el]]
+                    dist_tmp = dist_tmp * sign(dot(x - xₚ, n_vertex))
+                    if (abs(dist_tmp) < abs(dist[v]))
+                        dist[v] = dist_tmp
+                        isVertex = true
+                        xp[:, v] = xₚ
+                    end
+                end
+                v = next[v]
+            end
+        end
     end
+    # dist = marchingCubes(dist, N.+1, big) 
+
+    # Combine results from each thread
+    # final_dist = reduce(min, dists)
+
+    for i in eachindex(dist)
+        if (abs(dist[i]) > norm(grid.cell_size))
+            dist[i] = sign(dist[i]) * norm(grid.cell_size)
+        end
+    end
+
+    return dist
 end
 
-# Here's a possible way to streamline this code:
 
-# 1. The function `generateGridPoints` and `computeLinkedList` are called with parameters that are not explicitly passed to them. These should be the only parameters of these functions, instead of being global variables in your script. 
-# 2. The `println` calls can be removed from `initializePseudoNormals` as they are side effects and not part of the function's actual computation.
-# 3. The `processElements` function could accept all necessary parameters as arguments instead of referring to them globally, which is considered bad practice in Julia.
-# 4. The code inside `processElements` could be refactored into smaller functions that each perform a specific task (like `computeGridPointsAndLinkedList`, `initializePseudoNormals` and so on). This would make the main function easier to read and maintain. 
-# 5. For loop variables like `el` should follow Julia's conventions of having names of one character.
-# 6. The computation inside loops could be optimized with built-in functions or vectorized operations for better performance. 
-# 7. In some places, the code could use more descriptive variable names. This makes the code easier to read and understand. For example, `Et` might be renamed to `edge_vectors`.

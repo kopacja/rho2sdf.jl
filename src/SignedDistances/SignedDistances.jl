@@ -1,6 +1,6 @@
 module SignedDistances
 
-export evalSignedDistancesOnTriangularMesh, evalSignedDistances, computePseudoNormals
+export evalSignedDistancesOnTriangularMesh, evalSignedDistances, computePseudoNormals, barycentricCoordinates, calculate_triangle_edges
 
 using Base.Threads
 using Einsum
@@ -13,152 +13,9 @@ using Rho2sdf
 
 include("Derivatives.jl")
 include("PseudoNormals.jl")
-# include("sdfOnTriangularMesh.jl")
+include("sdfOnTriangularMesh.jl")
 # include("sdfOnDensityField.jl")
 
-
-function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
-
-    points = generateGridPoints(grid)
-    linkedList = LinkedList(grid, points)
-
-    println("Init pseudo normals...")
-    VPN, EPN = computePseudoNormals(mesh)
-    println("...done.")
-
-    head = linkedList.head
-    next = linkedList.next
-    N = linkedList.grid.N
-    AABB_min = linkedList.grid.AABB_min
-    AABB_max = linkedList.grid.AABB_max
-    δ = 2.5 * grid.cell_size
-    X = mesh.X
-    IEN = mesh.IEN
-    # INE = mesh.INE
-    nsd = mesh.nsd
-    nel = mesh.nel
-
-    ngp = grid.ngp
-    big = 1.0e10
-    dist = big * ones(ngp)
-    xp = zeros(nsd, ngp)
-
-    for el = 1:nel
-        Xt = X[:, IEN[:, el]] # souřadnice trojúhelníku
-        Xt_min = minimum(Xt, dims = 2) .- δ # trojúhelník vložený do BB a přifouknu o deltu
-        Xt_max = maximum(Xt, dims = 2) .+ δ
-
-        I_min = floor.(N .* (Xt_min .- AABB_min) ./ (AABB_max .- AABB_min)) # index oddílu
-        I_max = floor.(N .* (Xt_max .- AABB_min) ./ (AABB_max .- AABB_min))
-
-        for j = 1:nsd # pokud jsem nepřetekl do mínusu nebo za max
-            if (I_min[j] < 0)
-                I_min[j] = 0
-            end
-            if (I_max[j] >= N[j])
-                I_max[j] = N[j]
-            end
-        end
-
-        x₁ = Xt[:, 1]
-        x₂ = Xt[:, 2]
-        x₃ = Xt[:, 3]
-
-        Et = Vector{Vector{Float64}}() # vektory hran trojúhelníku
-        push!(Et, Xt[:, 2] - Xt[:, 1])
-        push!(Et, Xt[:, 3] - Xt[:, 2])
-        push!(Et, Xt[:, 1] - Xt[:, 3])
-
-        n = cross(Et[1], Et[2]) # normála
-        n = n / norm(n) # jednotková normála
-
-        Is = Iterators.product(
-            I_min[1]:I_max[1],
-            I_min[2]:I_max[2],
-            I_min[3]:I_max[3],
-        )
-        for I ∈ Is
-            i = Int(
-                I[3] * (N[1] + 1) * (N[2] + 1) + I[2] * (N[1] + 1) + I[1] + 1,
-            )
-            v = head[i]
-            while v != -1
-                x = points[:, v]
-                A = [
-                    (x₁[2]*n[3]-x₁[3]*n[2]) (x₂[2]*n[3]-x₂[3]*n[2]) (x₃[2]*n[3]-x₃[3]*n[2])
-                    (x₁[3]*n[1]-x₁[1]*n[3]) (x₂[3]*n[1]-x₂[1]*n[3]) (x₃[3]*n[1]-x₃[1]*n[3])
-                    (x₁[1]*n[2]-x₁[2]*n[1]) (x₂[1]*n[2]-x₂[2]*n[1]) (x₃[1]*n[2]-x₃[2]*n[1])
-                ]
-                b = [
-                    x[2] * n[3] - x[3] * n[2],
-                    x[3] * n[1] - x[1] * n[3],
-                    x[1] * n[2] - x[2] * n[1],
-                ]
-
-                n_max, i_max = findmax(abs.(n))
-                A[i_max, :] = [1.0 1.0 1.0]
-                b[i_max] = 1.0
-                λ = A \ b # baricentrické souřadnice
-
-                xₚ = zeros(nsd)
-                # kam jsem se promítl?
-                isFace = false
-                isEdge = false
-                isVertex = false
-                if (minimum(λ) >= 0.0) # xₚ is in the triangle el
-                    xₚ = λ[1] * x₁ + λ[2] * x₂ + λ[3] * x₃
-                    dist_tmp = dot(x - xₚ, n)
-                    if (abs(dist_tmp) < abs(dist[v]))
-                        dist[v] = dist_tmp
-                        isFace = true
-                        xp[:, v] = xₚ
-                    end
-                else
-
-                    for j = 1:3
-                        L = norm(Et[j])
-                        xᵥ = Xt[:, j]
-                        P = dot(x - xᵥ, Et[j] / L)
-                        if (P >= 0 && P <= L) # pohybuji se na intervalu hrany
-                            xₚ = xᵥ + (Et[j] / L) * P
-                            n_edge = EPN[el][j]
-                            dist_tmp = sign(dot(x - xₚ, n_edge)) * norm(x - xₚ)
-
-                            if (abs(dist_tmp) < abs(dist[v]))
-                                dist[v] = dist_tmp
-                                # isEdge = true
-                                isVertex = true
-                                xp[:, v] = xₚ
-                            end
-                        end
-                    end
-                end
-                if (isFace == false && isEdge == false)
-                    dist_tmp, idx =
-                        findmin([norm(x - x₁), norm(x - x₂), norm(x - x₃)])
-                    xₚ = Xt[:, idx]
-                    n_vertex = VPN[IEN[idx, el]]
-                    dist_tmp = dist_tmp * sign(dot(x - xₚ, n_vertex))
-                    if (abs(dist_tmp) < abs(dist[v]))
-                        dist[v] = dist_tmp
-                        isVertex = true
-                        xp[:, v] = xₚ
-                    end
-                end
-                v = next[v]
-            end
-        end
-    end
-    # dist = marchingCubes(dist, N.+1, big)
-
-    for i = 1:length(dist)
-        if (abs(dist[i]) > norm(grid.cell_size))
-            dist[i] = sign(dist[i]) * norm(grid.cell_size)
-        end
-    end
-
-    return dist
-end
 
 function evalSignedDistances(
     mesh::Mesh,
@@ -167,8 +24,8 @@ function evalSignedDistances(
     ρₜ::Float64,
 )
 
-    points = generateGridPoints(grid) # uzly pravidelné mřížky
-    linkedList = LinkedList(grid, points) # pro rychlé vyhledávání
+    points = MeshGrid.generateGridPoints(grid) # uzly pravidelné mřížky
+    linkedList = MeshGrid.LinkedList(grid, points) # pro rychlé vyhledávání
 
     head = linkedList.head # ID pravidelné bunky (pozice), index bodu z points
     next = linkedList.next # vel délky points, další uzly pro danou bunku, když -1 tak už další není
