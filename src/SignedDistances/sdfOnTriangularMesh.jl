@@ -96,8 +96,9 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
             I_min[2]:I_max[2],
             I_min[3]:I_max[3],
         )
-        for I ∈ Is
-            i = Int(
+        for I ∈ Is # cycle through the nodes of the mini AABB grid
+        # I is vector - node coords
+            i = Int( # node ID
                 I[3] * (N[1] + 1) * (N[2] + 1) + I[2] * (N[1] + 1) + I[1] + 1,
             )
             v = head[i]
@@ -110,13 +111,13 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
                 isFace = false
                 isEdge = false
                 isVertex = false
-                if (minimum(λ) >= 0.0) # xₚ is in the triangle el
+                if (minimum(λ) >= 0.0) # xₚ is in the triangle, projection node x inside triangle 
                     xₚ = λ[1] * x₁ + λ[2] * x₂ + λ[3] * x₃
                     dist_tmp = dot(x - xₚ, n)
                     if (abs(dist_tmp) < abs(dist[v]))
                         dist[v] = dist_tmp
                         isFace = true
-                        xp[:, v] = xₚ
+                        xp[:, v] = xₚ # k čemu to je?
                     end
                 else
 
@@ -133,7 +134,7 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
                                 dist[v] = dist_tmp
                                 # isEdge = true
                                 isVertex = true
-                                xp[:, v] = xₚ
+                                xp[:, v] = xₚ # k čemu to je?
                             end
                         end
                     end
@@ -147,7 +148,7 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
                     if (abs(dist_tmp) < abs(dist[v]))
                         dist[v] = dist_tmp
                         isVertex = true
-                        xp[:, v] = xₚ
+                        xp[:, v] = xₚ # k čemu to je?
                     end
                 end
                 v = next[v]
