@@ -117,38 +117,38 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
                     if (abs(dist_tmp) < abs(dist[v]))
                         dist[v] = dist_tmp
                         isFace = true
-                        xp[:, v] = xₚ # k čemu to je?
+                        xp[:, v] = xₚ ## k čemu to je?
                     end
                 else
 
                     for j = 1:3
-                        L = norm(Et[j])
+                        L = norm(Et[j]) # length of j triangle edge
                         xᵥ = Xt[:, j]
-                        P = dot(x - xᵥ, Et[j] / L)
-                        if (P >= 0 && P <= L) # pohybuji se na intervalu hrany
+                        P = dot(x - xᵥ, Et[j] / L) # skalar product of vector (vertex&node) and norm edge
+                        if (P >= 0 && P <= L) # is the perpendicular projection of a node onto an edge in the edge interval?
                             xₚ = xᵥ + (Et[j] / L) * P
                             n_edge = EPN[el][j]
-                            dist_tmp = sign(dot(x - xₚ, n_edge)) * norm(x - xₚ)
+                            dist_tmp = sign(dot(x - xₚ, n_edge)) * norm(x - xₚ) ## hustý, ale nechápu, asi ok
 
                             if (abs(dist_tmp) < abs(dist[v]))
                                 dist[v] = dist_tmp
                                 # isEdge = true
                                 isVertex = true
-                                xp[:, v] = xₚ # k čemu to je?
+                                xp[:, v] = xₚ ## k čemu to je?
                             end
                         end
                     end
                 end
-                if (isFace == false && isEdge == false)
+                if (isFace == false && isEdge == false) # remaining case - "blind spot"
                     dist_tmp, idx =
-                        findmin([norm(x - x₁), norm(x - x₂), norm(x - x₃)])
-                    xₚ = Xt[:, idx]
+                        findmin([norm(x - x₁), norm(x - x₂), norm(x - x₃)]) # which node of the triangle is closer?
+                    xₚ = Xt[:, idx] # the node of triangle
                     n_vertex = VPN[IEN[idx, el]]
                     dist_tmp = dist_tmp * sign(dot(x - xₚ, n_vertex))
                     if (abs(dist_tmp) < abs(dist[v]))
                         dist[v] = dist_tmp
                         isVertex = true
-                        xp[:, v] = xₚ # k čemu to je?
+                        xp[:, v] = xₚ ## k čemu to je?
                     end
                 end
                 v = next[v]
