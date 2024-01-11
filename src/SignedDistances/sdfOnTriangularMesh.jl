@@ -1,8 +1,9 @@
-function barycentricCoordinates(x₁::Vector{Float64},
-  x₂::Vector{Float64},
-  x₃::Vector{Float64},
-  n::Vector{Float64},
-  x::Vector{Float64})
+function barycentricCoordinates(
+  x₁::Vector{Float64}, # coordinates of vertex one of the triangle
+  x₂::Vector{Float64}, # coordinates of vertex two of the triangle
+  x₃::Vector{Float64}, # coordinates of vertex tree of the triangle
+  n::Vector{Float64},  # unit normal to the face of the triangle
+  x::Vector{Float64})  # one node of the grid
 
     A = [
         (x₁[2]*n[3]-x₁[3]*n[2]) (x₂[2]*n[3]-x₂[3]*n[2]) (x₃[2]*n[3]-x₃[3]*n[2])
@@ -19,11 +20,13 @@ function barycentricCoordinates(x₁::Vector{Float64},
     A[i_max, :] = [1.0 1.0 1.0]
     b[i_max] = 1.0
 
-    return λ = A \ b # baricentrické souřadnice
+    return λ = A \ b # barycentric coordinates
 end
 
 
-function calculate_triangle_edges(Xt::Matrix{Float64})
+function calculate_triangle_edges(
+    Xt::Matrix{Float64}) # Coordinates of the vertices of the triangle
+
     Et = Vector{Vector{Float64}}(undef, 3) # Preallocate with undefined values
     Et[1] = Xt[:, 2] - Xt[:, 1]
     Et[2] = Xt[:, 3] - Xt[:, 2]
@@ -105,7 +108,7 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
                 x = points[:, v]
                 λ = barycentricCoordinates(x₁, x₂, x₃, n, x)
         
-                xₚ = zeros(nsd)
+                xₚ = zeros(nsd) # projection
                 
                 isFaceOrEdge = false # projection check
 
