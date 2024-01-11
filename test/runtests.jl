@@ -12,12 +12,12 @@ using JLD
 
 @testset "Rho2sdf.jl" begin
     
-    @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
-    @time @testset "MeshGridTest" begin include("MeshGridTest/runtests.jl") end
-    @time @testset "SignedDistancesTest" begin include("SignedDistancesTest/runtests.jl") end
+    # @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
+    # @time @testset "MeshGridTest" begin include("MeshGridTest/runtests.jl") end
+#     @time @testset "SignedDistancesTest" begin include("SignedDistancesTest/runtests.jl") end
 # end
 # exit()
-    
+#     
     # # Data from Matlab:
     taskName = "chapadlo"
     data = matread(taskName * ".mat")
@@ -53,20 +53,21 @@ using JLD
     ## Grid:
     X_min, X_max = MeshGrid.getMesh_AABB(mesh.X) # vec, vec
     
-    N = 50  #Number of divisions along the longest side (along some axis)
+    N = 100  #Number of divisions along the longest side (along some axis)
     sdf_grid = MeshGrid.Grid(X_min, X_max, N) # cartesian grid
     
     ## SFD from triangular mesh:
     sdf_dists = SignedDistances.evalSignedDistancesOnTriangularMesh(mesh, sdf_grid) # Vector{Float64}
-    exit()
+    # print("done")
+    # exit()
     
     ## SDF from densities:
-    ρₜ = 0.5
-    sdf_dists = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ , ρₜ)
+    # ρₜ = 0.5
+    # sdf_dists = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ , ρₜ)
 
     ## Data export to VTK:
     # Rho2sdf.DataProcessing.exportStructuredPointsToVTK(taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
-    Rho2sdf.exportStructuredPointsToVTK("trubka_" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
+    Rho2sdf.exportStructuredPointsToVTK("test-trubka_" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
 
 
 
