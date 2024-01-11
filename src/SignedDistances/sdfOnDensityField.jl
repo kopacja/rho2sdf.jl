@@ -54,8 +54,6 @@ function evalSignedDistances(
 
                     for a = 1:nsn # cyklus přes uzly segmentu (face)
 
-
-
                         As = IEN[ISN[sg][a], el] # globální číslo uzlu
                         adj_els = INE[As] # všechny elementy které jsou součástí tohoto uzlu
                         for adj_el in adj_els
@@ -101,24 +99,15 @@ function evalSignedDistances(
                                     Xt = [x_prev, xs, x_next]
                                     Xt = reduce(hcat, Xt)
 
-                                    Et = Vector{Vector{Float64}}()
-                                    push!(Et, Xt[:, 2] - Xt[:, 1])
-                                    push!(Et, Xt[:, 3] - Xt[:, 2])
-                                    push!(Et, Xt[:, 1] - Xt[:, 3])
+                                    Et = calculate_triangle_edges(Xt)
 
                                     n = cross(Et[1], Et[2])
                                     n = n / norm(n)
 
-
-
                                 end
                             end
                         end
-
-
-
-
-
+                        
                         x₁ = Xs[:, a] # trojúhelník
                         x₂ = Xs[:, (a%nsn)+1]
                         x₃ = Xc
@@ -126,119 +115,58 @@ function evalSignedDistances(
                         Xt = [x₁, x₂, x₃]
                         Xt = reduce(hcat, Xt)
 
-                        Xt_min = minimum(Xt, dims = 2) .- δ # hraniční body přifouklého trojúhelníku
-                        Xt_max = maximum(Xt, dims = 2) .+ δ
-
-                        # trojúhelník v konstičce a zjišťuji kde se nachází
-                        I_min =
-                            floor.(
-                                N .* (Xt_min .- AABB_min) ./
-                                (AABB_max .- AABB_min),
-                            )
-                        I_max =
-                            floor.(
-                                N .* (Xt_max .- AABB_min) ./
-                                (AABB_max .- AABB_min),
-                            )
-
-                        # kontrola indexů (jeslti nelezou přes)
-                        for j = 1:nsd
-                            if (I_min[j] < 0)
-                                I_min[j] = 0
-                            end
-                            if (I_max[j] >= N[j])
-                                I_max[j] = N[j]
-                            end
-                        end
-
                         # Hrany trojúhelníku
-                        Et = Vector{Vector{Float64}}()
-                        push!(Et, Xt[:, 2] - Xt[:, 1])
-                        push!(Et, Xt[:, 3] - Xt[:, 2])
-                        push!(Et, Xt[:, 1] - Xt[:, 3])
+                        Et = calculate_triangle_edges(Xt)
 
                         # normála trojúhelníka
                         n = cross(Et[1], Et[2])
                         n = n / norm(n)
 
-                        # MeshGrid jako v matlabu
-                        Is = Iterators.product(
-                            I_min[1]:I_max[1],
-                            I_min[2]:I_max[2],
-                            I_min[3]:I_max[3],
-                        )
+                        Is = MeshGrid.calculateMiniAABB_grid(Xt, δ, N, AABB_min, AABB_max, nsd)
+
                         for I ∈ Is # bunce přiřadím jedno číslo
                             ii = Int(
-                                I[3] * (N[1] + 1) * (N[2] + 1) +
-                                I[2] * (N[1] + 1) +
-                                I[1] +
-                                1,
+                                I[3] * (N[1] + 1) * (N[2] + 1) + I[2] * (N[1] + 1) + I[1] + 1,
                             )
                             v = head[ii]
                             while v != -1
                                 x = points[:, v]
-                                A = [ # promítám x na trojúhelník
-                                    (x₁[2]*n[3]-x₁[3]*n[2]) (x₂[2]*n[3]-x₂[3]*n[2]) (x₃[2]*n[3]-x₃[3]*n[2])
-                                    (x₁[3]*n[1]-x₁[1]*n[3]) (x₂[3]*n[1]-x₂[1]*n[3]) (x₃[3]*n[1]-x₃[1]*n[3])
-                                    (x₁[1]*n[2]-x₁[2]*n[1]) (x₂[1]*n[2]-x₂[2]*n[1]) (x₃[1]*n[2]-x₃[2]*n[1])
-                                ]
-                                b = [
-                                    x[2] * n[3] - x[3] * n[2],
-                                    x[3] * n[1] - x[1] * n[3],
-                                    x[1] * n[2] - x[2] * n[1],
-                                ]
+                                λ = barycentricCoordinates(x₁, x₂, x₃, n, x)
+                                
+                                xₚ = zeros(nsd) # projection
 
-                                n_max, i_max = findmax(abs.(n))
-                                A[i_max, :] = [1.0 1.0 1.0]
-                                b[i_max] = 1.0
-                                λ = A \ b # baricentrické souřadnice
+                                isFaceOrEdge = false # projection check
 
-                                xₚ = zeros(nsd) # geometrická projekce
-                                isFace = false
-                                isEdge = false
-                                isVertex = false
-                                if (minimum(λ) >= 0.0) # xₚ is in the triangle el
+                                if (minimum(λ) >= 0.0) # xₚ is in the triangle, projection node x inside triangle 
                                     xₚ = λ[1] * x₁ + λ[2] * x₂ + λ[3] * x₃
                                     dist_tmp = dot(x - xₚ, n)
-                                    if (abs(dist_tmp) < abs(dist[v])) # kontrola vzádlenosti (hledám tu nejkratší)
-                                        dist[v] = dist_tmp
-                                        isFace = true
-                                        xp[:, v] = xₚ
-                                    # end
-                                    else
-                                        for j = 1:3
-                                            L = norm(Et[j])
-                                            xᵥ = Xt[:, j]
-                                            P = dot(x - xᵥ, Et[j] / L)
-                                            if (P >= 0 && P <= L)
-                                                xₚ = xᵥ + (Et[j] / L) * P
-                                                #n_edge = EPN[el][j]
-                                                dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
 
-                                                if (abs(dist_tmp) < abs(dist[v]))
-                                                    dist[v] = dist_tmp
-                                                    isVertex = true
-                                                    xp[:, v] = xₚ
-                                                end
-                                            end
+                                    isFaceOrEdge = update_distance!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
+                                else
+                    
+                                    # Edges of the triangle:
+                                    for j = 1:3
+                                        L = norm(Et[j]) # length of j triangle edge
+                                        xᵥ = Xt[:, j]
+                                        P = dot(x - xᵥ, Et[j] / L) # skalar product of vector (vertex&node) and norm edge
+                                        if (P >= 0 && P <= L) # is the perpendicular projection of a node onto an edge in the edge interval?
+                                            xₚ = xᵥ + (Et[j] / L) * P
+                                            n_edge = EPN[el][j]
+                                            dist_tmp = sign(dot(x - xₚ, n_edge)) * norm(x - xₚ) ## hustý, ale nechápu, asi ok
+
+                                            isFaceOrEdge = update_distance!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
                                         end
                                     end
                                 end
-                                if (isFace == false && isEdge == false)
-                                    dist_tmp, idx = findmin([
-                                        norm(x - x₁),
-                                        norm(x - x₂),
-                                        norm(x - x₃),
-                                    ])
-                                    xₚ = Xt[:, idx]
-                                    #n_vertex = VPN[IEN[idx, el]]
-                                    dist_tmp =
-                                        dist_tmp * sign(dot(x - xₚ, n))
-                                    if (abs(dist_tmp) < abs(dist[v]))
-                                        dist[v] = dist_tmp
-                                        isVertex = true
-                                        xp[:, v] = xₚ
-                                    end
+                                 # Remaining cases:
+                                if (isFaceOrEdge == false) 
+                                    dist_tmp, idx =
+                                        findmin([norm(x - x₁), norm(x - x₂), norm(x - x₃)]) # which node of the triangle is closer?
+                                    xₚ = Xt[:, idx] # the node of triangle
+                                    n_vertex = VPN[IEN[idx, el]]
+                                    dist_tmp = dist_tmp * sign(dot(x - xₚ, n_vertex))
+
+                                    isFaceOrEdge = update_distance!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
                                 end
                                 v = next[v]
                             end
@@ -253,34 +181,12 @@ function evalSignedDistances(
                 # println("Hranice prochází elementem...")
 
                 Xₑ = X[:, IEN[:, el]]
-                Xₑ_min = minimum(Xₑ, dims = 2) .- δ
-                Xₑ_max = maximum(Xₑ, dims = 2) .+ δ
+                
+                Is = MeshGrid.calculateMiniAABB_grid(Xₑ, δ, N, AABB_min, AABB_max, nsd)
 
-                I_min =
-                    floor.(N .* (Xₑ_min .- AABB_min) ./ (AABB_max .- AABB_min),)
-                I_max =
-                    floor.(N .* (Xₑ_max .- AABB_min) ./ (AABB_max .- AABB_min),)
-
-                for j = 1:nsd
-                    if (I_min[j] < 0)
-                        I_min[j] = 0
-                    end
-                    if (I_max[j] >= N[j])
-                        I_max[j] = N[j]
-                    end
-                end
-
-                Is = Iterators.product(
-                    I_min[1]:I_max[1],
-                    I_min[2]:I_max[2],
-                    I_min[3]:I_max[3],
-                )
                 for I ∈ Is
                     ii = Int(
-                        I[3] * (N[1] + 1) * (N[2] + 1) +
-                        I[2] * (N[1] + 1) +
-                        I[1] +
-                        1,
+                        I[3] * (N[1] + 1) * (N[2] + 1) + I[2] * (N[1] + 1) + I[1] + 1,
                     )
                     v = head[ii]
                     while v != -1
