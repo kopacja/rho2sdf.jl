@@ -85,23 +85,6 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
 
         Xt = X[:, IEN[:, el]] # coordinates of the vertices of the triangle
         
-        # Triangle inside AABB 
-        Xt_min = minimum(Xt, dims = 2) .- δ # bottom left corner coord
-        Xt_max = maximum(Xt, dims = 2) .+ δ # top righ corner coord
-        
-        # Mini AABB for triangle:
-        I_min = floor.(N .* (Xt_min .- AABB_min) ./ (AABB_max .- AABB_min)) # Triangle location (index) within the grid
-        I_max = floor.(N .* (Xt_max .- AABB_min) ./ (AABB_max .- AABB_min)) # Triangle location (index) within the grid
-
-        for j = 1:nsd # am I inside AABB?
-            if (I_min[j] < 0)
-                I_min[j] = 0
-            end
-            if (I_max[j] >= N[j])
-                I_max[j] = N[j]
-            end
-        end
-
         x₁, x₂, x₃ = Xt[:, 1], Xt[:, 2], Xt[:, 3] # coordinates of nodes of the triangle
 
         Et = calculate_triangle_edges(Xt)
@@ -109,11 +92,9 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
         n = cross(Et[1], Et[2]) # norm of triangle
         n = n / norm(n) # unit norm
 
-        Is = Iterators.product( # step range of mini AABB
-            I_min[1]:I_max[1],
-            I_min[2]:I_max[2],
-            I_min[3]:I_max[3],
-        )
+        # Nodes of mini AABB grid:
+        Is = MeshGrid.calculateMiniAABB_grid(Xt, δ, N, AABB_min, AABB_max, nsd)
+
         for I ∈ Is # cycle through the nodes of the mini AABB grid
         # I is vector - node coords
             i = Int( # node ID

@@ -139,3 +139,38 @@ end
 #     end
 #     return X
 # end
+
+
+function calculateMiniAABB_grid(Xt::Matrix{Float64},
+    δ::Float64,
+    N::Vector{Int64},
+    AABB_min::Vector{Float64},
+    AABB_max::Vector{Float64},
+    nsd::Int)
+    
+    Xt_min = minimum(Xt, dims = 2) .- δ # bottom left corner coord
+    Xt_max = maximum(Xt, dims = 2) .+ δ # top righ corner coord
+
+    # Mini AABB for triangle:
+    I_min = floor.(N .* (Xt_min .- AABB_min) ./ (AABB_max .- AABB_min)) # Triangle location (index) within the grid
+    I_max = floor.(N .* (Xt_max .- AABB_min) ./ (AABB_max .- AABB_min)) # Triangle location (index) within the grid
+
+
+    for j = 1:nsd # am I inside AABB?
+        if (I_min[j] < 0)
+            I_min[j] = 0
+        end
+        if (I_max[j] >= N[j])
+            I_max[j] = N[j] - 1
+        end
+    end
+
+    Is = Iterators.product( # step range of mini AABB
+        I_min[1]:I_max[1],
+        I_min[2]:I_max[2],
+        I_min[3]:I_max[3],
+    )
+
+    return Is
+end
+
