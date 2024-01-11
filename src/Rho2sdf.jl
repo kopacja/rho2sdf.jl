@@ -133,11 +133,14 @@ function exportStructuredPointsToVTK(
     dim_y = dim[2]
     dim_z = dim[3]
     write(io, "DIMENSIONS $dim_x $dim_y $dim_z\n") # dimenze pravidelné sítě
+    
+    #     spacing_x = spacing[1]
+    #     spacing_y = spacing[2]
+    #     spacing_z = spacing[3]
 
-    spacing_x = spacing[1]
-    spacing_y = spacing[2]
-    spacing_z = spacing[3]
-    write(io, "SPACING $spacing_x $spacing_y $spacing_z\n") # krok sítě ve 3 směrech
+    #     write(io, "SPACING $spacing_x $spacing_y $spacing_z\n") # krok sítě ve 3 směrech jiný
+
+    write(io, "SPACING $spacing $spacing $spacing\n") # krok sítě ve 3 směrech stejný
 
     org_x = org[1]
     org_y = org[2]
