@@ -15,7 +15,7 @@ function barycentricCoordinates(x₁::Vector{Float64},
         x[1] * n[2] - x[2] * n[1],
     ]
     
-    n_max, i_max = findmax(abs.(n))
+    n_max, i_max = findmax(abs.(n)) ##???
     A[i_max, :] = [1.0 1.0 1.0]
     b[i_max] = 1.0
 
@@ -32,7 +32,7 @@ function calculate_triangle_edges(Xt::Matrix{Float64})
 end
 
 
-function update_distance_and_vertex!(dist::Vector{Float64},
+function update_distance!(dist::Vector{Float64},
   dist_tmp::Float64,
   v::Int,
   xp::Matrix{Float64},
@@ -42,7 +42,7 @@ function update_distance_and_vertex!(dist::Vector{Float64},
     if abs(dist_tmp) < abs(dist[v])
         dist[v] = dist_tmp
         isFaceOrEdge = true
-        xp[:, v] = xₚ  # Update the matrix column for vertex v
+        xp[:, v] = xₚ  # Update the matrix column for vertex v, ???
     end
     return isFaceOrEdge  # Optionally return whether the vertex was updated
 end
@@ -133,7 +133,7 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
                     xₚ = λ[1] * x₁ + λ[2] * x₂ + λ[3] * x₃
                     dist_tmp = dot(x - xₚ, n)
                     
-                    isFaceOrEdge = update_distance_and_vertex!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
+                    isFaceOrEdge = update_distance!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
                 else
                     
                     # Edges of the triangle:
@@ -146,7 +146,7 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
                             n_edge = EPN[el][j]
                             dist_tmp = sign(dot(x - xₚ, n_edge)) * norm(x - xₚ) ## hustý, ale nechápu, asi ok
 
-                            isFaceOrEdge = update_distance_and_vertex!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
+                            isFaceOrEdge = update_distance!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
                         end
                     end
                 end
@@ -158,7 +158,7 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
                     n_vertex = VPN[IEN[idx, el]]
                     dist_tmp = dist_tmp * sign(dot(x - xₚ, n_vertex))
 
-                    isFaceOrEdge = update_distance_and_vertex!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
+                    isFaceOrEdge = update_distance!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
                 end
                 v = next[v]
             end
