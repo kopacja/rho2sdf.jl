@@ -31,6 +31,24 @@ function calculate_triangle_edges(Xt::Matrix{Float64})
     return Et
 end
 
+
+function update_distance_and_vertex!(dist::Vector{Float64},
+  dist_tmp::Float64,
+  v::Int,
+  xp::Matrix{Float64},
+  xₚ::Vector{Float64},
+  isFaceOrEdge::Bool)
+
+    if abs(dist_tmp) < abs(dist[v])
+        dist[v] = dist_tmp
+        isFaceOrEdge = true
+        xp[:, v] = xₚ  # Update the matrix column for vertex v
+    end
+    return isFaceOrEdge  # Optionally return whether the vertex was updated
+end
+
+
+  
 function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
 
     points = MeshGrid.generateGridPoints(grid)
@@ -107,20 +125,18 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
                 λ = barycentricCoordinates(x₁, x₂, x₃, n, x)
         
                 xₚ = zeros(nsd)
-                # kam jsem se promítl?
-                isFace = false
-                isEdge = false
-                isVertex = false
+                
+                isFaceOrEdge = false # projection check
+
+                # Inside triangle:
                 if (minimum(λ) >= 0.0) # xₚ is in the triangle, projection node x inside triangle 
                     xₚ = λ[1] * x₁ + λ[2] * x₂ + λ[3] * x₃
                     dist_tmp = dot(x - xₚ, n)
-                    if (abs(dist_tmp) < abs(dist[v]))
-                        dist[v] = dist_tmp
-                        isFace = true
-                        xp[:, v] = xₚ ## k čemu to je?
-                    end
+                    
+                    isFaceOrEdge = update_distance_and_vertex!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
                 else
-
+                    
+                    # Edges of the triangle:
                     for j = 1:3
                         L = norm(Et[j]) # length of j triangle edge
                         xᵥ = Xt[:, j]
@@ -130,26 +146,19 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
                             n_edge = EPN[el][j]
                             dist_tmp = sign(dot(x - xₚ, n_edge)) * norm(x - xₚ) ## hustý, ale nechápu, asi ok
 
-                            if (abs(dist_tmp) < abs(dist[v]))
-                                dist[v] = dist_tmp
-                                # isEdge = true
-                                isVertex = true
-                                xp[:, v] = xₚ ## k čemu to je?
-                            end
+                            isFaceOrEdge = update_distance_and_vertex!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
                         end
                     end
                 end
-                if (isFace == false && isEdge == false) # remaining case - "blind spot"
+                # Remaining cases:
+                if (isFaceOrEdge == false) 
                     dist_tmp, idx =
                         findmin([norm(x - x₁), norm(x - x₂), norm(x - x₃)]) # which node of the triangle is closer?
                     xₚ = Xt[:, idx] # the node of triangle
                     n_vertex = VPN[IEN[idx, el]]
                     dist_tmp = dist_tmp * sign(dot(x - xₚ, n_vertex))
-                    if (abs(dist_tmp) < abs(dist[v]))
-                        dist[v] = dist_tmp
-                        isVertex = true
-                        xp[:, v] = xₚ ## k čemu to je?
-                    end
+
+                    isFaceOrEdge = update_distance_and_vertex!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
                 end
                 v = next[v]
             end
