@@ -61,17 +61,17 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
     VPN, EPN = computePseudoNormals(mesh)
     println("...done.")
 
-    head = linkedList.head
-    next = linkedList.next
+    head = linkedList.head # ID pravidelné bunky (pozice), index bodu z points
+    next = linkedList.next # vec délky points, další uzly pro danou bunku, když -1 tak už další není
     N = linkedList.grid.N  # Number of divisions along each axis of the grid
-    AABB_min = linkedList.grid.AABB_min
-    AABB_max = linkedList.grid.AABB_max
-    δ = 2.5 * grid.cell_size
-    X = mesh.X
-    IEN = mesh.IEN
-    # INE = mesh.INE
-    nsd = mesh.nsd
-    nel = mesh.nel
+    AABB_min = linkedList.grid.AABB_min # Minimum coordinates of the Axis-Aligned Bounding Box (AABB)
+    AABB_max = linkedList.grid.AABB_max # Maximum coordinates of the AABB
+    δ = 2.5 * grid.cell_size # offset for mini AABB
+    
+    X   = mesh.X   # vector of nodes positions
+    IEN = mesh.IEN # ID element -> ID nodes
+    nsd = mesh.nsd # number of spacial dimensions
+    nel = mesh.nel # number of all elements
 
     ngp = grid.ngp
     big = 1.0e10
