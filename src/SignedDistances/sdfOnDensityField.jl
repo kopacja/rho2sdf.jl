@@ -11,121 +11,70 @@ function evalSignedDistances(
     linkedList = MeshGrid.LinkedList(grid, points) # pro rychlé vyhledávání
 
     head = linkedList.head # ID pravidelné bunky (pozice), index bodu z points
-    next = linkedList.next # vel délky points, další uzly pro danou bunku, když -1 tak už další není
-    N = linkedList.grid.N # počet buněk ve směru xyz
-    AABB_min = linkedList.grid.AABB_min # bod boxu (minimum v xyz)
-    AABB_max = linkedList.grid.AABB_max # bod boxu (maximum v xyz)
-    δ = 5.1 * grid.cell_size # offset (přifouknutí celého boxu)
-    X = mesh.X
-    IEN = mesh.IEN
-    INE = mesh.INE
-    ISN = mesh.ISN
-    nsd = mesh.nsd
-    nel = mesh.nel
-    nes = mesh.nes
-    nsn = mesh.nsn
+    next = linkedList.next # vec délky points, další uzly pro danou bunku, když -1 tak už další není
+    N = linkedList.grid.N # Number of divisions along each axis of the grid
+    AABB_min = linkedList.grid.AABB_min # Minimum coordinates of the Axis-Aligned Bounding Box (AABB)
+    AABB_max = linkedList.grid.AABB_max # Maximum coordinates of the AABB
+    δ = 5.1 * grid.cell_size # offset for mini AABB
 
-    ngp = grid.ngp # počet vrcholu prav sítě
+    X   = mesh.X   # vector of nodes positions
+    IEN = mesh.IEN # ID element -> ID nodes
+    INE = mesh.INE # ID node -> ID elements
+    ISN = mesh.ISN # connectivity face - edges
+    nsd = mesh.nsd # number of spacial dimensions
+    nel = mesh.nel # number of all elements
+    nes = mesh.nes # number of element segments (faces)
+    nsn = mesh.nsn # number of face nodes
+
+    ngp = grid.ngp # number of nodes in grid
     big = 1.0e10
-    dist = big * ones(ngp) # inicializace dist fieldu
+    dist = big * ones(ngp) # distance field initialization
     xp = zeros(nsd, ngp) # souřadnice bodů vrcholů (3xngp)
 
     for el = 1:nel
-    # for el = 415
-        ρₑ = ρₙ[IEN[:, el]]
+        
+        ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
 
         ρₑ_min = minimum(ρₑ)
         ρₑ_max = maximum(ρₑ)
-        if (ρₑ_min >= ρₜ) # hranice elementem neprochází
+        if (ρₑ_min >= ρₜ) # the boundary does not cross through the element
             # continue # PRO PŘESKAKUJE HRANIČNÍ ELEMENTY (pouze pro ladění kodu)
             commonEls = []
-            for sg = 1:nes # je to hraniční element?
-                commonEls = INE[IEN[mesh.ISN[sg][1], el]]
+
+            # cycle through element faces (6)
+            for sg = 1:nes 
+                commonEls = INE[IEN[mesh.ISN[sg][1], el]] # 
                 for a = 2:nsn
-                    idx = findall(in(INE[IEN[ISN[sg][a], el]]), commonEls)
+                    idx = findall(in(INE[IEN[ISN[sg][a], el]]), commonEls) # for how many elements does this face belong ?
                     commonEls = commonEls[idx]
                 end
 
-                # Mám vnější segment a chci jeho pseudonormály,...
-
-                if (length(commonEls) == 1) # is a part of the outer boundary of the body
+                if (length(commonEls) == 1) # = is a part of the outer boundary of the body
                     Xs = X[:, IEN[ISN[sg], el]]
-                    Xc = mean(Xs, dims = 2)
+                    Xc = vec(mean(Xs, dims = 2))
 
-                    for a = 1:nsn # cyklus přes uzly segmentu (face)
+                    for a = 1:nsn # cycle through number of all nodals belong to face
 
-                        As = IEN[ISN[sg][a], el] # globální číslo uzlu
-                        adj_els = INE[As] # všechny elementy které jsou součástí tohoto uzlu
-                        for adj_el in adj_els
-                            common_adj_els = []
-                            for adj_sg = 1:nes # cyklus přes sousední stěny elementu
-                                common_adj_els =
-                                    INE[IEN[mesh.ISN[adj_sg][1], adj_el]]
-                                for b = 2:nsn
-                                    idx = findall(
-                                        in(INE[IEN[ISN[adj_sg][b], adj_el]]),
-                                        common_adj_els,
-                                    )
-                                    common_adj_els = common_adj_els[idx]
-                                end
-
-                                if (
-                                    length(common_adj_els) == 1 &&
-                                    in(As, IEN[mesh.ISN[adj_sg], adj_el])
-                                )
-                                    # println("Adjacent element")
-
-                                    adj_Xs = X[:, IEN[ISN[adj_sg], adj_el]]
-                                    adj_Xc = mean(adj_Xs, dims = 2)
-
-                                    as = indexin(
-                                        As,
-                                        IEN[mesh.ISN[adj_sg], adj_el],
-                                    )
-
-                                    a_prev = ((as[1] + nsn - 1 - 1) % nsn) + 1
-                                    a_next = ((as[1] + nsn + 1 - 1) % nsn) + 1
-
-                                    x_prev = X[
-                                        :,
-                                        IEN[mesh.ISN[adj_sg][a_prev], adj_el],
-                                    ]
-                                    xs = X[:, IEN[mesh.ISN[adj_sg][as], adj_el]]
-                                    x_next = X[
-                                        :,
-                                        IEN[mesh.ISN[adj_sg][a_next], adj_el],
-                                    ]
-
-                                    Xt = [x_prev, xs, x_next]
-                                    Xt = reduce(hcat, Xt)
-
-                                    Et = calculate_triangle_edges(Xt)
-
-                                    n = cross(Et[1], Et[2])
-                                    n = n / norm(n)
-
-                                end
-                            end
-                        end
-                        
-                        x₁ = Xs[:, a] # trojúhelník
+                        # coordinates of nodes of the triangle
+                        x₁ = Xs[:, a] 
                         x₂ = Xs[:, (a%nsn)+1]
                         x₃ = Xc
-
+                        
+                        # coordinates of the vertices of the triangle
                         Xt = [x₁, x₂, x₃]
                         Xt = reduce(hcat, Xt)
 
-                        # Hrany trojúhelníku
+                        # Triangle edges
                         Et = calculate_triangle_edges(Xt)
 
-                        # normála trojúhelníka
-                        n = cross(Et[1], Et[2])
-                        n = n / norm(n)
+                        n = cross(Et[1], Et[2]) # norm of triangle
+                        n = n / norm(n) # unit norm
 
+                        # Nodes of mini AABB grid:
                         Is = MeshGrid.calculateMiniAABB_grid(Xt, δ, N, AABB_min, AABB_max, nsd)
 
-                        for I ∈ Is # bunce přiřadím jedno číslo
-                            ii = Int(
+                        for I ∈ Is # cycle through the nodes of the mini AABB grid
+                            ii = Int( # node ID
                                 I[3] * (N[1] + 1) * (N[2] + 1) + I[2] * (N[1] + 1) + I[1] + 1,
                             )
                             v = head[ii]
@@ -151,19 +100,21 @@ function evalSignedDistances(
                                         P = dot(x - xᵥ, Et[j] / L) # skalar product of vector (vertex&node) and norm edge
                                         if (P >= 0 && P <= L) # is the perpendicular projection of a node onto an edge in the edge interval?
                                             xₚ = xᵥ + (Et[j] / L) * P
-                                            n_edge = EPN[el][j]
+                                            n_edge = n
+                                            # n_edge = EPN[el][j]
                                             dist_tmp = sign(dot(x - xₚ, n_edge)) * norm(x - xₚ) ## hustý, ale nechápu, asi ok
 
                                             isFaceOrEdge = update_distance!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
                                         end
                                     end
                                 end
-                                 # Remaining cases:
+                                # Remaining cases:
                                 if (isFaceOrEdge == false) 
                                     dist_tmp, idx =
                                         findmin([norm(x - x₁), norm(x - x₂), norm(x - x₃)]) # which node of the triangle is closer?
                                     xₚ = Xt[:, idx] # the node of triangle
-                                    n_vertex = VPN[IEN[idx, el]]
+                                    n_vertex = n
+                                    # n_vertex = VPN[IEN[idx, el]]
                                     dist_tmp = dist_tmp * sign(dot(x - xₚ, n_vertex))
 
                                     isFaceOrEdge = update_distance!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
@@ -178,7 +129,9 @@ function evalSignedDistances(
         else # (ρₑ_min < ρₜ)
             # continue
             if (ρₑ_max > ρₜ)
-                # println("Hranice prochází elementem...")
+                println("Hranice prochází elementem...")
+                println("ρₑ_min", ρₑ_min)
+                println("ρₑ_max", ρₑ_max)
 
                 Xₑ = X[:, IEN[:, el]]
                 

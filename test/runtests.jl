@@ -21,11 +21,11 @@ using JLD
     # # Data from Matlab:
     taskName = "chapadlo"
     data = matread(taskName * ".mat")
-    # data = matread("test/" * taskName * ".mat")
+    # # data = matread("test/" * taskName * ".mat")
     part_name = "elementy_trubky.txt"
-    # part_name = "test/elementy_trubky.txt"
+    # # part_name = "test/elementy_trubky.txt"
     (X, IEN, rho) = MeshGrid.MeshInformations(data)
-    
+    # 
     # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("cube", 14)
     # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 6)
 
@@ -34,13 +34,13 @@ using JLD
     (mesh, rho) = MeshGrid.PartOfModel(mesh, rho, part_name)
     
 
-    # ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
+    ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
     # ρₙ = MeshGrid.elementToNodalValues(mesh, rho) # average
     # exit()
 
 
     ## Face triangular mesh:
-    mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh) 
+    # mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh) 
 
     # save("taskName" * "_triangular_mesh.jld", "mesh", mesh)
     # mesh = load("taskName" * "_triangular_mesh.jld", "mesh") # načtení chapadla (stl)
@@ -57,17 +57,17 @@ using JLD
     sdf_grid = MeshGrid.Grid(X_min, X_max, N) # cartesian grid
     
     ## SFD from triangular mesh:
-    sdf_dists = SignedDistances.evalSignedDistancesOnTriangularMesh(mesh, sdf_grid) # Vector{Float64}
+    # sdf_dists = SignedDistances.evalSignedDistancesOnTriangularMesh(mesh, sdf_grid) # Vector{Float64}
     # print("done")
     # exit()
     
     ## SDF from densities:
-    # ρₜ = 0.5
-    # sdf_dists = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ , ρₜ)
+    ρₜ = 0.5
+    sdf_dists = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ , ρₜ)
 
     ## Data export to VTK:
     # Rho2sdf.DataProcessing.exportStructuredPointsToVTK(taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
-    Rho2sdf.exportStructuredPointsToVTK("test-trubka_" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
+    Rho2sdf.exportStructuredPointsToVTK("sdf2-test-trubka_" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
 
 
 
