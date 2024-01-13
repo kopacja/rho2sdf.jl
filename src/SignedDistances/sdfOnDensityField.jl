@@ -25,6 +25,7 @@ function evalSignedDistances(
     nel = mesh.nel # number of all elements
     nes = mesh.nes # number of element segments (faces)
     nsn = mesh.nsn # number of face nodes
+    println("number of all elements: ", nel)
 
     ngp = grid.ngp # number of nodes in grid
     big = 1.0e10
@@ -32,7 +33,7 @@ function evalSignedDistances(
     xp = zeros(nsd, ngp) # souřadnice bodů vrcholů (3xngp)
 
     for el = 1:nel
-        
+        println("element ID: ", el)
         ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
 
         ρₑ_min = minimum(ρₑ)
@@ -129,37 +130,46 @@ function evalSignedDistances(
         else # (ρₑ_min < ρₜ)
             # continue
             if (ρₑ_max > ρₜ)
-                println("Hranice prochází elementem...")
-                println("ρₑ_min", ρₑ_min)
-                println("ρₑ_max", ρₑ_max)
+                # println("Hranice prochází elementem...")
+                # println("ρₑ_min: ", ρₑ_min)
+                # println("ρₑ_max: ", ρₑ_max)
 
                 Xₑ = X[:, IEN[:, el]]
+                # println("Xₑ: ", Xₑ)
+                
+                # println("el: ", el)
                 
                 Is = MeshGrid.calculateMiniAABB_grid(Xₑ, δ, N, AABB_min, AABB_max, nsd)
+                # println("length Is: ", length(Is))
+                Isi = 0
 
                 for I ∈ Is
+                    Isi = Isi + 1
+                    # println("where am I (Isi): ", Isi)
+
                     ii = Int(
                         I[3] * (N[1] + 1) * (N[2] + 1) + I[2] * (N[1] + 1) + I[1] + 1,
                     )
                     v = head[ii]
                     while v != -1
                         x = points[:, v]
-                        println("xxx:",typeof(x))
+                        # println("xxx:",typeof(x))
 
-                        xₚ = [0.0, 0.0, 0.0] # odhad?
-                        n = [0.0, 0.0, 0.0]
-                        Ξ = [0.0, 0.0, 0.0]
-                        λ = 1.0
+                        xₚ = [0.0, 0.0, 0.0] # estimation of point projection position
+                        n = [0.0, 0.0, 0.0]  # estimation of norm
+                        Ξ = [0.0, 0.0, 0.0]  # local coordinates
+                        λ = 1.0              # Lagrange multiplier
                         Ξ_tol = 1e-2
                         Ξ_norm = 2 * Ξ_tol
                         r_tol = 1e-2
-                        r_norm = 2 * r_tol
-                        niter = 100
-                        iter = 1
+                        r_norm = 2 * r_tol   # 
+                        niter = 100          # maximum number of iterations
+                        iter = 1             # iteration form one 
 
                         while (Ξ_norm ≥ Ξ_tol && iter ≤ niter)# || r_norm ≥ r_tol)
-                            println("el:",el)
-                            sleep(0.5)
+                            # println("el: ",el)
+                            # println("Ξ_norm: ",Ξ_norm)
+                            # sleep(0.2)
                             ########################################
                             (K, r) = AnalyticalDerivations(Ξ, Xₑ, ρₑ, λ, ρₜ, x)
                             # (K_diff) = NumericalDerivations(Ξ, Xₑ, ρₑ, λ, ρₜ, x)
@@ -185,6 +195,7 @@ function evalSignedDistances(
                                 ΔΞ_and_Δλ = Φ * ΔΞ̃_and_Δλ̃
                             else
                                 ΔΞ_and_Δλ = K \ -r
+                                # ΔΞ_and_Δλ = K \ r
                             end
 
                             max_abs_Ξ = maximum(abs.(ΔΞ_and_Δλ[1:end-1]))
@@ -194,12 +205,13 @@ function evalSignedDistances(
                             end
 
 
-                            Ξ = Ξ + ΔΞ_and_Δλ[1:end-1]
-                            λ = λ + ΔΞ_and_Δλ[end]
+                            Ξ = Ξ - ΔΞ_and_Δλ[1:end-1]
+                            λ = λ - ΔΞ_and_Δλ[end]
 
                             Ξ_norm = norm(ΔΞ_and_Δλ)
 
                             iter = iter + 1
+                            # println("local coord Ξ: ",Ξ)
                         end
 
                         if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element

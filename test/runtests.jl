@@ -20,19 +20,20 @@ using JLD
 #     
     # # Data from Matlab:
     taskName = "chapadlo"
-    data = matread(taskName * ".mat")
-    # # data = matread("test/" * taskName * ".mat")
-    part_name = "elementy_trubky.txt"
-    # # part_name = "test/elementy_trubky.txt"
+    # taskName = "sphere"
+    # data = matread(taskName * ".mat")
+    data = matread("test/" * taskName * ".mat")
+    # part_name = "elementy_trubky.txt"
+    part_name = "test/elementy_trubky.txt"
     (X, IEN, rho) = MeshGrid.MeshInformations(data)
     # 
-    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("cube", 14)
-    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 6)
+    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("cube", 5)
+    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 5)
 
     # input data propertis (mesh, density)
     mesh = MeshGrid.Mesh(X, IEN)
     (mesh, rho) = MeshGrid.PartOfModel(mesh, rho, part_name)
-    
+    rho = MeshGrid.modiffElementalDensities(mesh, rho)    
 
     ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
     # ρₙ = MeshGrid.elementToNodalValues(mesh, rho) # average
@@ -53,7 +54,7 @@ using JLD
     ## Grid:
     X_min, X_max = MeshGrid.getMesh_AABB(mesh.X) # vec, vec
     
-    N = 100  #Number of divisions along the longest side (along some axis)
+    N = 20  #Number of divisions along the longest side (along some axis)
     sdf_grid = MeshGrid.Grid(X_min, X_max, N) # cartesian grid
     
     ## SFD from triangular mesh:
@@ -67,7 +68,7 @@ using JLD
 
     ## Data export to VTK:
     # Rho2sdf.DataProcessing.exportStructuredPointsToVTK(taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
-    Rho2sdf.exportStructuredPointsToVTK("sdf2-test-trubka_" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
+    Rho2sdf.exportStructuredPointsToVTK("sdf2-test-sphere_" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
 
 
 
