@@ -59,3 +59,22 @@ end
 
 # (Xₙ, IENₙ, ρₙ) = PartOfModel(IDes, X, IEN, ρ)
 # (mesh, ρ) = PartOfModel(mesh, IDes, ρ)
+
+function modiffElementalDensities(mesh::Mesh, rho::Vector{Float64})
+    # Vectorized operations for min and max
+    mins = minimum(mesh.X, dims=2)
+    maxs = maximum(mesh.X, dims=2)
+    
+    part_size = maxs - mins
+    max_size, poz = findmax(part_size)
+
+    El_coord = zeros(mesh.nnp)  # Ensure this is the correct size
+    for el in 1:mesh.nel  # Make sure the loop iterates over the correct range
+        El_coord[el] = mean(mesh.X[:,mesh.IEN[:,el]][poz,:])
+        rho[el] *= abs(El_coord[el] - mins[poz]) / max_size
+    end
+       
+    return rho
+end
+
+

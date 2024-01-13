@@ -1,6 +1,6 @@
 module PrimitiveGeometries
 
-export  round_down_to_even, selectPrimitiveGeometry
+export round_down_to_even, selectPrimitiveGeometry
 
 using LinearAlgebra
 using Statistics
