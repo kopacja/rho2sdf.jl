@@ -19,21 +19,21 @@ using JLD
 # exit()
 #     
     # # Data from Matlab:
-    taskName = "chapadlo"
-    # taskName = "sphere"
-    data = matread(taskName * ".mat")
+    # taskName = "chapadlo"
+    taskName = "cube"
+    # data = matread(taskName * ".mat")
     # data = matread("test/" * taskName * ".mat")
-    part_name = "elementy_trubky.txt"
+    # part_name = "elementy_trubky.txt"
     # part_name = "test/elementy_trubky.txt"
-    (X, IEN, rho) = MeshGrid.MeshInformations(data)
+    # (X, IEN, rho) = MeshGrid.MeshInformations(data)
     # 
-    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("cube", 5)
-    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 5)
+    (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("cube", 4)
+    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 9)
 
     # input data propertis (mesh, density)
     mesh = MeshGrid.Mesh(X, IEN)
-    (mesh, rho) = MeshGrid.PartOfModel(mesh, rho, part_name)
-    rho = MeshGrid.modiffElementalDensities(mesh, rho)    
+    # (mesh, rho) = MeshGrid.PartOfModel(mesh, rho, part_name)
+    # rho = MeshGrid.modiffElementalDensities(mesh, rho)    
 
     ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
     # ρₙ = MeshGrid.elementToNodalValues(mesh, rho) # average
@@ -68,7 +68,7 @@ using JLD
 
     ## Data export to VTK:
     # Rho2sdf.DataProcessing.exportStructuredPointsToVTK(taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
-    Rho2sdf.exportStructuredPointsToVTK("sdf2-test-sphere_" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
+    Rho2sdf.exportStructuredPointsToVTK("sdf2-test-" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
 
 
 
