@@ -21,10 +21,10 @@ using JLD
     # # Data from Matlab:
     taskName = "chapadlo"
     # taskName = "sphere"
-    # data = matread(taskName * ".mat")
-    data = matread("test/" * taskName * ".mat")
-    # part_name = "elementy_trubky.txt"
-    part_name = "test/elementy_trubky.txt"
+    data = matread(taskName * ".mat")
+    # data = matread("test/" * taskName * ".mat")
+    part_name = "elementy_trubky.txt"
+    # part_name = "test/elementy_trubky.txt"
     (X, IEN, rho) = MeshGrid.MeshInformations(data)
     # 
     # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("cube", 5)
