@@ -141,7 +141,8 @@ end
 # end
 
 
-function calculateMiniAABB_grid(Xt::Matrix{Float64},
+function calculateMiniAABB_grid(
+    Xt::Matrix{Float64}, # 
     δ::Float64,
     N::Vector{Int64},
     AABB_min::Vector{Float64},
