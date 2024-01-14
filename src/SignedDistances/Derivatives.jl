@@ -53,7 +53,7 @@ function AnalyticalDerivations(
     ]
     r = [dL_dΞ; dL_dλ] # r1 ... r4 vyčíslím v bode xi_temp
 
-    return K, r
+    return K, r, n
 end
 
 
