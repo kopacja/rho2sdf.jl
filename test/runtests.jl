@@ -11,56 +11,64 @@ using LinearAlgebra
 using JLD
 
 @testset "Rho2sdf.jl" begin
-
-    taskName = "chapadlo"
-
+    
+    # @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
+    # @time @testset "MeshGridTest" begin include("MeshGridTest/runtests.jl") end
+#     @time @testset "SignedDistancesTest" begin include("SignedDistancesTest/runtests.jl") end
+# end
+# exit()
+#     
     # # Data from Matlab:
-    data = matread(taskName * ".mat")
-    # data = matread("test/" * taskName * ".mat")
-    part_name = "elementy_trubky.txt"
-    # part_name = "test/elementy_trubky.txt"
-    
-    (X, IEN, rho) = PrimitiveGeometries.TestGeometrySphere(104)
-    # (X, IEN, rho) = MeshGrid.MeshInformations(data)
-    
+    taskName = "chapadlo"
+    # taskName = "sphere"
+    # data = matread(taskName * ".mat")
+    data = matread("test/" * taskName * ".mat")
+    # part_name = "elementy_trubky.txt"
+    part_name = "test/elementy_trubky.txt"
+    (X, IEN, rho) = MeshGrid.MeshInformations(data)
+    # 
+    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("cube", 5)
+    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 5)
 
     # input data propertis (mesh, density)
     mesh = MeshGrid.Mesh(X, IEN)
-    # (mesh, rho) = MeshGrid.PartOfModel(mesh, rho, part_name)
-    
+    (mesh, rho) = MeshGrid.PartOfModel(mesh, rho, part_name)
+    rho = MeshGrid.modiffElementalDensities(mesh, rho)    
 
-    # ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
+    ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
     # ρₙ = MeshGrid.elementToNodalValues(mesh, rho) # average
     # exit()
 
 
     ## Face triangular mesh:
-    mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh) 
+    # mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh) 
 
     # save("taskName" * "_triangular_mesh.jld", "mesh", mesh)
     # mesh = load("taskName" * "_triangular_mesh.jld", "mesh") # načtení chapadla (stl)
 
-    X = [mesh.X[:,i] for i in 1:size(mesh.X,2)]
-    IEN = [mesh.IEN[:,i] for i in 1:size(mesh.IEN,2)]
-    Rho2sdf.exportToVTU("triNoha.vtu", X, IEN)
-    exit()
+    # X = [mesh.X[:,i] for i in 1:size(mesh.X,2)]
+    # IEN = [mesh.IEN[:,i] for i in 1:size(mesh.IEN,2)]
+    # Rho2sdf.exportToVTU("triKoule.vtu", X, IEN)
+    # exit()
 
     ## Grid:
     X_min, X_max = MeshGrid.getMesh_AABB(mesh.X) # vec, vec
-    N = [300, 300, 300]
+    
+    N = 20  #Number of divisions along the longest side (along some axis)
     sdf_grid = MeshGrid.Grid(X_min, X_max, N) # cartesian grid
-   
+    
     ## SFD from triangular mesh:
-    # sdf_dists = SignedDistances.evalSignedDiscancesOnTriangularMesh(mesh, sdf_grid) # Vector{Float64}
+    # sdf_dists = SignedDistances.evalSignedDistancesOnTriangularMesh(mesh, sdf_grid) # Vector{Float64}
+    # print("done")
+    # exit()
     
     ## SDF from densities:
     ρₜ = 0.5
     sdf_dists = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ , ρₜ)
 
-    # exit()
     ## Data export to VTK:
     # Rho2sdf.DataProcessing.exportStructuredPointsToVTK(taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
-    Rho2sdf.exportStructuredPointsToVTK("trubka_" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
+    Rho2sdf.exportStructuredPointsToVTK("sdf2-test-sphere_" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
 
 
 
