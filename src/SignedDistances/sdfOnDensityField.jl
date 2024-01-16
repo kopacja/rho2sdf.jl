@@ -192,9 +192,10 @@ function evalSignedDistances(
                             # sleep(0.2)
                             ########################################
                             (K, r, n) = AnalyticalDerivations(Ξ, Xₑ, ρₑ, λ, ρₜ, x)
-                            # (K_diff) = NumericalDerivations(Ξ, Xₑ, ρₑ, λ, ρₜ, x)
+                            # (K_diff, r_tmp) = NumericalDerivations(Ξ, Xₑ, ρₑ, λ, ρₜ, x)
 
                             # K = K_diff
+                            # r = r_tmp
                             # if (round.(K, digits=4))=! (round.(K_diff, digits=4))
                                 # println("K:",K)
                                 # println("K_diff:",K_diff)
@@ -210,7 +211,7 @@ function evalSignedDistances(
                                     ΔΞ_and_Δλ[1:end-1] / max_abs_Ξ
                             end
 
-
+                            # Coordinates update:
                             Ξ = Ξ - ΔΞ_and_Δλ[1:end-1]
                             λ = λ - ΔΞ_and_Δλ[end]
 

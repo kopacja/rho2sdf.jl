@@ -111,7 +111,7 @@ function NumericalDerivations(
         K_diff[m, :] = K_diff_col ./ (2 * h)
     end
 
-    return K_diff
+    return K_diff, r_tmp
 end
 
 
