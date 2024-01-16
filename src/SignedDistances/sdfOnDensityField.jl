@@ -1,5 +1,24 @@
 
 
+function ReduceEigenvals(K::Matrix{Float64}, r::Vector{Float64}, sign::Int)
+    Λ = real.(eigvals(K))
+    (Λ_min, idx_min) = findmin(abs.(Λ))
+                           
+    if (abs(Λ_min) < 1.0e-6)
+        Φ = real.(eigvecs(K))
+        idx = [1, 2, 3, 4]
+        deleteat!(idx, idx_min)
+        Φ = Φ[:, idx]
+        ΔΞ̃_and_Δλ̃ = 1.0 ./ Λ[idx] .* (Φ' * r)
+        ΔΞ_and_Δλ = (Φ .* sign) * ΔΞ̃_and_Δλ̃
+    else
+        ΔΞ_and_Δλ = K \ (r .* sign)
+    end
+    return ΔΞ_and_Δλ, Λ_min
+end
+
+
+
 function evalSignedDistances(
     mesh::Mesh,
     grid::Grid,
@@ -183,32 +202,7 @@ function evalSignedDistances(
                             # end
                             ########################################
 
-                            function ReduceEigenvals(K::Matrix{Float64}, r::Vector{Float64})
-                                r_norm = norm(r)
-                                Λ = real.(eigvals(K))
-                                (Λ_min, idx_min) = findmin(abs.(Λ))
-
-                                # if (Λ_min < 1.0e-10)
-                                if (abs(Λ_min) < 1.0e-6)
-                                    Φ = real.(eigvecs(K))
-                                    idx = [1, 2, 3, 4]
-                                    deleteat!(idx, idx_min)
-                                    Φ = Φ[:, idx]
-                                    ΔΞ̃_and_Δλ̃ = 1.0 ./ Λ[idx] .* (Φ' * r)
-                                    # ΔΞ_and_Δλ = - Φ * ΔΞ̃_and_Δλ̃
-                                    ΔΞ_and_Δλ =  Φ * ΔΞ̃_and_Δλ̃
-
-                                    # println("Λ_min: ", Λ_min)
-                                    # sleep(0.5)
-                                else
-                                    # ΔΞ_and_Δλ = K \ -r
-                                    ΔΞ_and_Δλ = K \ r
-                                end
-                                return ΔΞ_and_Δλ
-                            end
-
-                            ΔΞ_and_Δλ = ReduceEigenvals(K, r)
-
+                            ΔΞ_and_Δλ, Λ_min = ReduceEigenvals(K, r, 1) # sign (1/ -1) -> ΔΞ_and_Δλ = K \ (r .* sign)
 
                             max_abs_Ξ = maximum(abs.(ΔΞ_and_Δλ[1:end-1]))
                             if (max_abs_Ξ > 1.0)
