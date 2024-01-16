@@ -17,7 +17,19 @@ function ReduceEigenvals(K::Matrix{Float64}, r::Vector{Float64}, sign::Int)
     return ΔΞ_and_Δλ, Λ_min
 end
 
+function ReturnLocalCoordsIntoTheElement(Ξ::Vector{Float64})
+    Ξ_OutOfElement = 0
+    Ξₘₐₓcomp = maximum(abs.(Ξ)) 
 
+    if Ξₘₐₓcomp > 1
+        Ξ = Ξ ./ Ξₘₐₓcomp
+        Ξ_OutOfElement = Ξ_OutOfElement + 1
+        if Ξ_OutOfElement > 5
+            return Ξ, true  # Return a tuple with a flag indicating to break
+        end
+    end
+    return Ξ, false
+end
 
 function evalSignedDistances(
     mesh::Mesh,
@@ -217,6 +229,25 @@ function evalSignedDistances(
 
                             Ξ_norm = norm(ΔΞ_and_Δλ)
 
+
+                            function ReturnLocalCoordsIntoTheElement(Ξ::Vector{Float64})
+                                Ξ_OutOfElement = 0
+                                Ξₘₐₓcomp = maximum(abs.(Ξ)) 
+
+                                if Ξₘₐₓcomp > 1
+                                    Ξ = Ξ ./ Ξₘₐₓcomp
+                                    Ξ_OutOfElement = Ξ_OutOfElement + 1
+                                    if Ξ_OutOfElement > 5
+                                        break
+                                    end
+                                end
+                                return Ξ
+                            end
+
+                            Ξ, should_break = ReturnLocalCoordsIntoTheElement(Ξ)
+                            should_break && break
+
+
                             iter = iter + 1
                             
                             ####################################
@@ -283,5 +314,4 @@ function evalSignedDistances(
 
     return dist
 end
-
 
