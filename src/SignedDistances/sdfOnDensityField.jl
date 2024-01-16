@@ -251,23 +251,23 @@ function evalSignedDistances(
                             iter = iter + 1
                             
                             ####################################
-                            if Ξ_norm_old < Ξ_norm
-                                println("____Diverguje!____")
-                                println("el: ",el)
-                                println("length Is: ", length(Is))
-                                println("where am I (Isi): ", Isi)
-                                println("local coord Ξ: ",Ξ)
-                                println("Ξ_norm: ",Ξ_norm)
-                                println("Λ_min: ",Λ_min)
-                                H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ) # tvarové funkce a jejich derivace
-                                xₚ = Xₑ * H
-                                println("xₚ: ",xₚ)
-                                println("x: ",x)
-                                dist_tmp = dot(x - xₚ, n)
-                                println("dist: ", dist_tmp)
-                                sleep(2.)
-                            end 
-                            Ξ_norm_old = Ξ_norm
+                            # if Ξ_norm_old < (Ξ_norm * 0.6)
+                            #     println("____Diverguje!____")
+                            #     println("el: ",el)
+                            #     println("length Is: ", length(Is))
+                            #     println("where am I (Isi): ", Isi)
+                            #     println("local coord Ξ: ",Ξ)
+                            #     println("Ξ_norm: ",Ξ_norm)
+                            #     println("Λ_min: ",Λ_min)
+                            #     H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ) # tvarové funkce a jejich derivace
+                            #     xₚ = Xₑ * H
+                            #     println("xₚ: ",xₚ)
+                            #     println("x: ",x)
+                            #     dist_tmp = dot(x - xₚ, n)
+                            #     println("dist: ", dist_tmp)
+                            #     sleep(2.)
+                            # end 
+                            # Ξ_norm_old = Ξ_norm
                             ####################################
 
                         end
