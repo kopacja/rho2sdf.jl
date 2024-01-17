@@ -1,5 +1,70 @@
 
 
+function ReduceEigenvals(K::Matrix{Float64}, r::Vector{Float64}, sign::Int)
+    Λ = real.(eigvals(K))
+    (Λ_min, idx_min) = findmin(abs.(Λ))
+                           
+    if (abs(Λ_min) < 1.0e-6)
+        Φ = real.(eigvecs(K))
+        idx = [1, 2, 3, 4]
+        deleteat!(idx, idx_min)
+        Φ = Φ[:, idx]
+        ΔΞ̃_and_Δλ̃ = 1.0 ./ Λ[idx] .* (Φ' * r)
+        ΔΞ_and_Δλ = (Φ .* sign) * ΔΞ̃_and_Δλ̃
+    else
+        ΔΞ_and_Δλ = K \ (r .* sign)
+    end
+    return ΔΞ_and_Δλ, Λ_min
+end
+
+function ReturnLocalCoordsIntoTheElement(Ξ::Vector{Float64})
+    Ξ_OutOfElement = 0
+    Ξₘₐₓcomp = maximum(abs.(Ξ)) 
+
+    if Ξₘₐₓcomp > 1
+        Ξ = Ξ ./ Ξₘₐₓcomp
+        Ξ_OutOfElement = Ξ_OutOfElement + 1
+        if Ξ_OutOfElement > 5
+            return Ξ, true  # Return a tuple with a flag indicating to break
+        end
+    end
+    return Ξ, false
+end
+
+function SelectProjectedNodes(mesh::Mesh,
+    grid::Grid,
+    xp::Matrix{Float64},
+    points::Matrix{Float64})
+    ngp = grid.ngp # number of nodes in grid
+    nsd = mesh.nsd # number of spacial dimensions
+
+    # Assuming ngp is defined somewhere in your code
+    # Preallocate arrays with maximum possible size
+    max_size = ngp * 2  # Adjust this based on your knowledge of the data
+    X = [zeros(Float64, nsd) for _ in 1:max_size]
+    Xp = [zeros(Float64, nsd) for _ in 1:max_size]
+
+    count = 0
+    for i = 1:ngp
+        if sum(abs.(xp[:, i])) > 1.0e-10
+            count += 1
+            X[count] = points[:, i]
+            Xp[count] = xp[:, i]
+        end
+    end
+
+    # Trim the unused preallocated space
+    X = resize!(X, count)
+    Xp = resize!(Xp, count)
+
+    # Mean and max projected distance:
+    mean_PD = mean(norm.(X-Xp))
+    max_PD = maximum(norm.(X-Xp))
+
+    return X, Xp, mean_PD, max_PD
+end
+
+
 function evalSignedDistances(
     mesh::Mesh,
     grid::Grid,
@@ -161,9 +226,10 @@ function evalSignedDistances(
                         λ = 1.0              # Lagrange multiplier
                         Ξ_tol = 1e-2
                         Ξ_norm = 2 * Ξ_tol
+                        Ξ_norm_old = 1000.0
                         r_tol = 1e-2
                         r_norm = 2 * r_tol   # 
-                        niter = 100          # maximum number of iterations
+                        niter = 15          # maximum number of iterations
                         iter = 1             # iteration form one 
 
                         while (Ξ_norm ≥ Ξ_tol && iter ≤ niter)# || r_norm ≥ r_tol)
@@ -171,10 +237,11 @@ function evalSignedDistances(
                             # println("Ξ_norm: ",Ξ_norm)
                             # sleep(0.2)
                             ########################################
-                            (K, r) = AnalyticalDerivations(Ξ, Xₑ, ρₑ, λ, ρₜ, x)
-                            # (K_diff) = NumericalDerivations(Ξ, Xₑ, ρₑ, λ, ρₜ, x)
+                            (K, r, n) = AnalyticalDerivations(Ξ, Xₑ, ρₑ, λ, ρₜ, x)
+                            # (K_diff, r_tmp) = NumericalDerivations(Ξ, Xₑ, ρₑ, λ, ρₜ, x)
 
                             # K = K_diff
+                            # r = r_tmp
                             # if (round.(K, digits=4))=! (round.(K_diff, digits=4))
                                 # println("K:",K)
                                 # println("K_diff:",K_diff)
@@ -182,21 +249,7 @@ function evalSignedDistances(
                             # end
                             ########################################
 
-                            r_norm = norm(r)
-                            Λ = real.(eigvals(K))
-                            (Λ_min, idx_min) = findmin(Λ)
-
-                            if (Λ_min < 1.0e-10)
-                                Φ = real.(eigvecs(K))
-                                idx = [1, 2, 3, 4]
-                                deleteat!(idx, idx_min)
-                                Φ = Φ[:, idx]
-                                ΔΞ̃_and_Δλ̃ = 1.0 ./ Λ[idx] .* (Φ' * r)
-                                ΔΞ_and_Δλ = Φ * ΔΞ̃_and_Δλ̃
-                            else
-                                ΔΞ_and_Δλ = K \ -r
-                                # ΔΞ_and_Δλ = K \ r
-                            end
+                            ΔΞ_and_Δλ, Λ_min = ReduceEigenvals(K, r, 1) # sign (1/ -1) -> ΔΞ_and_Δλ = K \ (r .* sign)
 
                             max_abs_Ξ = maximum(abs.(ΔΞ_and_Δλ[1:end-1]))
                             if (max_abs_Ξ > 1.0)
@@ -204,17 +257,44 @@ function evalSignedDistances(
                                     ΔΞ_and_Δλ[1:end-1] / max_abs_Ξ
                             end
 
-
+                            # Coordinates update:
                             Ξ = Ξ - ΔΞ_and_Δλ[1:end-1]
                             λ = λ - ΔΞ_and_Δλ[end]
 
                             Ξ_norm = norm(ΔΞ_and_Δλ)
 
-                            iter = iter + 1
-                            # println("local coord Ξ: ",Ξ)
-                        end
 
+                            Ξ, should_break = ReturnLocalCoordsIntoTheElement(Ξ)
+                            should_break && break
+
+
+                            iter = iter + 1
+                            
+                            ####################################
+                            # if Ξ_norm_old < (Ξ_norm * 0.6)
+                            #     println("____Diverguje!____")
+                            #     println("el: ",el)
+                            #     println("length Is: ", length(Is))
+                            #     println("where am I (Isi): ", Isi)
+                            #     println("local coord Ξ: ",Ξ)
+                            #     println("Ξ_norm: ",Ξ_norm)
+                            #     println("Λ_min: ",Λ_min)
+                            #     H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = C3D8_SFaD(Ξ) # tvarové funkce a jejich derivace
+                            #     xₚ = Xₑ * H
+                            #     println("xₚ: ",xₚ)
+                            #     println("x: ",x)
+                            #     dist_tmp = dot(x - xₚ, n)
+                            #     println("dist: ", dist_tmp)
+                            #     sleep(2.)
+                            # end 
+                            # Ξ_norm_old = Ξ_norm
+                            ####################################
+
+                        end
+                        
                         if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
+                            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = C3D8_SFaD(Ξ) # tvarové funkce a jejich derivace
+                            xₚ = Xₑ * H
                             dist_tmp = dot(x - xₚ, n)
                             if (abs(dist_tmp) < abs(dist[v]))
                                 dist[v] = dist_tmp
@@ -231,21 +311,17 @@ function evalSignedDistances(
     end
     # dist = marchingCubes(dist, N.+1, big)
 
-    X = Vector{Float64}(undef, 3)
-    Xp = Vector{Float64}(undef, 3)
-    for i = 1:size(xp, 2)
-        if (sum(abs.(xp[:, i])) > 1.0e-10)
-            X = [X points[:, i]]
-            Xp = [Xp xp[:, i]]
-        end
-    end
-    X = [X Xp]
-    X = [X[:, i] for i = 1:size(X, 2)]
+    Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
+    println("mean of projected distance: ", mean_PD)
+    println("maximum projected distance: ", max_PD)
 
-    nnp = size(Xp, 2)
+    nnp = length(Xg)
     IEN = [[i; i + nnp] for i = 1:nnp]
+    
+    X_combined = [Xg; Xp] 
+    # X_combined_couples = [X Xp]
 
-    Rho2sdf.exportToVTU("xp.vtu", X, IEN)
+    Rho2sdf.exportToVTU("xp.vtu", X_combined, IEN)
 
     open("xp.csv", "w") do io
         writedlm(io, ['x' 'y' 'z'], ',')
@@ -254,5 +330,4 @@ function evalSignedDistances(
 
     return dist
 end
-
 
