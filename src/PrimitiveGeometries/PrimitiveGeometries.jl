@@ -104,7 +104,7 @@ function TestGeometryCube(max_elements::Int64)
 
     # Preallocate arrays
     total_nodes = (max_elements + 1)^3
-    nodes = Array{Float64}(undef, total_nodes, 3)
+    nodes = zeros(Float64, total_nodes, 3)
     node_map = Dict()
 
     # Calculate nodes in parallel
@@ -124,8 +124,8 @@ function TestGeometryCube(max_elements::Int64)
 
     # Calculate elements
     total_elements = max_elements^3
-    elements = Array{Int}(undef, total_elements, 8)
-    elements_center = Array{Float64}(undef, total_elements, 3)
+    elements = zeros(Int, total_elements, 8)
+    elements_center = zeros(Float64, total_elements, 3)
     densities = zeros(Float64, total_elements)
 
     @threads for i in 0:max_elements-1
@@ -185,7 +185,7 @@ function TestGeometryBlock(N::Vector{Int64})
 
     # Calculate elements
     total_elements = prod(N)
-    elements = zeros(Float64, total_elements, 8)
+    elements = zeros(Int64, total_elements, 8)
     elements_center = zeros(Float64, total_elements, 3)
     densities = zeros(Float64, total_elements)
 
@@ -209,7 +209,7 @@ function TestGeometryBlock(N::Vector{Int64})
     end
 
     nodes_new = [nodes[i, :] for i in 1:total_nodes]
-    elements_new = [Int.(elements[i, :]) for i in 1:total_elements]
+    elements_new = [elements[i, :] for i in 1:total_elements]
 
     return nodes_new, elements_new, densities, elements_center
 end
