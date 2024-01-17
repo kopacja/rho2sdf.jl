@@ -31,6 +31,40 @@ function ReturnLocalCoordsIntoTheElement(Ξ::Vector{Float64})
     return Ξ, false
 end
 
+function SelectProjectedNodes(mesh::Mesh,
+    grid::Grid,
+    xp::Matrix{Float64},
+    points::Matrix{Float64})
+    ngp = grid.ngp # number of nodes in grid
+    nsd = mesh.nsd # number of spacial dimensions
+
+    # Assuming ngp is defined somewhere in your code
+    # Preallocate arrays with maximum possible size
+    max_size = ngp * 2  # Adjust this based on your knowledge of the data
+    X = [zeros(Float64, nsd) for _ in 1:max_size]
+    Xp = [zeros(Float64, nsd) for _ in 1:max_size]
+
+    count = 0
+    for i = 1:ngp
+        if sum(abs.(xp[:, i])) > 1.0e-10
+            count += 1
+            X[count] = points[:, i]
+            Xp[count] = xp[:, i]
+        end
+    end
+
+    # Trim the unused preallocated space
+    X = resize!(X, count)
+    Xp = resize!(Xp, count)
+
+    # Mean and max projected distance:
+    mean_PD = mean(norm.(X-Xp))
+    max_PD = maximum(norm.(X-Xp))
+
+    return X, Xp, mean_PD, max_PD
+end
+
+
 function evalSignedDistances(
     mesh::Mesh,
     grid::Grid,
@@ -230,20 +264,6 @@ function evalSignedDistances(
                             Ξ_norm = norm(ΔΞ_and_Δλ)
 
 
-                            function ReturnLocalCoordsIntoTheElement(Ξ::Vector{Float64})
-                                Ξ_OutOfElement = 0
-                                Ξₘₐₓcomp = maximum(abs.(Ξ)) 
-
-                                if Ξₘₐₓcomp > 1
-                                    Ξ = Ξ ./ Ξₘₐₓcomp
-                                    Ξ_OutOfElement = Ξ_OutOfElement + 1
-                                    if Ξ_OutOfElement > 5
-                                        break
-                                    end
-                                end
-                                return Ξ
-                            end
-
                             Ξ, should_break = ReturnLocalCoordsIntoTheElement(Ξ)
                             should_break && break
 
@@ -291,21 +311,17 @@ function evalSignedDistances(
     end
     # dist = marchingCubes(dist, N.+1, big)
 
-    X = Vector{Float64}(undef, 3)
-    Xp = Vector{Float64}(undef, 3)
-    for i = 1:size(xp, 2)
-        if (sum(abs.(xp[:, i])) > 1.0e-10)
-            X = [X points[:, i]]
-            Xp = [Xp xp[:, i]]
-        end
-    end
-    X = [X Xp]
-    X = [X[:, i] for i = 1:size(X, 2)]
+    Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
+    println("mean of projected distance: ", mean_PD)
+    println("maximum projected distance: ", max_PD)
 
-    nnp = size(Xp, 2)
+    nnp = length(Xg)
     IEN = [[i; i + nnp] for i = 1:nnp]
+    
+    X_combined = [Xg; Xp] 
+    # X_combined_couples = [X Xp]
 
-    Rho2sdf.exportToVTU("xp.vtu", X, IEN)
+    Rho2sdf.exportToVTU("xp.vtu", X_combined, IEN)
 
     open("xp.csv", "w") do io
         writedlm(io, ['x' 'y' 'z'], ',')
