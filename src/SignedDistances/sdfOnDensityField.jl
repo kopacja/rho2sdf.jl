@@ -195,7 +195,7 @@ function evalSignedDistances(
         else # (ρₑ_min < ρₜ)
             # continue
             if (ρₑ_max > ρₜ)
-                println("Hranice prochází elementem...")
+                # println("Hranice prochází elementem...")
                 # println("ρₑ_min: ", ρₑ_min)
                 # println("ρₑ_max: ", ρₑ_max)
 
@@ -205,12 +205,12 @@ function evalSignedDistances(
                 # println("el: ", el)
                 
                 Is = MeshGrid.calculateMiniAABB_grid(Xₑ, δ, N, AABB_min, AABB_max, nsd)
-                println("length Is: ", length(Is))
+                # println("length Is: ", length(Is))
                 Isi = 0
 
                 for I ∈ Is
                     Isi = Isi + 1
-                    println("where am I (Isi): ", Isi)
+                    # println("where am I (Isi): ", Isi)
 
                     ii = Int(
                         I[3] * (N[1] + 1) * (N[2] + 1) + I[2] * (N[1] + 1) + I[1] + 1,
@@ -229,12 +229,12 @@ function evalSignedDistances(
                         Ξ_norm_old = 1000.0
                         r_tol = 1e-2
                         r_norm = 2 * r_tol   # 
-                        niter = 100          # maximum number of iterations
+                        niter = 15          # maximum number of iterations
                         iter = 1             # iteration form one 
 
                         while (Ξ_norm ≥ Ξ_tol && iter ≤ niter)# || r_norm ≥ r_tol)
                             # println("el: ",el)
-                            println("Ξ_norm: ",Ξ_norm)
+                            # println("Ξ_norm: ",Ξ_norm)
                             # sleep(0.2)
                             ########################################
                             (K, r, n) = AnalyticalDerivations(Ξ, Xₑ, ρₑ, λ, ρₜ, x)
@@ -279,7 +279,7 @@ function evalSignedDistances(
                             #     println("local coord Ξ: ",Ξ)
                             #     println("Ξ_norm: ",Ξ_norm)
                             #     println("Λ_min: ",Λ_min)
-                            #     H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ) # tvarové funkce a jejich derivace
+                            #     H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = C3D8_SFaD(Ξ) # tvarové funkce a jejich derivace
                             #     xₚ = Xₑ * H
                             #     println("xₚ: ",xₚ)
                             #     println("x: ",x)
@@ -293,7 +293,7 @@ function evalSignedDistances(
                         end
                         
                         if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
-                            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ) # tvarové funkce a jejich derivace
+                            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = C3D8_SFaD(Ξ) # tvarové funkce a jejich derivace
                             xₚ = Xₑ * H
                             dist_tmp = dot(x - xₚ, n)
                             if (abs(dist_tmp) < abs(dist[v]))

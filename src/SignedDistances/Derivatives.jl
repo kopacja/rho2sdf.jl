@@ -11,8 +11,7 @@ function AnalyticalDerivations(
     ρₜ::Float64, # hraniční hustota
     x::Vector{Float64}, # uzly pravidelné sítě
 )
-
-    H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ) # tvarové funkce a jejich derivace
+    H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = C3D8_SFaD(Ξ) # tvarové funkce a jejich derivace
     (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
 
     norm_dρ_dΞ = norm(dρ_dΞ) # ok
@@ -79,7 +78,7 @@ function NumericalDerivations(
             ΔΞ_tmp = zeros(Float64, 4)
             ΔΞ_tmp[m] = ϵ[p]
 
-            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ_tmp + ΔΞ_tmp)
+            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = C3D8_SFaD(Ξ_tmp + ΔΞ_tmp)
             (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ_tmp + ΔΞ_tmp)
 
             norm_dρ_dΞ = norm(dρ_dΞ)
@@ -119,7 +118,7 @@ end
 
 function ρ_derivatives(ρₑ::Vector, Ξ::Vector)
     
-    H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ) # tvarové funkce a jejich derivace
+    H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = C3D8_SFaD(Ξ) # tvarové funkce a jejich derivace
 
     # dρ_dΞ = zeros(Float64, 3)
     # @einsum dρ_dΞ[i] = ρₑ[k] * d¹N_dξ¹[k, i]

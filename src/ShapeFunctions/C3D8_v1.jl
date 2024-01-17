@@ -1,4 +1,4 @@
-function sfce(Ξ::Vector{Float64})
+function sC3D8_SFaD(Ξ::Vector{Float64})
 
     ξ₁ = Ξ[1]
     ξ₂ = Ξ[2]
