@@ -20,14 +20,15 @@ using JLD
 #     
     # # Data from Matlab:
     # taskName = "chapadlo"
-    taskName = "cube"
+    taskName = "block"
     # data = matread(taskName * ".mat")
     # data = matread("test/" * taskName * ".mat")
     # part_name = "elementy_trubky.txt"
     # part_name = "test/elementy_trubky.txt"
     # (X, IEN, rho) = MeshGrid.MeshInformations(data)
     # 
-    (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("cube", 4)
+    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("cube", 4)
+    (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("block", [9,1,1])
     # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 9)
 
     # input data propertis (mesh, density)
