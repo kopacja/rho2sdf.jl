@@ -12,7 +12,7 @@ using JLD
 
 @testset "Rho2sdf.jl" begin
     
-    # @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
+    @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
     # @time @testset "MeshGridTest" begin include("MeshGridTest/runtests.jl") end
 #     @time @testset "SignedDistancesTest" begin include("SignedDistancesTest/runtests.jl") end
 # end
@@ -28,8 +28,8 @@ using JLD
     # (X, IEN, rho) = MeshGrid.MeshInformations(data)
     # 
     # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("cube", 4)
-    (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("block", [9,1,1])
-    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 9)
+    # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("block", [9,1,1])
+    (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 9)
 
     # input data propertis (mesh, density)
     mesh = MeshGrid.Mesh(X, IEN)
