@@ -31,7 +31,8 @@ function ReturnLocalCoordsIntoTheElement(Ξ::Vector{Float64})
     return Ξ, false
 end
 
-function SelectProjectedNodes(mesh::Mesh,
+function SelectProjectedNodes(
+    mesh::Mesh,
     grid::Grid,
     xp::Matrix{Float64},
     points::Matrix{Float64})
@@ -311,28 +312,28 @@ function evalSignedDistances(
     end
     # dist = marchingCubes(dist, N.+1, big)
 
-    Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
-    println("mean of projected distance: ", mean_PD)
-    println("maximum projected distance: ", max_PD)
+    # Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
+    # println("mean of projected distance: ", mean_PD)
+    # println("maximum projected distance: ", max_PD)
 
-    nnp = Int(length(Xg)/2)
-    IEN = [[i; i + nnp] for i = 1:nnp]
-    
+    # nnp = Int(length(Xg)/2)
+    # IEN = [[i; i + nnp] for i = 1:nnp]
+    # 
     # nnp₂ = Int(length(Xg)/2)
     # IEN₂ = [[i; i + nnp₂] for i = 1:nnp₂]
 
-    X_combined = [Xg; Xp] 
-    # X_combined_couples = [X Xp]
+    # X_combined = [Xg; Xp] 
+    # # X_combined_couples = [X Xp]
 
-    Rho2sdf.exportToVTU("xp.vtu", X_combined, IEN)
+    # Rho2sdf.exportToVTU("xp.vtu", X_combined, IEN)
     # Rho2sdf.exportToVTU("Xg.vtu", Xg, IEN₂)
     # Rho2sdf.exportToVTU("Xp.vtu", Xp, IEN₂)
 
-    open("xp.csv", "w") do io
-        writedlm(io, ['x' 'y' 'z'], ',')
-        writedlm(io, xp', ',')
-    end
+    # open("xp.csv", "w") do io
+    #     writedlm(io, ['x' 'y' 'z'], ',')
+    #     writedlm(io, xp', ',')
+    # end
 
-    return dist
+    return dist, xp
 end
 

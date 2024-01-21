@@ -5,6 +5,7 @@ using Rho2sdf.PrimitiveGeometries
 using Rho2sdf.ShapeFunctions
 using Rho2sdf.MeshGrid
 using Rho2sdf.SignedDistances
+using Rho2sdf.DataExport
 using MAT
 using SymPy
 using LinearAlgebra
@@ -50,7 +51,7 @@ exit()
 
     # X = [mesh.X[:,i] for i in 1:size(mesh.X,2)]
     # IEN = [mesh.IEN[:,i] for i in 1:size(mesh.IEN,2)]
-    # Rho2sdf.exportToVTU("triKoule.vtu", X, IEN)
+    # DataExport.exportToVTU("triKoule.vtu", X, IEN)
     # exit()
 
     ## Grid:
@@ -69,8 +70,8 @@ exit()
     sdf_dists = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ , ρₜ)
 
     ## Data export to VTK:
-    # Rho2sdf.DataProcessing.exportStructuredPointsToVTK(taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
-    Rho2sdf.exportStructuredPointsToVTK("sdf2-test-" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
+    # DataExport.exportStructuredPointsToVTK(taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
+    DataExport.exportStructuredPointsToVTK("sdf2-test-" *taskName*"_sdf.vtk", sdf_grid, sdf_dists, "distance")
 
 
 
