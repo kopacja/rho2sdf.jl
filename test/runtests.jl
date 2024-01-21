@@ -12,11 +12,12 @@ using JLD
 
 @testset "Rho2sdf.jl" begin
     
-    @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
+    # @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
     # @time @testset "MeshGridTest" begin include("MeshGridTest/runtests.jl") end
-#     @time @testset "SignedDistancesTest" begin include("SignedDistancesTest/runtests.jl") end
-# end
-# exit()
+    # @time @testset "SignedDistancesTest" begin include("SignedDistancesTest/runtests.jl") end
+    @time @testset "SeparatedTests" begin include("SeparatedTests/runtests.jl") end
+end
+exit()
 #     
     # # Data from Matlab:
     # taskName = "chapadlo"
@@ -55,7 +56,7 @@ using JLD
     ## Grid:
     X_min, X_max = MeshGrid.getMesh_AABB(mesh.X) # vec, vec
     
-    N = 20  #Number of divisions along the longest side (along some axis)
+    N = 20  #Number of cells along the longest side (along some axis)
     sdf_grid = MeshGrid.Grid(X_min, X_max, N) # cartesian grid
     
     ## SFD from triangular mesh:
@@ -73,4 +74,4 @@ using JLD
 
 
 
-end
+# end

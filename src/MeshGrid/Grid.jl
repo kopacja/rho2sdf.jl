@@ -35,7 +35,7 @@
 struct Grid
     AABB_min::Vector{Float64}  # Minimum coordinates of the Axis-Aligned Bounding Box (AABB)
     AABB_max::Vector{Float64}  # Maximum coordinates of the AABB
-    N::Vector{Int64}           # Number of divisions along the longest side (along some axis)
+    N::Vector{Int64}           # Number of cells along the longest side (along some axis)
     cell_size::Float64         # Size of each cell in the grid
     ngp::Int64                 # Total number of grid points
 
@@ -73,7 +73,7 @@ mutable struct LinkedList # rozdělení pravidelné sítě na regiony
     grid::Grid           # The grid associated with the linked list
     head::Vector{Int64}  # Array representing the head of each list
     next::Vector{Int64}  # Array representing the next element in each list
-    N::Vector{Float64}   # Number of divisions along each axis of the grid
+    N::Vector{Float64}   # Number of cells along each axis of the grid
 
     # Constructor for LinkedList.
     # Maps points in a 3D space to the corresponding grid cells.
