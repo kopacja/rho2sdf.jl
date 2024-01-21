@@ -20,31 +20,16 @@ taskName = "block"
 mesh = MeshGrid.Mesh(X, IEN)
 
 # rho in nodes:
-ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
-ρₙ = []
-
-## Face triangular mesh:
-# mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh) 
-
-# save("taskName" * "_triangular_mesh.jld", "mesh", mesh)
-# mesh = load("taskName" * "_triangular_mesh.jld", "mesh") # načtení chapadla (stl)
-
-# X = [mesh.X[:,i] for i in 1:size(mesh.X,2)]
-# IEN = [mesh.IEN[:,i] for i in 1:size(mesh.IEN,2)]
-# Rho2sdf.exportToVTU("triKoule.vtu", X, IEN)
-# exit()
+# ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
+ρₙ = [0., 0., 0., 0., 1., 1., 1., 1.]
 
 ## Grid:
 X_min, X_max = MeshGrid.getMesh_AABB(mesh.X) # vec, vec
     
-N = 20  #Number of divisions along the longest side (along some axis)
+N = 2  #Number of cells along the longest side (along some axis)
 sdf_grid = MeshGrid.Grid(X_min, X_max, N) # cartesian grid
     
-## SFD from triangular mesh:
-# sdf_dists = SignedDistances.evalSignedDistancesOnTriangularMesh(mesh, sdf_grid) # Vector{Float64}
-# print("done")
-# exit()
-    
+
 ## SDF from densities:
 ρₜ = 0.5
 sdf_dists = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ , ρₜ)
