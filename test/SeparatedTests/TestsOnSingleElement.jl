@@ -14,7 +14,6 @@ using LinearAlgebra
 using JLD
 using DelimitedFiles
 
-    
 taskName = "block"
 (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("block", [1,1,1])
 
@@ -23,14 +22,20 @@ mesh = MeshGrid.Mesh(X, IEN)
 
 # rho in nodes:
 # ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
-ρₙ = [0.3, 0.8, 0., 0., 1., 1., 1., 1.]
+# ρₙ = [0.3, 0.8, 0., 0., 1., 1., 1., 1.]
+ρₙ = [0., 0., 0., 0., 1., 1., 1., 1.]
 
 ## Grid:
 X_min, X_max = MeshGrid.getMesh_AABB(mesh.X) # vec, vec
     
 N = 2  #Number of cells along the longest side (along some axis)
 sdf_grid = MeshGrid.Grid(X_min, X_max, N) # cartesian grid
-    
+
+sdf_grid.AABB_min = [0.0, 0.0, 0.0]
+sdf_grid.AABB_max = [1.0, 1.0, 1.0]
+sdf_grid.N = [1.0, 1.0, 1.0]
+sdf_grid.cell_size = 0.5
+sdf_grid.ngp = 1.
 
 ## SDF from densities:
 ρₜ = 0.5
