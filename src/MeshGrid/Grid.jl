@@ -162,7 +162,7 @@ function calculateMiniAABB_grid(
             I_min[j] = 0
         end
         if (I_max[j] >= N[j])
-            I_max[j] = N[j] - 1
+            I_max[j] = N[j]
         end
     end
 

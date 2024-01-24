@@ -2,6 +2,116 @@
 Derivatives for SDF
 """
 
+function Hessian(
+    Ξ::Vector{Float64},
+    λ::Float64,
+    x::Vector{Float64}, # uzly pravidelné sítě
+    Xₑ::Matrix{Float64}, # Souřadnice uzlů jednoho elementu
+    ρₑ::Vector{Float64}, # Uzlové hustoty    
+)
+
+    H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ) # tvarové funkce a jejich derivace
+    (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
+
+    norm_dρ_dΞ = norm(dρ_dΞ) # ok
+    n = dρ_dΞ / norm_dρ_dΞ # ok
+
+    xₚ = Xₑ * H # Xₑ je souřadnice uzlů, H tvarové funkce -> souřadnice bodu KONTROLA!!
+
+    ### 1. Derivace ###
+    dx_dΞ = d¹N_dξ¹' * Xₑ' # ok
+
+    dn_dΞ = dn_dΞ_compute(d²ρ_dΞ², norm_dρ_dΞ, dρ_dΞ) # ok
+
+    dd_dΞ = dd_dΞ_compute(dx_dΞ, n, x, xₚ, dn_dΞ) # ok
+
+    dL_dΞ = zeros(Float64, 3)
+    @einsum dL_dΞ[i] = dd_dΞ[i] + λ * dρ_dΞ[i] # ok = dd_dΞ + λ * dρ_dΞ (alternativní zápis)
+    # dL_dΞ = dd_dΞ + λ .* dρ_dΞ 
+
+    ρ = H ⋅ ρₑ # hustota v bodě
+
+    ### 2. Derivace ###
+    d²x_dΞ² = d²x_dΞ²_compute(Xₑ, d²N_dξ²) # ok
+
+    d²n_dΞ² = d²n_dΞ²_compute(d³ρ_dΞ³, norm_dρ_dΞ, d²ρ_dΞ², dρ_dΞ) # ok
+
+    d²d_dΞ² = d²d_dΞ²_compute(x, xₚ, d²x_dΞ², n, dx_dΞ, dn_dΞ, d²n_dΞ²) # ok 
+
+    ### Lagrange ###
+    d²L_dΞ² = d²d_dΞ² + λ .* d²ρ_dΞ²
+
+    d²L_dΞdλ = dρ_dΞ
+    d²L_dλ² = 0.0
+
+    K = [
+        d²L_dΞ² d²L_dΞdλ
+        d²L_dΞdλ' d²L_dλ²
+    ]
+
+    return K
+end
+
+function Lagrangian(
+    Ξ::Vector{Float64},
+    λ::Float64,
+    x::Vector{Float64}, # uzly pravidelné sítě
+    Xₑ::Matrix{Float64}, # Souřadnice uzlů jednoho elementu
+    ρₑ::Vector{Float64}, # Uzlové hustoty    
+    ρₜ::Float64, # hraniční hustota
+)
+
+    H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ) # tvarové funkce a jejich derivace
+    (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
+
+    norm_dρ_dΞ = norm(dρ_dΞ)
+    n = dρ_dΞ / norm_dρ_dΞ     
+    xₚ = Xₑ * H
+
+    d = 0.5 * norm(x - xₚ)^2
+
+    ρ = H ⋅ ρₑ 
+
+    L = d + λ * (ρ - ρₜ)
+
+    return L
+end
+
+function Gradient(
+    Ξ::Vector{Float64},
+    λ::Float64,
+    x::Vector{Float64}, # uzly pravidelné sítě
+    Xₑ::Matrix{Float64}, # Souřadnice uzlů jednoho elementu
+    ρₑ::Vector{Float64}, # Uzlové hustoty    
+    ρₜ::Float64, # hraniční hustota
+)
+
+    H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ) # tvarové funkce a jejich derivace
+    (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
+
+    norm_dρ_dΞ = norm(dρ_dΞ) # ok
+    n = dρ_dΞ / norm_dρ_dΞ # ok
+
+    xₚ = Xₑ * H # Xₑ je souřadnice uzlů, H tvarové funkce -> souřadnice bodu KONTROLA!!
+
+    ### 1. Derivace ###
+    dx_dΞ = d¹N_dξ¹' * Xₑ' # ok
+
+    dn_dΞ = dn_dΞ_compute(d²ρ_dΞ², norm_dρ_dΞ, dρ_dΞ) # ok
+
+    dd_dΞ = dd_dΞ_compute(dx_dΞ, n, x, xₚ, dn_dΞ) # ok
+
+    dL_dΞ = zeros(Float64, 3)
+    @einsum dL_dΞ[i] = dd_dΞ[i] + λ * dρ_dΞ[i] # ok = dd_dΞ + λ * dρ_dΞ (alternativní zápis)
+    
+    ρ = H ⋅ ρₑ # hustota v bodě
+    dL_dλ = ρ - ρₜ # ok
+
+    r = [dL_dΞ; dL_dλ] # r1 ... r4 vyčíslím v bode xi_temp
+
+    return r
+end
+
 
 function AnalyticalDerivations(
     Ξ::Vector{Float64},
@@ -16,9 +126,8 @@ function AnalyticalDerivations(
 
     norm_dρ_dΞ = norm(dρ_dΞ) # ok
     n = dρ_dΞ / norm_dρ_dΞ # ok
-
     xₚ = Xₑ * H # Xₑ je souřadnice uzlů, H tvarové funkce -> souřadnice bodu KONTROLA!!
-
+    println("xₚ: ", xₚ)
     ### 1. Derivace ###
     dx_dΞ = d¹N_dξ¹' * Xₑ' # ok
 
@@ -158,7 +267,7 @@ function dd_dΞ_compute(
 
     X = x - xₚ
     dd_dΞ = zeros(Float64, 3)
-    @einsum dd_dΞ[i] = -dx_dΞ[i, k] * n[k] + X[k] * dn_dΞ[k, i]
+    @einsum dd_dΞ[i] = -dx_dΞ[i, k] * X[k]
 
     return dd_dΞ
 end
@@ -233,10 +342,8 @@ function d²d_dΞ²_compute(
 #        2 * dx_dΞ[j, k] * dn_dΞ[k, i] +
 #        X[k] * d²n_dΞ²[k, i, j]
 
-@einsum d²d_dΞ²[i, j] = -d²x_dΞ²[i, j, k] * n[k] - 
-         dx_dΞ[j, k] * dn_dΞ[k, i] -
-         dx_dΞ[i, k] * dn_dΞ[k, j] +
-         X[k] * d²n_dΞ²[k, i, j]
+@einsum d²d_dΞ²[i, j] = -d²x_dΞ²[i, j, k] * X[k] + 
+         dx_dΞ[j, k] * dx_dΞ[k, i]
 
     return d²d_dΞ²
 end
