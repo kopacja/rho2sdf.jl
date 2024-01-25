@@ -3,6 +3,7 @@ Derivatives for SDF
 """
 
 function Hessian(
+    sfce::Function,
     Ξ::Vector{Float64},
     λ::Float64,
     x::Vector{Float64}, # uzly pravidelné sítě
@@ -53,6 +54,7 @@ function Hessian(
 end
 
 function Lagrangian(
+    sfce::Function,
     Ξ::Vector{Float64},
     λ::Float64,
     x::Vector{Float64}, # uzly pravidelné sítě
@@ -78,6 +80,7 @@ function Lagrangian(
 end
 
 function Gradient(
+    sfce::Function,
     Ξ::Vector{Float64},
     λ::Float64,
     x::Vector{Float64}, # uzly pravidelné sítě

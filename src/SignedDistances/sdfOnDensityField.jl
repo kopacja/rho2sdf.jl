@@ -86,6 +86,7 @@ function evalSignedDistances(
     IEN = mesh.IEN # ID element -> ID nodes
     INE = mesh.INE # ID node -> ID elements
     ISN = mesh.ISN # connectivity face - edges
+    sfce = mesh.sfce # shape function handler
     nsd = mesh.nsd # number of spacial dimensions
     nel = mesh.nel # number of all elements
     nes = mesh.nes # number of element segments (faces)
@@ -221,8 +222,8 @@ println("element ID: ", el)
 
                         while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
 
-                            K =  Hessian(Ξ,λ,x,Xₑ,ρₑ)
-                            r =  Gradient(Ξ,λ,x,Xₑ,ρₑ,ρₜ)
+                            K =  Hessian(sfce, Ξ,λ,x,Xₑ,ρₑ)
+                            r =  Gradient(sfce, Ξ,λ,x,Xₑ,ρₑ,ρₜ)
 
                             r_norm = norm(r)
 
@@ -260,8 +261,8 @@ println("element ID: ", el)
                                 niter = 10
                                 while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
     
-                                    r4 =  Gradient(Ξ,λ[1],x,Xₑ,ρₑ,ρₜ)
-                                    K4 =  Hessian(Ξ,λ[1],x,Xₑ,ρₑ)
+                                    r4 =  Gradient(sfce, Ξ,λ[1],x,Xₑ,ρₑ,ρₜ)
+                                    K4 =  Hessian(sfce, Ξ,λ[1],x,Xₑ,ρₑ)
                                     
                                     # Fifth equation, e.g. (ξ₁ - 1) = 0 etc., representing constraint of the fixed segment component is added into the residual and tangent matrix
                                     r = zeros(5)                                    

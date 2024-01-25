@@ -21,9 +21,9 @@ using JLD
     # # Data from Matlab:
     # taskName = "chapadlo"
 
-    RUN_PLANE = false
-    RUN_SPHERE = false
-    RUN_CHAPADLO = true
+    RUN_PLANE = true
+    RUN_SPHERE = true
+    RUN_CHAPADLO = false
 
     if (RUN_PLANE)
         @testset "Plane" begin
@@ -46,7 +46,7 @@ using JLD
             ρₙ = [0.0, 0.0, 0.0, 0.0, 1, 1, 1, 1]
 
             ## Generate FEM mesh structure:
-            mesh = MeshGrid.Mesh(X, IEN)
+            mesh = MeshGrid.Mesh(X, IEN, C3D8_SFaD)
 
             VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
             Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
@@ -75,7 +75,7 @@ using JLD
             (X, IEN, rho) = MeshGrid.MeshInformations(data)
 
             ## Generate FEM mesh structure:
-            mesh = MeshGrid.Mesh(X, IEN)
+            mesh = MeshGrid.Mesh(X, IEN, C3D8_SFaD)
 
             ## Map elemental densities to the nodes:
             ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
@@ -109,7 +109,7 @@ using JLD
             #Z,idx_Z = findall(x->X[3,i] > 50 for i in [1:size(X,2)])
 
             ## Generate FEM mesh structure:
-            mesh = MeshGrid.Mesh(X, IEN)
+            mesh = MeshGrid.Mesh(X, IEN, C3D8_SFaD)
 
             ## Map elemental densities to the nodes:
             ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
