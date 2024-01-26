@@ -5,6 +5,8 @@ using Rho2sdf.PrimitiveGeometries
 using Rho2sdf.ShapeFunctions
 using Rho2sdf.MeshGrid
 using Rho2sdf.SignedDistances
+using Rho2sdf.MarchingCubes
+using Rho2sdf.DataExport
 using MAT
 using SymPy
 using LinearAlgebra
@@ -14,7 +16,7 @@ using JLD
 
     # @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
     # @time @testset "MeshGridTest" begin include("MeshGridTest/runtests.jl") end
-    #     @time @testset "SignedDistancesTest" begin include("SignedDistancesTest/runtests.jl") end
+    # @time @testset "SignedDistancesTest" begin include("SignedDistancesTest/runtests.jl") end
     # end
     # exit()
     #     

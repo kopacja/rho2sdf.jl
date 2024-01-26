@@ -7,3 +7,5 @@ Manifest.toml
 *.csv
 *.vtu
 *.vtk
+test/xp.csv
+test/xp.vtu
