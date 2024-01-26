@@ -3,6 +3,8 @@ function exportToVTU(
     fileName::String,
     X::Vector{Vector{Float64}},
     IEN::Vector{Vector{Int64}},
+    VTK_CODE::Int64,
+    rho::Vector{Float64}=nothing,
 )
 
     nnp = length(X)
@@ -51,7 +53,6 @@ function exportToVTU(
         "		  <DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">",
     )
 
-    VTK_CODE = 5
     for el = 1:nel
         print(io, "         ")
         for a = 1:nen
@@ -79,10 +80,22 @@ function exportToVTU(
     println(io, "        </DataArray>")
     println(io, "      </Cells>")
 
+    if (rho !== nothing)
+    println(io, "      <PointData Scalars=\"scalars\">")
+    println(io, "           <DataArray type=\"Float32\" Name=\"density\" Format=\"ascii\">")
+    for A = 1:nnp
+        println(io, "             ", rho[A])
+    end
+    println(io, "           </DataArray>")
+    println(io, "      </PointData>")
+    end
+
+
     println(io, "    </Piece>")
     println(io, "  </UnstructuredGrid>")
     println(io, "</VTKFile>")
 
     close(io)
 end
+
 

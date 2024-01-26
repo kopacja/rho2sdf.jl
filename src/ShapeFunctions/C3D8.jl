@@ -2,7 +2,7 @@
 C3D8_SFaD -> struct
 """
 
-
+# Shape functions and derivatives for C3D8 element:
 function C3D8_SFaD(Ξ::Vector{Float64})
 
     ξ₁ = Ξ[1]
