@@ -65,6 +65,24 @@ function SelectProjectedNodes(
     return X, Xp, mean_PD, max_PD
 end
 
+function SignCorrection4SDF(dist::Vector{Float64},
+    grid::Grid, 
+    big::Float64)
+    ngp = grid.ngp # number of nodes in grid
+
+    Sign = -1
+    for i in ngp
+        if dist[i] == big
+            dist[i] = Sign * dist[i]
+        else
+            if dist[i] == -1
+                Sign = Sign * Sign
+            end
+        end
+    end
+    return dist
+end
+
 
 function evalSignedDistances(
     mesh::Mesh,
@@ -74,6 +92,7 @@ function evalSignedDistances(
 )
 
     points = MeshGrid.generateGridPoints(grid) # uzly pravidelné mřížky
+    # points = reshape([-0.5 -0.5 -0.5], 3,1)
     linkedList = MeshGrid.LinkedList(grid, points) # pro rychlé vyhledávání
 
     head = linkedList.head # ID pravidelné bunky (pozice), index bodu z points
@@ -373,8 +392,8 @@ println("element ID: ", el)
     # X_combined = [Xg; Xp] 
     # # X_combined_couples = [X Xp]
 
-    nnp = length(Xg)
-    IEN = [[i; i + nnp] for i = 1:nnp]
+    # nnp = length(Xg)
+    # IEN = [[i; i + nnp] for i = 1:nnp]
 
    # Rho2sdf.exportToVTU("xp.vtu", X, IEN, 5)
 
@@ -386,7 +405,7 @@ println("element ID: ", el)
     #     writedlm(io, ['x' 'y' 'z'], ',')
     #     writedlm(io, xp', ',')
     # end
-
+    dist = SignCorrection4SDF(dist, grid, big)
     return dist, xp
 end
 
