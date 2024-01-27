@@ -24,14 +24,14 @@ using JLD
     # taskName = "chapadlo"
 
     RUN_PLANE = true
-    RUN_SPHERE = true
+    RUN_SPHERE = false
     RUN_CHAPADLO = false
 
     if (RUN_PLANE)
         @testset "Plane" begin
 
             taskName = "plane"
-            N = 1  # Number of cells along the longest side
+            N = 5  # Number of cells along the longest side
             ρₜ = 0.5 # Threshold density (isosurface level)
 
             X = [
@@ -43,7 +43,7 @@ using JLD
                 [1.0, -1.0, 1.0],
                 [1.0, 1.0, 1.0],
                 [-1.0, 1.0, 1.0],
-            ]
+            ] 
             IEN = [[1, 2, 3, 4, 5, 6, 7, 8]]
             ρₙ = [0.0, 0.0, 0.0, 0.0, 1, 1, 1, 1]
 
@@ -55,13 +55,17 @@ using JLD
 
             ## Grid:
             X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
-            sdf_grid = MeshGrid.Grid(X_min, X_max, N, 0) # cartesian grid
+            sdf_grid = MeshGrid.Grid(X_min, X_max, N, 3) # cartesian grid
+            
+            # sdf_grid.cell_size = 2.
+            # sdf_grid.ngp = 1.
 
             ## SDF from densities:
-            sdf_dists = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ, ρₜ)
+            (sdf_dists, xp) = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ, ρₜ)
+            println(sdf_dists)
 
             ## Export to VTK:
-            Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf.vtk", sdf_grid, sdf_dists, "distance")
+            # Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf.vtk", sdf_grid, sdf_dists, "distance")
         end
     end
 
@@ -91,7 +95,7 @@ using JLD
             sdf_grid = MeshGrid.Grid(X_min, X_max, N, 0) # cartesian grid
 
             ## SDF from densities:
-            sdf_dists = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ, ρₜ)
+            (sdf_dists, xp) = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ, ρₜ)
 
             ## Export to VTK:
             Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf.vtk", sdf_grid, sdf_dists, "distance")
@@ -127,7 +131,7 @@ using JLD
             sdf_grid = MeshGrid.Grid(X_min, X_max, N, 0) # cartesian grid
 
             ## SDF from densities:
-            sdf_dists = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ, ρₜ)
+            (sdf_dists, xp) = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ, ρₜ)
 
             ## Export to VTK:
             Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf.vtk", sdf_grid, sdf_dists, "distance")
