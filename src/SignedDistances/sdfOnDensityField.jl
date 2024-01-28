@@ -31,7 +31,8 @@ function ReturnLocalCoordsIntoTheElement(Ξ::Vector{Float64})
     return Ξ, false
 end
 
-function SelectProjectedNodes(mesh::Mesh,
+function SelectProjectedNodes(
+    mesh::Mesh,
     grid::Grid,
     xp::Matrix{Float64},
     points::Matrix{Float64})
@@ -64,6 +65,24 @@ function SelectProjectedNodes(mesh::Mesh,
     return X, Xp, mean_PD, max_PD
 end
 
+function SignCorrection4SDF(dist::Vector{Float64},
+    grid::Grid, 
+    big::Float64)
+    ngp = grid.ngp # number of nodes in grid
+
+    Sign = -1
+    for i in ngp
+        if dist[i] == big
+            dist[i] = Sign * dist[i]
+        else
+            if dist[i] == -1
+                Sign = Sign * Sign
+            end
+        end
+    end
+    return dist
+end
+
 
 function evalSignedDistances(
     mesh::Mesh,
@@ -73,6 +92,7 @@ function evalSignedDistances(
 )
 
     points = MeshGrid.generateGridPoints(grid) # uzly pravidelné mřížky
+    # points = reshape([-0.5 -0.5 -0.5], 3,1)
     linkedList = MeshGrid.LinkedList(grid, points) # pro rychlé vyhledávání
 
     head = linkedList.head # ID pravidelné bunky (pozice), index bodu z points
@@ -99,7 +119,7 @@ function evalSignedDistances(
     xp = zeros(nsd, ngp) # souřadnice bodů vrcholů (3xngp)
 
     for el = 1:nel
-println("element ID: ", el)
+        println("element ID: ", el)
         ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
 
         ρₑ_min = minimum(ρₑ)
@@ -214,7 +234,6 @@ println("element ID: ", el)
                         λ = 1.0              # Lagrange multiplier
                         Ξ_tol = 1e-2
                         Ξ_norm = 2 * Ξ_tol
-                        Ξ_norm_old = 1000.0
                         r_tol = 1e-2
                         r_norm = 2 * r_tol   # 
                         niter = 10           # maximum number of iterations
@@ -222,8 +241,8 @@ println("element ID: ", el)
 
                         while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
 
-                            K =  Hessian(sfce, Ξ,λ,x,Xₑ,ρₑ)
-                            r =  Gradient(sfce, Ξ,λ,x,Xₑ,ρₑ,ρₜ)
+                            K =  Hessian(sfce, Ξ, λ, x, Xₑ, ρₑ)
+                            r =  Gradient(sfce, Ξ, λ, x, Xₑ, ρₑ, ρₜ)
 
                             r_norm = norm(r)
 
@@ -261,8 +280,8 @@ println("element ID: ", el)
                                 niter = 10
                                 while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
     
-                                    r4 =  Gradient(sfce, Ξ,λ[1],x,Xₑ,ρₑ,ρₜ)
-                                    K4 =  Hessian(sfce, Ξ,λ[1],x,Xₑ,ρₑ)
+                                    r4 =  Gradient(sfce, Ξ, λ[1], x, Xₑ, ρₑ, ρₜ)
+                                    K4 =  Hessian(sfce, Ξ, λ[1], x, Xₑ, ρₑ)
                                     
                                     # Fifth equation, e.g. (ξ₁ - 1) = 0 etc., representing constraint of the fixed segment component is added into the residual and tangent matrix
                                     r = zeros(5)                                    
@@ -358,20 +377,34 @@ println("element ID: ", el)
     end
     # dist = marchingCubes(dist, N.+1, big)
 
-    Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
-    println("mean of projected distance: ", mean_PD)
-    println("maximum projected distance: ", max_PD)
+    # Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
+    # println("mean of projected distance: ", mean_PD)
+    # println("maximum projected distance: ", max_PD)
 
-    nnp = length(Xg)
-    IEN = [[i; i + nnp] for i = 1:nnp]
+
+    # nnp = Int(length(Xg)/2)
+    # IEN = [[i; i + nnp] for i = 1:nnp]
+    # 
+    # nnp₂ = Int(length(Xg)/2)
+    # IEN₂ = [[i; i + nnp₂] for i = 1:nnp₂]
+
+    # X_combined = [Xg; Xp] 
+    # # X_combined_couples = [X Xp]
+
+    # nnp = length(Xg)
+    # IEN = [[i; i + nnp] for i = 1:nnp]
 
    # Rho2sdf.exportToVTU("xp.vtu", X, IEN, 5)
 
-    open("xp.csv", "w") do io
-        writedlm(io, ['x' 'y' 'z'], ',')
-        writedlm(io, xp', ',')
-    end
+    # Rho2sdf.exportToVTU("xp.vtu", X_combined, IEN)
+    # Rho2sdf.exportToVTU("Xg.vtu", Xg, IEN₂)
+    # Rho2sdf.exportToVTU("Xp.vtu", Xp, IEN₂)
 
-    return dist
+    # open("xp.csv", "w") do io
+    #     writedlm(io, ['x' 'y' 'z'], ',')
+    #     writedlm(io, xp', ',')
+    # end
+    dist = SignCorrection4SDF(dist, grid, big)
+    return dist, xp
 end
 
