@@ -17,14 +17,18 @@ using JLD
     # @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
     # @time @testset "MeshGridTest" begin include("MeshGridTest/runtests.jl") end
     # @time @testset "SignedDistancesTest" begin include("SignedDistancesTest/runtests.jl") end
-    @time @testset "SeparatedTests" begin include("SeparatedTests/runtests.jl") end
-end
-exit()
+    # @time @testset "SeparatedTests" begin include("SeparatedTests/runtests.jl") end
+    #
+    ### Tests on geometries: ###
+    # @testset "TestOnLegGripper" begin include("SeparatedTests/TestOnLegGripper.jl") end
+    @testset "TestOnPrimitiveGeometry" begin include("SeparatedTests/TestOnPrimitiveGeometry.jl") end
+# end
+# exit()
     #     
     # # Data from Matlab:
     # taskName = "chapadlo"
 
-    RUN_PLANE = true
+    RUN_PLANE = false
     RUN_SPHERE = false
     RUN_CHAPADLO = false
 
@@ -63,10 +67,10 @@ exit()
 
             ## SDF from densities:
             (sdf_dists, xp) = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ, ρₜ)
-            println(sdf_dists)
+            # println(sdf_dists)
 
             ## Export to VTK:
-            # Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf.vtk", sdf_grid, sdf_dists, "distance")
+            Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf.vtk", sdf_grid, sdf_dists, "distance")
         end
     end
 
@@ -74,7 +78,7 @@ exit()
         @testset "Sphere" begin
             ## Inputs:
             taskName = "sphere"
-            N = 3  # Number of cells along the longest side
+            N = 5  # Number of cells along the longest side
             ρₜ = 0.5 # Threshold density (isosurface level)
 
             ## Read FEM mesh:
@@ -93,7 +97,7 @@ exit()
 
             ## Grid:
             X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
-            sdf_grid = MeshGrid.Grid(X_min, X_max, N, 0) # cartesian grid
+            sdf_grid = MeshGrid.Grid(X_min, X_max, N, 3) # cartesian grid
 
             ## SDF from densities:
             (sdf_dists, xp) = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ, ρₜ)
