@@ -17,8 +17,9 @@ using JLD
     # @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
     # @time @testset "MeshGridTest" begin include("MeshGridTest/runtests.jl") end
     # @time @testset "SignedDistancesTest" begin include("SignedDistancesTest/runtests.jl") end
-    # end
-    # exit()
+    @time @testset "SeparatedTests" begin include("SeparatedTests/runtests.jl") end
+end
+exit()
     #     
     # # Data from Matlab:
     # taskName = "chapadlo"

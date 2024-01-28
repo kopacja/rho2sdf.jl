@@ -1,18 +1,19 @@
 
 
-function ReduceEigenvals(K::Matrix{Float64}, r::Vector{Float64}, sign::Int)
+function ReduceEigenvals(K::Matrix{Float64}, r::Vector{Float64}, Sign::Int)
     Λ = real.(eigvals(K))
     (Λ_min, idx_min) = findmin(abs.(Λ))
                            
     if (abs(Λ_min) < 1.0e-6)
         Φ = real.(eigvecs(K))
-        idx = [1, 2, 3, 4]
+        idx = [1, 2, 3, 4, 5]
+        resize!(idx, length(Λ))
         deleteat!(idx, idx_min)
         Φ = Φ[:, idx]
         ΔΞ̃_and_Δλ̃ = 1.0 ./ Λ[idx] .* (Φ' * r)
-        ΔΞ_and_Δλ = (Φ .* sign) * ΔΞ̃_and_Δλ̃
+        ΔΞ_and_Δλ = (Φ .* Sign) * ΔΞ̃_and_Δλ̃
     else
-        ΔΞ_and_Δλ = K \ (r .* sign)
+        ΔΞ_and_Δλ = K \ (r .* Sign)
     end
     return ΔΞ_and_Δλ, Λ_min
 end
@@ -246,7 +247,8 @@ function evalSignedDistances(
 
                             r_norm = norm(r)
 
-                            ΔΞ_and_Δλ = K \ -r
+                            # ΔΞ_and_Δλ = K \ -r
+                            (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
 
                             Ξ += ΔΞ_and_Δλ[1:3]
                             λ += ΔΞ_and_Δλ[4]
@@ -293,10 +295,11 @@ function evalSignedDistances(
                                     K[1:4, 1:4] = K4
                                     K[5,idx[sg]] = 1.
                                     K[idx[sg],5] = 1.
-
+                                    # println(K)
                                     r_norm = norm(r)
     
-                                    ΔΞ_and_Δλ = K \ -r
+                                    # ΔΞ_and_Δλ = K \ -r
+                                    (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
 
                                     Ξ += ΔΞ_and_Δλ[1:3]
                                     λ += ΔΞ_and_Δλ[4:5]
@@ -404,7 +407,7 @@ function evalSignedDistances(
     #     writedlm(io, ['x' 'y' 'z'], ',')
     #     writedlm(io, xp', ',')
     # end
-    dist = SignCorrection4SDF(dist, grid, big)
+    # dist = SignCorrection4SDF(dist, grid, big)
     return dist, xp
 end
 

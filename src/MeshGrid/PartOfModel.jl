@@ -60,7 +60,7 @@ end
 # (Xₙ, IENₙ, ρₙ) = PartOfModel(IDes, X, IEN, ρ)
 # (mesh, ρ) = PartOfModel(mesh, IDes, ρ)
 
-function modiffElementalDensities(mesh::Mesh, rho::Vector{Float64})
+function ModiffElementalDensities(mesh::Mesh, rho::Vector{Float64})
     # Vectorized operations for min and max
     mins = minimum(mesh.X, dims=2)
     maxs = maximum(mesh.X, dims=2)
