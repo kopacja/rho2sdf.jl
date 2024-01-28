@@ -9,7 +9,6 @@ using LinearAlgebra
 using DelimitedFiles
 using Rho2sdf.ShapeFunctions
 using Rho2sdf.MeshGrid
-using Rho2sdf.ExportData
 using Rho2sdf
 
 include("Derivatives.jl")
