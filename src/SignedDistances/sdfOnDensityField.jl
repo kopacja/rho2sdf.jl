@@ -119,7 +119,7 @@ function evalSignedDistances(
     xp = zeros(nsd, ngp) # souřadnice bodů vrcholů (3xngp)
 
     for el = 1:nel
-println("element ID: ", el)
+        println("element ID: ", el)
         ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
 
         ρₑ_min = minimum(ρₑ)
@@ -234,7 +234,6 @@ println("element ID: ", el)
                         λ = 1.0              # Lagrange multiplier
                         Ξ_tol = 1e-2
                         Ξ_norm = 2 * Ξ_tol
-                        Ξ_norm_old = 1000.0
                         r_tol = 1e-2
                         r_norm = 2 * r_tol   # 
                         niter = 10           # maximum number of iterations
@@ -242,8 +241,8 @@ println("element ID: ", el)
 
                         while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
 
-                            K =  Hessian(sfce, Ξ,λ,x,Xₑ,ρₑ)
-                            r =  Gradient(sfce, Ξ,λ,x,Xₑ,ρₑ,ρₜ)
+                            K =  Hessian(sfce, Ξ, λ, x, Xₑ, ρₑ)
+                            r =  Gradient(sfce, Ξ, λ, x, Xₑ, ρₑ, ρₜ)
 
                             r_norm = norm(r)
 
@@ -281,8 +280,8 @@ println("element ID: ", el)
                                 niter = 10
                                 while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
     
-                                    r4 =  Gradient(sfce, Ξ,λ[1],x,Xₑ,ρₑ,ρₜ)
-                                    K4 =  Hessian(sfce, Ξ,λ[1],x,Xₑ,ρₑ)
+                                    r4 =  Gradient(sfce, Ξ, λ[1], x, Xₑ, ρₑ, ρₜ)
+                                    K4 =  Hessian(sfce, Ξ, λ[1], x, Xₑ, ρₑ)
                                     
                                     # Fifth equation, e.g. (ξ₁ - 1) = 0 etc., representing constraint of the fixed segment component is added into the residual and tangent matrix
                                     r = zeros(5)                                    
