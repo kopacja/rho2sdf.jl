@@ -16,14 +16,15 @@ mutable struct Mesh
     IEN::Matrix{Int64} # ID element -> ID nodes
     INE::Vector{Vector{Int64}} # ID node -> ID elements
     ISN::Vector{Vector{Int64}} # connectivity face - edges
+    sfce::Function # shape functions
     nsd::Int64 # number of spacial dimensions
-    nnp::Int64 # number of all points
+    nnp::Int64 # number of all nodes
     nen::Int64 # number of element nodes
     nel::Int64 # number of all elements
     nes::Int64 # number of element segments (faces)
     nsn::Int64 # number of face nodes
 
-    function Mesh(X::Vector{Vector{Float64}}, IEN::Vector{Vector{Int64}})
+    function Mesh(X::Vector{Vector{Float64}}, IEN::Vector{Vector{Int64}}, sfce::Function)
         X = reduce(hcat, X)
         IEN = reduce(hcat, IEN)
         INE = nodeToElementConnectivity(X, IEN)
@@ -41,7 +42,7 @@ mutable struct Mesh
         nel = size(IEN, 2)
         nes = length(ISN)
         nsn = length(ISN[1])
-        return new(X, IEN, INE, ISN, nsd, nnp, nen, nel, nes, nsn)
+        return new(X, IEN, INE, ISN, sfce, nsd, nnp, nen, nel, nes, nsn)
     end
 end
 

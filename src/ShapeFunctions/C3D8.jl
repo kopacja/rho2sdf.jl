@@ -1,10 +1,16 @@
-function sfce(Ξ::Vector{Float64})
+"""
+C3D8_SFaD -> struct
+"""
+
+# Shape functions and derivatives for C3D8 element:
+function C3D8_SFaD(Ξ::Vector{Float64})
 
     ξ₁ = Ξ[1]
     ξ₂ = Ξ[2]
     ξ₃ = Ξ[3]
 
-    N = Array{Float64}(undef, 8)
+    # N = Array{Float64}(undef, 8)
+    N = zeros(Float64, 8)
     N[1] = -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1)
     N[2] =  1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1)
     N[3] = -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1)
@@ -15,7 +21,8 @@ function sfce(Ξ::Vector{Float64})
     N[7] =  1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1)
     N[8] = -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
 
-    d¹N_dξ¹ = Array{Float64}(undef, 8, 3)
+    d¹N_dξ¹ = zeros(Float64, 8, 3)
+    # d¹N_dξ¹ = Array{Float64}(undef, 8, 3)
     d¹N_dξ¹[1, :] = [
         -0.125 * (ξ₂ - 1) * (ξ₃ - 1)
         -0.125 * (ξ₁ - 1) * (ξ₃ - 1)
@@ -66,7 +73,8 @@ function sfce(Ξ::Vector{Float64})
 
 
 
-    d²N_dξ² = Array{Float64}(undef, 8, 3, 3)
+    d²N_dξ² = zeros(Float64, 8, 3, 3)
+    # d²N_dξ² = Array{Float64}(undef, 8, 3, 3)
     d²N_dξ²[1, :, :] = [
         0 0.125*(1-ξ₃) 0.125*(1-ξ₂)
         0.125*(1-ξ₃) 0 0.125*(1-ξ₁)
@@ -117,7 +125,8 @@ function sfce(Ξ::Vector{Float64})
 
 
 
-    d³N_dξ³ = Array{Float64}(undef, 8, 3, 3, 3)
+    d³N_dξ³ = zeros(Float64, 8, 3, 3, 3)
+    # d³N_dξ³ = Array{Float64}(undef, 8, 3, 3, 3)
     d³N_dξ³[1, :, :, :] = reshape([
         0 0 0
         0 0 -0.125000000000000
