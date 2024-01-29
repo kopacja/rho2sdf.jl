@@ -69,6 +69,19 @@ end
 function SignCorrection4SDF(dist::Vector{Float64},
     grid::Grid, 
     big::Float64)
+
+    # Is = Iterators.product(
+    #     1:grid.N[1], # Notice the range begins with 1 not zero because 
+    #     0:grid.N[2],
+    #     0:grid.N[3],
+    # )
+
+    # for I ∈ Is
+    #     i = Int(I[3] * (grid.N[1] + 1) * (grid.N[2] + 1) + I[2] * (grid.N[1] + 1) + I[1] + 1)
+    #     if (dist[i] == big && dist[i-1] < 0.0)
+    #         dist[i] = -big
+    #     end
+    # end
     ngp = grid.ngp # number of nodes in grid
 
     Sign = -1
@@ -218,7 +231,7 @@ function evalSignedDistances(
             if (ρₑ_max > ρₜ) # Hranice prochází elementem...
 
                 Xₑ = X[:, IEN[:, el]]
-                
+
                 Is = MeshGrid.calculateMiniAABB_grid(Xₑ, δ, N, AABB_min, AABB_max, nsd)
 
                 for I ∈ Is
@@ -231,24 +244,24 @@ function evalSignedDistances(
                     while v != -1
                         x = points[:, v]
 
-                        Ξ = zeros(Float64,3)  # local coordinates
+                        Ξ = zeros(Float64, 3)  # local coordinates
                         λ = 1.0              # Lagrange multiplier
                         Ξ_tol = 1e-2
                         Ξ_norm = 2 * Ξ_tol
+                        Ξ_norm_old = 1000.0
                         r_tol = 1e-2
                         r_norm = 2 * r_tol   # 
                         niter = 10           # maximum number of iterations
                         iter = 1             # iteration form one 
-
+ 
                         while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
 
-                            K =  Hessian(sfce, Ξ, λ, x, Xₑ, ρₑ)
-                            r =  Gradient(sfce, Ξ, λ, x, Xₑ, ρₑ, ρₜ)
+                            K = Hessian(sfce, Ξ, λ, x, Xₑ, ρₑ)
+                            r = Gradient(sfce, Ξ, λ, x, Xₑ, ρₑ, ρₜ)
 
                             r_norm = norm(r)
 
-                            # ΔΞ_and_Δλ = K \ -r
-                            (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
+                            ΔΞ_and_Δλ = K \ -r
 
                             Ξ += ΔΞ_and_Δλ[1:3]
                             λ += ΔΞ_and_Δλ[4]
@@ -257,90 +270,72 @@ function evalSignedDistances(
 
                             iter = iter + 1
                         end
-
+#=
                         # If projection is not inside the element it is a good idea to try
                         # to project on the edges and corners of the isosurface              
                         if (maximum(abs.(Ξ)) > 1.0) # xₚ is NOT in the element
-                            
+
                             # Let's loop  check whether there is a projection on the edges of the density isocontour.
 
                             # Each segment (face) have not three components ξ₁, ξ₂, ξ₃ but only two and the
                             # third one is known constant and must be fixed by constraint equation. 
                             # Following two vectors represents index (1, 2 or 3) of the fixed component and its
                             # value (-1 or 1):
-                            idx = [ 3,  2, 1, 2,  1, 3] # Index of the third constant component 
-                            Ξ_  = [-1, -1, 1, 1, -1, 1] #
+                            idx = [3, 2, 1, 2, 1, 3] # Index of the third constant component 
+                            Ξ_ = [-1, -1, 1, 1, -1, 1] #
 
                             # Loop over segments (nes=6 for hex element)
                             for sg = 1:nes
+                                ρₛ = ρₑ[mesh.ISN[sg]]
 
-                                Ξ = zeros(3)
-                                λ = zeros(2)
-                                Ξ_norm = 2 * Ξ_tol                            
-                                r_norm = 2 * r_tol
-                                iter = 1
-                                niter = 10
-                                while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
-    
-                                    r4 =  Gradient(sfce, Ξ, λ[1], x, Xₑ, ρₑ, ρₜ)
-                                    K4 =  Hessian(sfce, Ξ, λ[1], x, Xₑ, ρₑ)
-                                    
-                                    # Fifth equation, e.g. (ξ₁ - 1) = 0 etc., representing constraint of the fixed segment component is added into the residual and tangent matrix
-                                    r = zeros(5)                                    
-                                    r[1:4] = r4
-                                    r[5] = (Ξ[idx[sg]] - Ξ_[sg])
-                                    r[idx[sg]] += λ[2]
+                                ρₛ_min = minimum(ρₛ)
+                                ρₛ_max = maximum(ρₛ)
 
-                                    K = zeros(5,5)                                    
-                                    K[1:4, 1:4] = K4
-                                    K[5,idx[sg]] = 1.
-                                    K[idx[sg],5] = 1.
-                                    # println(K)
-                                    r_norm = norm(r)
-    
-                                    # ΔΞ_and_Δλ = K \ -r
-                                    (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
+                                if (ρₛ_min <= ρₜ && ρₛ_max >= ρₜ) # the boundary cross through the segment
 
-                                    Ξ += ΔΞ_and_Δλ[1:3]
-                                    λ += ΔΞ_and_Δλ[4:5]
+                                    Ξ = zeros(3)
+                                    λ = ones(2)
+                                    Ξ_norm = 2 * Ξ_tol
+                                    r_norm = 2 * r_tol
+                                    iter = 1
+                                    niter = 10
+                                    while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
 
-        
-                                    Ξ_norm = norm(ΔΞ_and_Δλ)
-                                    #println("SG: ", sg , ", iter: ", iter, ", Ξ_norm: ", Ξ_norm, ", r_norm: ", r_norm)
-                                    iter = iter + 1
-                                end
-                            
-                                
-                                if (maximum(abs.(Ξ)) > 1.0) # xₚ is NOT in the element
-                                    # If there is not projection on the element segment the closed point must be a
-                                    # corner of the isocontour inside the element. 
-                                    # One can add next constraint equation and solve the non-linear system again for each edge of the element. We will speed up this by linear approximation.
+                                        r4 = Gradient(sfce, Ξ, λ[1], x, Xₑ, ρₑ, ρₜ)
+                                        K4 = Hessian(sfce, Ξ, λ[1], x, Xₑ, ρₑ)
 
-                                    # Let's us loop over edges and check whether rho of the end points is below and above the threshold density
-                                    for a = 1:length(ρₑ)-1
-                                        ρ_min, min_idx = findmin([ρₑ[a], ρₑ[a+1]])
-                                        ρ_max, max_idx = findmax([ρₑ[a], ρₑ[a+1]])
-                                    
-                                        a_min = a+min_idx-1
-                                        a_max = a+max_idx-1
-                            
-                                        if (ρ_min <= ρₜ && ρ_max >= ρₜ)
-                                            ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
-                                            xₚ = Xₑ[:,a_min] + ratio .* (Xₑ[:,a_max] - Xₑ[:,a_min])
+                                        # Fifth equation, e.g. (ξ₁ - 1) = 0 etc., representing constraint of the fixed segment component is added into the residual and tangent matrix
+                                        r = zeros(5)
+                                        r[1:4] = r4
+                                        r[5] = (Ξ[idx[sg]] - Ξ_[sg])
+                                        r[idx[sg]] += λ[2]
 
-                                            # Use normal vector at the center of the element
-                                            (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0., 0., 0.])
-                                            norm_dρ_dΞ = norm(dρ_dΞ)
-                                            n = dρ_dΞ / norm_dρ_dΞ
+                                        K = zeros(5, 5)
+                                        K[1:4, 1:4] = K4
+                                        K[5, idx[sg]] = 1.0
+                                        K[idx[sg], 5] = 1.0
 
-                                            dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                            if (abs(dist_tmp) < abs(dist[v]))
-                                                dist[v] = dist_tmp
-                                                xp[:, v] = xₚ
-                                            end
+                                        r_norm = norm(r)
+
+                                        ΔΞ_and_Δλ = K \ -r
+
+                                        ΔΞ = ΔΞ_and_Δλ[1:3]
+                                        Δλ = ΔΞ_and_Δλ[4:5]
+                                        
+                                        if (maximum(abs.(ΔΞ)) > 1.0)
+                                            ΔΞ *= 0.2/maximum(abs.(ΔΞ))
                                         end
+
+                                        Ξ += ΔΞ
+                                        λ += Δλ
+
+                                        Ξ_norm = norm(ΔΞ_and_Δλ)
+                                        #println("SG: ", sg , ", iter: ", iter, ", Ξ_norm: ", Ξ_norm, ", r_norm: ", r_norm)
+                                        iter = iter + 1
                                     end
-                                else
+                                end
+
+                                if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the segment
                                     H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
                                     xₚ = Xₑ * H
 
@@ -355,6 +350,7 @@ function evalSignedDistances(
                                     end
                                 end
                             end # for sg
+
                         else # maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
 
                             H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
@@ -370,6 +366,35 @@ function evalSignedDistances(
                                 xp[:, v] = xₚ
                             end
                         end
+=#
+
+                        # The closed point could be a corner of the isocontour inside the element. 
+
+                        # Let's loop over edges and check whether rho of the end points is below and above the threshold density
+                        for a = 1:length(ρₑ)-1
+                            ρ_min, min_idx = findmin([ρₑ[a], ρₑ[a+1]])
+                            ρ_max, max_idx = findmax([ρₑ[a], ρₑ[a+1]])
+
+                            a_min = a + min_idx - 1
+                            a_max = a + max_idx - 1
+
+                            if (ρ_min <= ρₜ && ρ_max >= ρₜ)
+
+                                ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
+                                xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
+
+                                # Use normal vector at the center of the element
+                                (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
+                                norm_dρ_dΞ = norm(dρ_dΞ)
+                                n = dρ_dΞ / norm_dρ_dΞ
+
+                                dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
+                                if (abs(dist_tmp) < abs(dist[v]))
+                                    dist[v] = dist_tmp
+                                    xp[:, v] = xₚ
+                                end
+                            end
+                        end
 
                         v = next[v]
 
@@ -378,6 +403,7 @@ function evalSignedDistances(
             end
         end
     end
+
     # dist = marchingCubes(dist, N.+1, big)
 
     # Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
@@ -407,7 +433,8 @@ function evalSignedDistances(
     #     writedlm(io, ['x' 'y' 'z'], ',')
     #     writedlm(io, xp', ',')
     # end
-    # dist = SignCorrection4SDF(dist, grid, big)
+    dist = SignCorrection4SDF(dist, grid, big)
+
     return dist, xp
 end
 
