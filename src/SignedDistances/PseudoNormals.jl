@@ -13,8 +13,8 @@ function computeEdgePseudoNormals(mesh)
     # for el = 1:mesh.nel # cycle over the number of all elements
     @threads for el = 1:mesh.nel # cycle over the number of all elements
         # Get the vertices of the current element
-        As = mesh.IEN[:, el]
-        Xt = mesh.X[:, As]
+        As = mesh.IEN[:, el] # ID of nodes for each triangle
+        Xt = mesh.X[:, As]   # cooradinates of nodes
         n = computeTriangleNormal(Xt)
 
         for i = 1:3

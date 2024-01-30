@@ -70,7 +70,8 @@ function extractSurfaceTriangularMesh(mesh::Mesh)
     end
 
     mesh.X = X
-    mesh.IEN= IEN
+    mesh.IEN = IEN
+    mesh.nel = Tri_nel
     # return (X_new, IEN_new)
     return mesh
 end
