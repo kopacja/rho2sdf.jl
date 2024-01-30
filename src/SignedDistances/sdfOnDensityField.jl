@@ -70,30 +70,30 @@ function SignCorrection4SDF(dist::Vector{Float64},
     grid::Grid, 
     big::Float64)
 
-    # Is = Iterators.product(
-    #     1:grid.N[1], # Notice the range begins with 1 not zero because 
-    #     0:grid.N[2],
-    #     0:grid.N[3],
-    # )
+    Is = Iterators.product(
+        1:grid.N[1], # Notice the range begins with 1 not zero because 
+        0:grid.N[2],
+        0:grid.N[3],
+    )
 
-    # for I ∈ Is
-    #     i = Int(I[3] * (grid.N[1] + 1) * (grid.N[2] + 1) + I[2] * (grid.N[1] + 1) + I[1] + 1)
-    #     if (dist[i] == big && dist[i-1] < 0.0)
-    #         dist[i] = -big
-    #     end
-    # end
-    ngp = grid.ngp # number of nodes in grid
-
-    Sign = -1
-    for i in ngp
-        if dist[i] == big
-            dist[i] = Sign * dist[i]
-        else
-            if dist[i] == -1
-                Sign = Sign * Sign
-            end
+    for I ∈ Is
+        i = Int(I[3] * (grid.N[1] + 1) * (grid.N[2] + 1) + I[2] * (grid.N[1] + 1) + I[1] + 1)
+        if (dist[i] == big && dist[i-1] < 0.0)
+            dist[i] = -big
         end
     end
+    # ngp = grid.ngp # number of nodes in grid
+
+    # Sign = -1
+    # for i in ngp
+    #     if dist[i] == big
+    #         dist[i] = Sign * dist[i]
+    #     else
+    #         if dist[i] == -1
+    #             Sign = Sign * Sign
+    #         end
+    #     end
+    # end
     return dist
 end
 
@@ -262,6 +262,7 @@ function evalSignedDistances(
                             r_norm = norm(r)
 
                             ΔΞ_and_Δλ = K \ -r
+                            # (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
 
                             Ξ += ΔΞ_and_Δλ[1:3]
                             λ += ΔΞ_and_Δλ[4]

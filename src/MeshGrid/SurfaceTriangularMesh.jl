@@ -55,7 +55,24 @@ function extractSurfaceTriangularMesh(mesh::Mesh)
             end # if (length(commonEls) == 1)
         end # sg
     end # el
-    return Mesh(X_new, IEN_new)
+
+    Tri_nnp = length(X_new)
+    Tri_nel = length(IEN_new)
+
+    X = zeros(3, Tri_nnp)
+    IEN = zeros(Int, 3, Tri_nel)
+    
+    for i in 1:Tri_nnp
+        X[:, i] = X_new[i]
+    end
+    for i in 1:Tri_nel
+        IEN[:, i] = IEN_new[i]
+    end
+
+    mesh.X = X
+    mesh.IEN= IEN
+    # return (X_new, IEN_new)
+    return mesh
 end
 
 

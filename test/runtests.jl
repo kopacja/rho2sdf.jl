@@ -21,7 +21,8 @@ using JLD
     #
     ### Tests on geometries: ###
     # @testset "TestOnLegGripper" begin include("SeparatedTests/TestOnLegGripper.jl") end
-    @testset "TestOnPrimitiveGeometry" begin include("SeparatedTests/TestOnPrimitiveGeometry.jl") end
+    @testset "TestOnLegGripperSTL" begin include("SeparatedTests/TestOnLegGripperSTL.jl") end
+    # @testset "TestOnPrimitiveGeometry" begin include("SeparatedTests/TestOnPrimitiveGeometry.jl") end
 # end
 # exit()
     #     
@@ -82,7 +83,8 @@ using JLD
             ρₜ = 0.5 # Threshold density (isosurface level)
 
             ## Read FEM mesh:
-            data = matread(taskName * ".mat")
+            # data = matread(taskName * ".mat")
+            data = matread("test/" * taskName * ".mat")
             (X, IEN, rho) = MeshGrid.MeshInformations(data)
 
             ## Generate FEM mesh structure:
