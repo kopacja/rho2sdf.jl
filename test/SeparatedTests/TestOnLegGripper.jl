@@ -51,12 +51,16 @@ using JLD
 
     nnp = length(Xg)
     IEN = [[i; i + nnp] for i = 1:nnp]
+    
+    Xx = vec([Xg Xp])
 
-    DataExport.exportToVTU("xp.vtu", X, IEN, 5)
+    DataExport.exportToVTU("lines.vtu", X, IEN, 3)
+
+    DataExport.exportToVTU("xp.vtu", X, IEN, 1)
 
     # Rho2sdf.exportToVTU("xp.vtu", X_combined, IEN)
-    DataExport.exportToVTU("Xg.vtu", Xg, IEN₂, 5)
-    DataExport.exportToVTU("Xp.vtu", Xp, IEN₂, 5)
+    DataExport.exportToVTU("Xg.vtu", Xg, IEN₂, 1)
+    DataExport.exportToVTU("Xp.vtu", Xp, IEN₂, 1)
 
 
     ## Data export to VTK:
