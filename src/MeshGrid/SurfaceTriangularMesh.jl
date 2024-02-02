@@ -9,6 +9,7 @@ function extractSurfaceTriangularMesh(mesh::Mesh)
     nel = mesh.nel # number of elements
     nes = mesh.nes # number of element segments (faces) 6
     nsn = mesh.nsn # number of segment nodes (kolik má stěna uzlů) 4
+    sfce = mesh.sfce
 
     X_new = Vector{Vector{Float64}}()
     push!(X_new, vec(X[:, 1]))
@@ -56,24 +57,7 @@ function extractSurfaceTriangularMesh(mesh::Mesh)
         end # sg
     end # el
 
-    Tri_nnp = length(X_new)
-    Tri_nel = length(IEN_new)
-
-    X = zeros(3, Tri_nnp)
-    IEN = zeros(Int, 3, Tri_nel)
-    
-    for i in 1:Tri_nnp
-        X[:, i] = X_new[i]
-    end
-    for i in 1:Tri_nel
-        IEN[:, i] = IEN_new[i]
-    end
-
-    mesh.X = X
-    mesh.IEN = IEN
-    mesh.nel = Tri_nel
-    # return (X_new, IEN_new)
-    return mesh
+    return Mesh(X_new, IEN_new, sfce)
 end
 
 
