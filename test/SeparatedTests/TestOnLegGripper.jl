@@ -17,6 +17,7 @@ using JLD
     # data = matread(taskName * ".mat")
     data = matread("test/" * taskName * ".mat")
     
+
     # part_name = "elementy_trubky.txt"
     part_name = "test/elementy_trubky.txt"
 
@@ -31,8 +32,10 @@ using JLD
     ## Grid:
     X_min, X_max = MeshGrid.getMesh_AABB(mesh.X) # vec, vec
     
+
     N = 20  #Number of divisions along the longest side (along some axis)
     sdf_grid = MeshGrid.Grid(X_min, X_max, N, 3) # cartesian grid
+
     
     ## SDF from densities:
     ρₜ = 0.5
