@@ -1,20 +1,22 @@
 
 
-function ReduceEigenvals(K::Matrix{Float64}, r::Vector{Float64}, Sign::Int)
+function ReduceEigenvals(K::Matrix{Float64}, r::Vector{Float64}, Sign::Int, th::Float64 = 1.0e-6)
     Λ = real.(eigvals(K))
-    (Λ_min, idx_min) = findmin(abs.(Λ))
-                           
-    if (abs(Λ_min) < 1.0e-6)
+    Λ_min = minimum(abs.(Λ))
+
+    if Λ_min < th
         Φ = real.(eigvecs(K))
-        idx = [1, 2, 3, 4, 5]
-        resize!(idx, length(Λ))
-        deleteat!(idx, idx_min)
-        Φ = Φ[:, idx]
-        ΔΞ̃_and_Δλ̃ = 1.0 ./ Λ[idx] .* (Φ' * r)
-        ΔΞ_and_Δλ = (Φ .* Sign) * ΔΞ̃_and_Δλ̃
+        # Adjust the calculation if necessary
+        idx_below_th = findall(x -> abs(x) < th, Λ)
+        idx = setdiff(1:length(Λ), (idx_below_th))
+        Φ_reduced = Φ[:, idx]
+        ΔΞ̃_and_Δλ̃ = 1.0 ./ Λ[idx] .* (Φ_reduced' * r)
+        ΔΞ_and_Δλ = (Φ_reduced .* Sign) * ΔΞ̃_and_Δλ̃
+       
     else
         ΔΞ_and_Δλ = K \ (r .* Sign)
     end
+
     return ΔΞ_and_Δλ, Λ_min
 end
 
@@ -69,31 +71,17 @@ end
 function SignCorrection4SDF(dist::Vector{Float64},
     grid::Grid, 
     big::Float64)
-
-    Is = Iterators.product(
-        1:grid.N[1], # Notice the range begins with 1 not zero because 
-        0:grid.N[2],
-        0:grid.N[3],
-    )
-
-    for I ∈ Is
-        i = Int(I[3] * (grid.N[1] + 1) * (grid.N[2] + 1) + I[2] * (grid.N[1] + 1) + I[1] + 1)
-        if (dist[i] == big && dist[i-1] < 0.0)
-            dist[i] = -big
+    
+    ngp = grid.ngp # number of nodes in grid
+    Sign = -1
+    for i in 1:ngp
+        if dist[i] != big
+            Sign = sign(dist[i])
+        end
+        if dist[i] == big && Sign == 1
+           dist[i] = dist[i] * -1
         end
     end
-    # ngp = grid.ngp # number of nodes in grid
-
-    # Sign = -1
-    # for i in ngp
-    #     if dist[i] == big
-    #         dist[i] = Sign * dist[i]
-    #     else
-    #         if dist[i] == -1
-    #             Sign = Sign * Sign
-    #         end
-    #     end
-    # end
     return dist
 end
 
@@ -114,7 +102,7 @@ function evalSignedDistances(
     N = linkedList.grid.N # Number of divisions along each axis of the grid
     AABB_min = linkedList.grid.AABB_min # Minimum coordinates of the Axis-Aligned Bounding Box (AABB)
     AABB_max = linkedList.grid.AABB_max # Maximum coordinates of the AABB
-    δ = 5.1 * grid.cell_size # offset for mini AABB
+    δ = 1.2 * grid.cell_size # offset for mini AABB
     
     X   = mesh.X   # vector of nodes positions
     IEN = mesh.IEN # ID element -> ID nodes
@@ -128,7 +116,7 @@ function evalSignedDistances(
     println("number of all elements: ", nel)
 
     ngp = grid.ngp # number of nodes in grid
-    big = 1.0e10
+    big = -1.0e10
     dist = big * ones(ngp) # distance field initialization
     xp = zeros(nsd, ngp) # souřadnice bodů vrcholů (3xngp)
 
