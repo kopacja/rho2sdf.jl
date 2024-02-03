@@ -69,31 +69,17 @@ end
 function SignCorrection4SDF(dist::Vector{Float64},
     grid::Grid, 
     big::Float64)
-
-    Is = Iterators.product(
-        1:grid.N[1], # Notice the range begins with 1 not zero because 
-        0:grid.N[2],
-        0:grid.N[3],
-    )
-
-    for I ∈ Is
-        i = Int(I[3] * (grid.N[1] + 1) * (grid.N[2] + 1) + I[2] * (grid.N[1] + 1) + I[1] + 1)
-        if (dist[i] == big && dist[i-1] < 0.0)
-            dist[i] = -big
+    
+    ngp = grid.ngp # number of nodes in grid
+    Sign = -1
+    for i in 1:ngp
+        if dist[i] != big
+            Sign = sign(dist[i])
+        end
+        if dist[i] == big && Sign == 1
+           dist[i] = dist[i] * -1
         end
     end
-    # ngp = grid.ngp # number of nodes in grid
-
-    # Sign = -1
-    # for i in ngp
-    #     if dist[i] == big
-    #         dist[i] = Sign * dist[i]
-    #     else
-    #         if dist[i] == -1
-    #             Sign = Sign * Sign
-    #         end
-    #     end
-    # end
     return dist
 end
 
@@ -114,7 +100,7 @@ function evalSignedDistances(
     N = linkedList.grid.N # Number of divisions along each axis of the grid
     AABB_min = linkedList.grid.AABB_min # Minimum coordinates of the Axis-Aligned Bounding Box (AABB)
     AABB_max = linkedList.grid.AABB_max # Maximum coordinates of the AABB
-    δ = 5.1 * grid.cell_size # offset for mini AABB
+    δ = 1.2 * grid.cell_size # offset for mini AABB
     
     X   = mesh.X   # vector of nodes positions
     IEN = mesh.IEN # ID element -> ID nodes
@@ -128,7 +114,7 @@ function evalSignedDistances(
     println("number of all elements: ", nel)
 
     ngp = grid.ngp # number of nodes in grid
-    big = 1.0e10
+    big = -1.0e10
     dist = big * ones(ngp) # distance field initialization
     xp = zeros(nsd, ngp) # souřadnice bodů vrcholů (3xngp)
 
