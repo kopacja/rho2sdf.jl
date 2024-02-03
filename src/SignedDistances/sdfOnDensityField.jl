@@ -1,20 +1,22 @@
 
 
-function ReduceEigenvals(K::Matrix{Float64}, r::Vector{Float64}, Sign::Int)
+function ReduceEigenvals(K::Matrix{Float64}, r::Vector{Float64}, Sign::Int, th::Float64 = 1.0e-6)
     Λ = real.(eigvals(K))
-    (Λ_min, idx_min) = findmin(abs.(Λ))
-                           
-    if (abs(Λ_min) < 1.0e-6)
+    Λ_min = minimum(abs.(Λ))
+
+    if Λ_min < th
         Φ = real.(eigvecs(K))
-        idx = [1, 2, 3, 4, 5]
-        resize!(idx, length(Λ))
-        deleteat!(idx, idx_min)
-        Φ = Φ[:, idx]
-        ΔΞ̃_and_Δλ̃ = 1.0 ./ Λ[idx] .* (Φ' * r)
-        ΔΞ_and_Δλ = (Φ .* Sign) * ΔΞ̃_and_Δλ̃
+        # Adjust the calculation if necessary
+        idx_below_th = findall(x -> abs(x) < th, Λ)
+        idx = setdiff(1:length(Λ), (idx_below_th))
+        Φ_reduced = Φ[:, idx]
+        ΔΞ̃_and_Δλ̃ = 1.0 ./ Λ[idx] .* (Φ_reduced' * r)
+        ΔΞ_and_Δλ = (Φ_reduced .* Sign) * ΔΞ̃_and_Δλ̃
+       
     else
         ΔΞ_and_Δλ = K \ (r .* Sign)
     end
+
     return ΔΞ_and_Δλ, Λ_min
 end
 
