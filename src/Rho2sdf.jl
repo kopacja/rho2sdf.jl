@@ -5,7 +5,6 @@ using Statistics
 using DelimitedFiles
 using Einsum
 using BenchmarkTools
-using ProgressMeter
 
 # Predefined shape functions and its derivatives:
 include("ShapeFunctions/ShapeFunctions.jl")

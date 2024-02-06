@@ -8,9 +8,7 @@ using Rho2sdf.SignedDistances
 using Rho2sdf.MarchingCubes
 using Rho2sdf.DataExport
 using MAT
-using SymPy
 using LinearAlgebra
-using JLD
 
 @testset "Rho2sdf.jl" begin
 
@@ -21,7 +19,7 @@ using JLD
     #
     ### Tests on geometries: ###
     # @testset "TestOnLegGripper" begin include("SeparatedTests/TestOnLegGripper.jl") end
-    @testset "TestOnLegGripperSTL" begin include("SeparatedTests/TestOnLegGripperSTL.jl") end
+    # @testset "TestOnLegGripperSTL" begin include("SeparatedTests/TestOnLegGripperSTL.jl") end
     # @testset "TestOnPrimitiveGeometry" begin include("SeparatedTests/TestOnPrimitiveGeometry.jl") end
 # end
 # exit()
@@ -29,7 +27,7 @@ using JLD
     # # Data from Matlab:
     # taskName = "chapadlo"
 
-    RUN_PLANE = false
+    RUN_PLANE = true
     RUN_SPHERE = false
     RUN_CHAPADLO = false
 
