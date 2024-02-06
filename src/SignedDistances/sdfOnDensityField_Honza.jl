@@ -112,6 +112,7 @@ function evalSignedDistances(
     nel = mesh.nel # number of all elements
     nes = mesh.nes # number of element segments (faces)
     nsn = mesh.nsn # number of face nodes
+    INN = mesh.INN # Neighbor nodes ID for the corresponding node
     println("number of all elements: ", nel)
 
     ngp = grid.ngp # number of nodes in grid
@@ -371,30 +372,69 @@ function evalSignedDistances(
                             # The closed point could be a corner of the isocontour inside the element.
                             # Let's loop over edges and check whether rho of the end points is below and above the threshold density
 
-                            for a = 1:length(ρₑ)-1
-                                ρ_min, min_idx = findmin([ρₑ[a], ρₑ[a+1]])
-                                ρ_max, max_idx = findmax([ρₑ[a], ρₑ[a+1]])
+                            # for a = 1:length(ρₑ)-1
+                            #     ρ_min, min_idx = findmin([ρₑ[a], ρₑ[a+1]])
+                            #     ρ_max, max_idx = findmax([ρₑ[a], ρₑ[a+1]])
 
-                                a_min = a + min_idx - 1
-                                a_max = a + max_idx - 1
+                            #     a_min = a + min_idx - 1
+                            #     a_max = a + max_idx - 1
 
-                                if (ρ_min <= ρₜ && ρ_max >= ρₜ)
+                            #     if (ρ_min <= ρₜ && ρ_max >= ρₜ)
 
-                                    ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
-                                    xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
+                            #         ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
+                            #         xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
 
-                                    # Use normal vector at the center of the element
-                                    (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
-                                    norm_dρ_dΞ = norm(dρ_dΞ)
-                                    n = dρ_dΞ / norm_dρ_dΞ
+                            #         # Use normal vector at the center of the element
+                            #         (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
+                            #         norm_dρ_dΞ = norm(dρ_dΞ)
+                            #         n = dρ_dΞ / norm_dρ_dΞ
 
-                                    dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                    if (abs(dist_tmp) < abs(dist[v]))
-                                        dist[v] = dist_tmp
-                                        xp[:, v] = xₚ
-                                    end
-                                end
-                            end 
+                            #         dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
+                            #         if (abs(dist_tmp) < abs(dist[v]))
+                            #             dist[v] = dist_tmp
+                            #             xp[:, v] = xₚ
+                            #         end
+                            #     end
+                            # end 
+                            # INN = [
+                            #      [4, 2, 5], # nodes define face 1
+                            #      [1, 3, 6],
+                            #      [2, 4, 7],
+                            #      [3, 1, 8],
+                            #      [8, 6, 1],
+                            #      [5, 7, 2],
+                            #      [6, 8, 3],
+                            #      [7, 5, 4],
+                            #     ]                               
+                            for a in eachindex(ρₑ)
+                            # for a in 1:4
+                                for b in 1:3
+                                     ρ_min, min_idx = findmin([ρₑ[a], ρₑ[INN[a][b]]])
+                                     ρ_max, max_idx = findmax([ρₑ[a], ρₑ[INN[a][b]]])
+
+                                     a_min = [a ,INN[a][b]][min_idx]
+                                     a_max = [a ,INN[a][b]][max_idx]
+
+                                     if (ρ_min <= ρₜ && ρ_max >= ρₜ)
+                                         # if a_min > length(ρₑ) a_min = 1 end
+                                         # if a_max > length(ρₑ) a_max = 1 end
+
+                                         ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
+                                         xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
+
+                                     #    Use normal vector at the center of the element
+                                         (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
+                                         norm_dρ_dΞ = norm(dρ_dΞ)
+                                         n = dρ_dΞ / norm_dρ_dΞ
+
+                                         dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
+                                         if (abs(dist_tmp) < abs(dist[v]))
+                                             dist[v] = dist_tmp
+                                             xp[:, v] = xₚ
+                                         end
+                                     end
+                                 end
+                            end                             
 
                         end
 

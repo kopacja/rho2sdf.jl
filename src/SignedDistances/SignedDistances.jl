@@ -14,7 +14,8 @@ using Rho2sdf
 include("Derivatives.jl")
 include("PseudoNormals.jl")
 include("sdfOnTriangularMesh.jl")
-include("sdfOnDensityField.jl")
+# include("sdfOnDensityField.jl")
+include("sdfOnDensityField_Honza.jl")
 
 
 
