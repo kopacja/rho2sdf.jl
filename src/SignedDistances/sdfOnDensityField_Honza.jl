@@ -84,6 +84,29 @@ function SignCorrection4SDF(dist::Vector{Float64},
     return dist
 end
 
+function ProjectionOnEdgeOfIsocountour(Xₑ::Matrix{Float64}, x::Vector{Float64})
+    # Convert points to vectors
+    vecA = [A[1], A[2]]
+    vecB = [B[1], B[2]]
+    vecP = [P[1], P[2]]
+    
+    # Calculate the directional vector of the line segment AB
+    AB = vecB - vecA
+    
+    # Calculate the vector AP
+    AP = vecP - vecA
+    
+    # Project AP onto AB to find the projection vector AP_proj
+    # The projection formula is AP_proj = (AP . AB) / |AB|^2 * AB
+    dotProduct = dot(AP, AB)
+    normABSquared = dot(AB, AB)
+    projectionScalar = dotProduct / normABSquared
+
+    projection = vecA + projectionScalar * AB
+    IsInside = 0 <= projectionScalar <= 1
+    # The projection is inside the segment if the scalar is between 0 and 1 (inclusive)
+    return  0 <= projectionScalar <= 1
+end
 
 function evalSignedDistances(
     mesh::Mesh,
@@ -271,7 +294,8 @@ function evalSignedDistances(
                             #println("iter: ", iter, ", Ξ_norm: ", Ξ_norm, ", r_norm: ", r_norm)
                             iter = iter + 1
                         end
-                        #=
+                        ####################################x
+                        
                                                 # If projection is not inside the element it is a good idea to try
                                                 # to project on the edges and corners of the isosurface              
                                                 if (maximum(abs.(Ξ)) > 1.0) # xₚ is NOT in the element
@@ -286,7 +310,8 @@ function evalSignedDistances(
                                                     Ξ_ = [-1, -1, 1, 1, -1, 1] #
 
                                                     # Loop over segments (nes=6 for hex element)
-                                                    for sg = 1:nes
+                                                    # for sg = 1:nes
+                                                    for sg = 1:7
                                                         ρₛ = ρₑ[mesh.ISN[sg]]
 
                                                         ρₛ_min = minimum(ρₛ)
@@ -318,7 +343,8 @@ function evalSignedDistances(
 
                                                                 r_norm = norm(r)
 
-                                                                ΔΞ_and_Δλ = K \ -r
+                                                                # ΔΞ_and_Δλ = K \ -r
+                                                                (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
 
                                                                 ΔΞ = ΔΞ_and_Δλ[1:3]
                                                                 Δλ = ΔΞ_and_Δλ[4:5]
@@ -351,8 +377,41 @@ function evalSignedDistances(
                                                             end
                                                         end
                                                     end # for sg
+                                                    
+                        ####################################x
+                                                    for a in eachindex(ρₑ)
+                                                    # for a in 1:4
+                                                        for b in 1:3
+                                                             ρ_min, min_idx = findmin([ρₑ[a], ρₑ[INN[a][b]]])
+                                                             ρ_max, max_idx = findmax([ρₑ[a], ρₑ[INN[a][b]]])
+
+                                                             a_min = [a ,INN[a][b]][min_idx]
+                                                             a_max = [a ,INN[a][b]][max_idx]
+
+                                                             if (ρ_min <= ρₜ && ρ_max >= ρₜ)
+                                                                 # if a_min > length(ρₑ) a_min = 1 end
+                                                                 # if a_max > length(ρₑ) a_max = 1 end
+
+                                                                 ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
+                                                                 xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
+
+                                                             #    Use normal vector at the center of the element
+                                                                 (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
+                                                                 norm_dρ_dΞ = norm(dρ_dΞ)
+                                                                 n = dρ_dΞ / norm_dρ_dΞ
+
+                                                                 dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
+                                                                 if (abs(dist_tmp) < abs(dist[v]))
+                                                                     dist[v] = dist_tmp
+                                                                     xp[:, v] = xₚ
+                                                                 end
+                                                             end
+                                                         end
+                                                    end                             
+
                                                 end
-                        =#
+                        
+                        ####################################x
                         if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
 
                             H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
@@ -396,45 +455,36 @@ function evalSignedDistances(
                             #         end
                             #     end
                             # end 
-                            # INN = [
-                            #      [4, 2, 5], # nodes define face 1
-                            #      [1, 3, 6],
-                            #      [2, 4, 7],
-                            #      [3, 1, 8],
-                            #      [8, 6, 1],
-                            #      [5, 7, 2],
-                            #      [6, 8, 3],
-                            #      [7, 5, 4],
-                            #     ]                               
-                            for a in eachindex(ρₑ)
-                            # for a in 1:4
-                                for b in 1:3
-                                     ρ_min, min_idx = findmin([ρₑ[a], ρₑ[INN[a][b]]])
-                                     ρ_max, max_idx = findmax([ρₑ[a], ρₑ[INN[a][b]]])
+                            
+                            # for a in eachindex(ρₑ)
+                            # # for a in 1:4
+                            #     for b in 1:3
+                            #          ρ_min, min_idx = findmin([ρₑ[a], ρₑ[INN[a][b]]])
+                            #          ρ_max, max_idx = findmax([ρₑ[a], ρₑ[INN[a][b]]])
 
-                                     a_min = [a ,INN[a][b]][min_idx]
-                                     a_max = [a ,INN[a][b]][max_idx]
+                            #          a_min = [a ,INN[a][b]][min_idx]
+                            #          a_max = [a ,INN[a][b]][max_idx]
 
-                                     if (ρ_min <= ρₜ && ρ_max >= ρₜ)
-                                         # if a_min > length(ρₑ) a_min = 1 end
-                                         # if a_max > length(ρₑ) a_max = 1 end
+                            #          if (ρ_min <= ρₜ && ρ_max >= ρₜ)
+                            #              # if a_min > length(ρₑ) a_min = 1 end
+                            #              # if a_max > length(ρₑ) a_max = 1 end
 
-                                         ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
-                                         xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
+                            #              ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
+                            #              xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
 
-                                     #    Use normal vector at the center of the element
-                                         (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
-                                         norm_dρ_dΞ = norm(dρ_dΞ)
-                                         n = dρ_dΞ / norm_dρ_dΞ
+                            #          #    Use normal vector at the center of the element
+                            #              (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
+                            #              norm_dρ_dΞ = norm(dρ_dΞ)
+                            #              n = dρ_dΞ / norm_dρ_dΞ
 
-                                         dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                         if (abs(dist_tmp) < abs(dist[v]))
-                                             dist[v] = dist_tmp
-                                             xp[:, v] = xₚ
-                                         end
-                                     end
-                                 end
-                            end                             
+                            #              dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
+                            #              if (abs(dist_tmp) < abs(dist[v]))
+                            #                  dist[v] = dist_tmp
+                            #                  xp[:, v] = xₚ
+                            #              end
+                            #          end
+                            #      end
+                            # end                             
 
                         end
 
