@@ -296,120 +296,119 @@ function evalSignedDistances(
                         end
                         ####################################x
                         
-                                                # If projection is not inside the element it is a good idea to try
-                                                # to project on the edges and corners of the isosurface              
-                                                if (maximum(abs.(Ξ)) > 1.0) # xₚ is NOT in the element
+                        # If projection is not inside the element it is a good idea to try
+                        # to project on the edges and corners of the isosurface              
+                        if (maximum(abs.(Ξ)) > 1.0) # xₚ is NOT in the element
+                            
+                            # Let's loop  check whether there is a projection on the edges of the density isocontour.
 
-                                                    # Let's loop  check whether there is a projection on the edges of the density isocontour.
+                            # Each segment (face) have not three components ξ₁, ξ₂, ξ₃ but only two and the
+                            # third one is known constant and must be fixed by constraint equation. 
+                            # Following two vectors represents index (1, 2 or 3) of the fixed component and its
+                            # value (-1 or 1):
+                            idx = [3, 2, 1, 2, 1, 3] # Index of the third constant component 
+                            Ξ_ = [-1, -1, 1, 1, -1, 1] #
 
-                                                    # Each segment (face) have not three components ξ₁, ξ₂, ξ₃ but only two and the
-                                                    # third one is known constant and must be fixed by constraint equation. 
-                                                    # Following two vectors represents index (1, 2 or 3) of the fixed component and its
-                                                    # value (-1 or 1):
-                                                    idx = [3, 2, 1, 2, 1, 3] # Index of the third constant component 
-                                                    Ξ_ = [-1, -1, 1, 1, -1, 1] #
+                            # Loop over segments (nes=6 for hex element)
+                            # for sg = 1:nes
+                            for sg = 1:7
+                                ρₛ = ρₑ[mesh.ISN[sg]]
 
-                                                    # Loop over segments (nes=6 for hex element)
-                                                    # for sg = 1:nes
-                                                    for sg = 1:7
-                                                        ρₛ = ρₑ[mesh.ISN[sg]]
+                                ρₛ_min = minimum(ρₛ)
+                                ρₛ_max = maximum(ρₛ)
 
-                                                        ρₛ_min = minimum(ρₛ)
-                                                        ρₛ_max = maximum(ρₛ)
+                                if (ρₛ_min <= ρₜ && ρₛ_max >= ρₜ) # the boundary cross through the segment
 
-                                                        if (ρₛ_min <= ρₜ && ρₛ_max >= ρₜ) # the boundary cross through the segment
+                                    Ξ = zeros(3)
+                                    λ = ones(2)
+                                    Ξ_norm = 2 * Ξ_tol
+                                    r_norm = 2 * r_tol
+                                    iter = 1
+                                    niter = 10
+                                    while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
 
-                                                            Ξ = zeros(3)
-                                                            λ = ones(2)
-                                                            Ξ_norm = 2 * Ξ_tol
-                                                            r_norm = 2 * r_tol
-                                                            iter = 1
-                                                            niter = 10
-                                                            while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
+                                        r4 = Gradient(sfce, Ξ, λ[1], x, Xₑ, ρₑ, ρₜ)
+                                        K4 = Hessian(sfce, Ξ, λ[1], x, Xₑ, ρₑ)
 
-                                                                r4 = Gradient(sfce, Ξ, λ[1], x, Xₑ, ρₑ, ρₜ)
-                                                                K4 = Hessian(sfce, Ξ, λ[1], x, Xₑ, ρₑ)
+                                        # Fifth equation, e.g. (ξ₁ - 1) = 0 etc., representing constraint of the fixed segment component is added into the residual and tangent matrix
+                                        r = zeros(5)
+                                        r[1:4] = r4
+                                        r[5] = (Ξ[idx[sg]] - Ξ_[sg])
+                                        r[idx[sg]] += λ[2]
 
-                                                                # Fifth equation, e.g. (ξ₁ - 1) = 0 etc., representing constraint of the fixed segment component is added into the residual and tangent matrix
-                                                                r = zeros(5)
-                                                                r[1:4] = r4
-                                                                r[5] = (Ξ[idx[sg]] - Ξ_[sg])
-                                                                r[idx[sg]] += λ[2]
+                                        K = zeros(5, 5)
+                                        K[1:4, 1:4] = K4
+                                        K[5, idx[sg]] = 1.0
+                                        K[idx[sg], 5] = 1.0
 
-                                                                K = zeros(5, 5)
-                                                                K[1:4, 1:4] = K4
-                                                                K[5, idx[sg]] = 1.0
-                                                                K[idx[sg], 5] = 1.0
+                                        r_norm = norm(r)
 
-                                                                r_norm = norm(r)
+                                        # ΔΞ_and_Δλ = K \ -r
+                                        (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
 
-                                                                # ΔΞ_and_Δλ = K \ -r
-                                                                (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
+                                        ΔΞ = ΔΞ_and_Δλ[1:3]
+                                        Δλ = ΔΞ_and_Δλ[4:5]
 
-                                                                ΔΞ = ΔΞ_and_Δλ[1:3]
-                                                                Δλ = ΔΞ_and_Δλ[4:5]
+                                        if (maximum(abs.(ΔΞ)) > 1.0)
+                                            ΔΞ *= 0.2/maximum(abs.(ΔΞ))
+                                        end
 
-                                                                if (maximum(abs.(ΔΞ)) > 1.0)
-                                                                    ΔΞ *= 0.2/maximum(abs.(ΔΞ))
-                                                                end
+                                        Ξ += ΔΞ
+                                        λ += Δλ
 
-                                                                Ξ += ΔΞ
-                                                                λ += Δλ
+                                        Ξ_norm = norm(ΔΞ_and_Δλ)
+                                        #println("SG: ", sg , ", iter: ", iter, ", Ξ_norm: ", Ξ_norm, ", r_norm: ", r_norm)
+                                        iter = iter + 1
+                                    end
+                                end
 
-                                                                Ξ_norm = norm(ΔΞ_and_Δλ)
-                                                                #println("SG: ", sg , ", iter: ", iter, ", Ξ_norm: ", Ξ_norm, ", r_norm: ", r_norm)
-                                                                iter = iter + 1
-                                                            end
-                                                        end
+                                if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the segment
+                                    H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
+                                    xₚ = Xₑ * H
 
-                                                        if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the segment
-                                                            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
-                                                            xₚ = Xₑ * H
+                                    (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
+                                    norm_dρ_dΞ = norm(dρ_dΞ)
+                                    n = dρ_dΞ / norm_dρ_dΞ
 
-                                                            (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
-                                                            norm_dρ_dΞ = norm(dρ_dΞ)
-                                                            n = dρ_dΞ / norm_dρ_dΞ
-
-                                                            dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                                            if (abs(dist_tmp) < abs(dist[v]))
-                                                                dist[v] = dist_tmp
-                                                                xp[:, v] = xₚ
-                                                            end
-                                                        end
-                                                    end # for sg
+                                    dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
+                                    if (abs(dist_tmp) < abs(dist[v]))
+                                        dist[v] = dist_tmp
+                                        xp[:, v] = xₚ
+                                    end
+                                end
+                            end # for sg
                                                     
                         ####################################x
-                                                    for a in eachindex(ρₑ)
-                                                    # for a in 1:4
-                                                        for b in 1:3
-                                                             ρ_min, min_idx = findmin([ρₑ[a], ρₑ[INN[a][b]]])
-                                                             ρ_max, max_idx = findmax([ρₑ[a], ρₑ[INN[a][b]]])
+                            for a in eachindex(ρₑ)
+                            # for a in 1:4
+                                for b in 1:3
+                                    ρ_min, min_idx = findmin([ρₑ[a], ρₑ[INN[a][b]]])
+                                    ρ_max, max_idx = findmax([ρₑ[a], ρₑ[INN[a][b]]])
 
-                                                             a_min = [a ,INN[a][b]][min_idx]
-                                                             a_max = [a ,INN[a][b]][max_idx]
+                                    a_min = [a ,INN[a][b]][min_idx]
+                                    a_max = [a ,INN[a][b]][max_idx]
 
-                                                             if (ρ_min <= ρₜ && ρ_max >= ρₜ)
-                                                                 # if a_min > length(ρₑ) a_min = 1 end
-                                                                 # if a_max > length(ρₑ) a_max = 1 end
+                                    if (ρ_min <= ρₜ && ρ_max >= ρₜ)
+                                        # if a_min > length(ρₑ) a_min = 1 end
+                                        # if a_max > length(ρₑ) a_max = 1 end
 
-                                                                 ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
-                                                                 xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
+                                        ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
+                                        xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
 
-                                                             #    Use normal vector at the center of the element
-                                                                 (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
-                                                                 norm_dρ_dΞ = norm(dρ_dΞ)
-                                                                 n = dρ_dΞ / norm_dρ_dΞ
+                                        #    Use normal vector at the center of the element
+                                        (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
+                                        norm_dρ_dΞ = norm(dρ_dΞ)
+                                        n = dρ_dΞ / norm_dρ_dΞ
 
-                                                                 dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                                                 if (abs(dist_tmp) < abs(dist[v]))
-                                                                     dist[v] = dist_tmp
-                                                                     xp[:, v] = xₚ
-                                                                 end
-                                                             end
-                                                         end
-                                                    end                             
-
-                                                end
+                                        dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
+                                        if (abs(dist_tmp) < abs(dist[v]))
+                                            dist[v] = dist_tmp
+                                            xp[:, v] = xₚ
+                                        end
+                                    end
+                                end
+                            end                             
+                        end
                         
                         ####################################x
                         if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
