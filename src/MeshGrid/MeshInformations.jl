@@ -23,7 +23,8 @@ mutable struct Mesh
     nel::Int64 # number of all elements
     nes::Int64 # number of element segments (faces)
     nsn::Int64 # number of face nodes
-    INN::Vector{Vector{Int64}}
+    edges::NTuple #
+    # INN::Vector{Vector{Int64}}
 
     function Mesh(X::Vector{Vector{Float64}}, IEN::Vector{Vector{Int64}}, sfce::Function)
         X = reduce(hcat, X)
@@ -43,17 +44,22 @@ mutable struct Mesh
         nel = size(IEN, 2)
         nes = length(ISN)
         nsn = length(ISN[1])
-        INN = [
-             [4, 2, 5], # Neighbor nodes ID for the corresponding node
-             [1, 3, 6],
-             [2, 4, 7],
-             [3, 1, 8],
-             [8, 6, 1],
-             [5, 7, 2],
-             [6, 8, 3],
-             [7, 5, 4],
-        ]                               
-        return new(X, IEN, INE, ISN, sfce, nsd, nnp, nen, nel, nes, nsn, INN)
+        # INN = [
+        #      [4, 2, 5], # Neighbor nodes ID for the corresponding node
+        #      [1, 3, 6],
+        #      [2, 4, 7],
+        #      [3, 1, 8],
+        #      [8, 6, 1],
+        #      [5, 7, 2],
+        #      [6, 8, 3],
+        #      [7, 5, 4],
+        # ]                               
+        edges = ((1,2), (2,3), (3,4), (4,1), 
+                 (5,6), (6,7), (7,8), (8,5), 
+                 (1,5), (2,6), (3,7), (4,8))
+
+
+        return new(X, IEN, INE, ISN, sfce, nsd, nnp, nen, nel, nes, nsn, edges) #INN)
     end
 end
 

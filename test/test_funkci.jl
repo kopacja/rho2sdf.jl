@@ -279,3 +279,76 @@ end
         Φ = Φ[:, idx]
         ΔΞ̃_and_Δλ̃ = 1.0 ./ Λ[idx] .* (Φ' * r)
         ΔΞ_and_Δλ = (Φ .* Sign) * ΔΞ̃_and_Δλ̃
+
+using LinearAlgebra
+using Statistics
+
+edges = ((1,2), (2,3), (3,4), (4,1), 
+        (5,6), (6,7), (7,8), (8,5), 
+        (1,5), (2,6), (3,7), (4,8))
+
+NodeOnEdge = zeros(Float64, (length(edges),3))
+NodeOnEdge = Array{Float64, 2}(undef, length(edges),3)
+matrix = fill(10e10, length(edges), nsd)
+
+
+i = 0
+for edge in edges
+    i = i + 1
+    vrt1 = edge[1]
+    vrt2 = edge[2]
+    ρ_min, min_idx = findmin([ρₑ[vrt1], ρₑ[vrt2]])
+    ρ_max, max_idx = findmax([ρₑ[vrt1], ρₑ[vrt2]])
+
+    a_min = [vrt1, vrt2][min_idx]
+    a_max = [vrt1, vrt2][max_idx]
+
+    if (ρ_min <= ρₜ && ρ_max >= ρₜ)
+
+        ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
+        xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
+        NodeOnEdge[i, :] = xₚ
+    end
+end
+
+ISE = ((1, 2, 3, 4),
+        (1, 9, 5, 10),
+        (2, 11, 6, 10),
+        (3, 12, 7, 11),
+        (4, 12, 8, 9),
+        (5, 6, 7, 8))
+vector_of_vector_pairs = [Vector{Float64}[] for _ in 1:nes]
+
+vector_of_vector_pairs[1] = [[0., 0., 0.], [0., 0., 0.]]
+vector_of_vector_pairs[1][1]
+
+for i in 1:nes
+    for j in 1:4
+        vector_of_vector_pairs[i][j] = NodeOnEdge[ISE[i][j],:]
+    end
+end
+
+function ProjectionOnEdgeOfIsocountour(Xₑ::Matrix{Float64}, x::Vector{Float64})
+    # Convert points to vectors
+    vecA = [A[1], A[2]]
+    vecB = [B[1], B[2]]
+    vecP = [P[1], P[2]]
+    
+    # Calculate the directional vector of the line segment AB
+    AB = vecB - vecA
+    
+    # Calculate the vector AP
+    AP = vecP - vecA
+    
+    # Project AP onto AB to find the projection vector AP_proj
+    # The projection formula is AP_proj = (AP . AB) / |AB|^2 * AB
+    dotProduct = dot(AP, AB)
+    normABSquared = dot(AB, AB)
+    projectionScalar = dotProduct / normABSquared
+
+    projection = vecA + projectionScalar * AB
+    IsInside = 0 <= projectionScalar <= 1
+    # The projection is inside the segment if the scalar is between 0 and 1 (inclusive)
+    return  0 <= projectionScalar <= 1
+end
+

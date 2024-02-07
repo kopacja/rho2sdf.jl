@@ -84,6 +84,48 @@ function SignCorrection4SDF(dist::Vector{Float64},
     return dist
 end
 
+function ProjectionIntoIsocontourVertices(
+    mesh::Mesh,
+    ρₑ::Vector{Float64},
+    ρₜ::Float64,
+    Xₑ::Matrix,
+    x::Vector{Float64},
+    v::Int64,
+    xp::Matrix{Float64},
+    dist::Vector{Float64})
+
+    edges = mesh.edges
+
+    for edge in edges
+        vrt1 = edge[1]
+        vrt2 = edge[2]
+        ρ_min, min_idx = findmin([ρₑ[vrt1], ρₑ[vrt2]])
+        ρ_max, max_idx = findmax([ρₑ[vrt1], ρₑ[vrt2]])
+
+        a_min = [vrt1, vrt2][min_idx]
+        a_max = [vrt1, vrt2][max_idx]# for a in eachindex(ρₑ)
+
+        if (ρ_min <= ρₜ && ρ_max >= ρₜ)
+
+            ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
+            xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
+
+            # Use normal vector at the center of the element
+            (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
+            norm_dρ_dΞ = norm(dρ_dΞ)
+            n = dρ_dΞ / norm_dρ_dΞ
+
+            dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
+            if (abs(dist_tmp) < abs(dist[v]))
+                dist[v] = dist_tmp
+                xp[:, v] = xₚ
+            end
+        end
+    end                             
+    return xp, dist
+end
+
+
 function ProjectionOnEdgeOfIsocountour(Xₑ::Matrix{Float64}, x::Vector{Float64})
     # Convert points to vectors
     vecA = [A[1], A[2]]
@@ -135,7 +177,8 @@ function evalSignedDistances(
     nel = mesh.nel # number of all elements
     nes = mesh.nes # number of element segments (faces)
     nsn = mesh.nsn # number of face nodes
-    INN = mesh.INN # Neighbor nodes ID for the corresponding node
+    # INN = mesh.INN # Neighbor nodes ID for the corresponding node
+    edges = mesh.edges
     println("number of all elements: ", nel)
 
     ngp = grid.ngp # number of nodes in grid
@@ -295,7 +338,7 @@ function evalSignedDistances(
                             iter = iter + 1
                         end
                         ####################################x
-                        
+
                         # If projection is not inside the element it is a good idea to try
                         # to project on the edges and corners of the isosurface              
                         if (maximum(abs.(Ξ)) > 1.0) # xₚ is NOT in the element
@@ -310,8 +353,8 @@ function evalSignedDistances(
                             Ξ_ = [-1, -1, 1, 1, -1, 1] #
 
                             # Loop over segments (nes=6 for hex element)
-                            # for sg = 1:nes
-                            for sg = 1:7
+                            for sg = 1:nes
+                            # for sg = 1:7
                                 ρₛ = ρₑ[mesh.ISN[sg]]
 
                                 ρₛ_min = minimum(ρₛ)
@@ -379,113 +422,31 @@ function evalSignedDistances(
                             end # for sg
                                                     
                         ####################################x
-                            for a in eachindex(ρₑ)
-                            # for a in 1:4
-                                for b in 1:3
-                                    ρ_min, min_idx = findmin([ρₑ[a], ρₑ[INN[a][b]]])
-                                    ρ_max, max_idx = findmax([ρₑ[a], ρₑ[INN[a][b]]])
-
-                                    a_min = [a ,INN[a][b]][min_idx]
-                                    a_max = [a ,INN[a][b]][max_idx]
-
-                                    if (ρ_min <= ρₜ && ρ_max >= ρₜ)
-                                        # if a_min > length(ρₑ) a_min = 1 end
-                                        # if a_max > length(ρₑ) a_max = 1 end
-
-                                        ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
-                                        xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
-
-                                        #    Use normal vector at the center of the element
-                                        (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
-                                        norm_dρ_dΞ = norm(dρ_dΞ)
-                                        n = dρ_dΞ / norm_dρ_dΞ
-
-                                        dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                        if (abs(dist_tmp) < abs(dist[v]))
-                                            dist[v] = dist_tmp
-                                            xp[:, v] = xₚ
-                                        end
-                                    end
-                                end
-                            end                             
+                            (xp, dist) = ProjectionIntoIsocontourVertices(mesh, ρₑ, ρₜ, Xₑ, x, v, xp, dist)
                         end
-                        
+
                         ####################################x
-                        if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
+                        # if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
 
-                            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
-                            xₚ = Xₑ * H
+                        #     H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
+                        #     xₚ = Xₑ * H
 
-                            (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
-                            norm_dρ_dΞ = norm(dρ_dΞ)
-                            n = dρ_dΞ / norm_dρ_dΞ
+                        #     (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
+                        #     norm_dρ_dΞ = norm(dρ_dΞ)
+                        #     n = dρ_dΞ / norm_dρ_dΞ
 
-                            dist_tmp = dot(x - xₚ, n)
-                            if (abs(dist_tmp) < abs(dist[v]))
-                                dist[v] = dist_tmp
-                                xp[:, v] = xₚ
-                            end
-                        else # maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
+                        #     dist_tmp = dot(x - xₚ, n)
+                        #     if (abs(dist_tmp) < abs(dist[v]))
+                        #         dist[v] = dist_tmp
+                        #         xp[:, v] = xₚ
+                        #     end
+                        # else # maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
 
-                            # The closed point could be a corner of the isocontour inside the element.
-                            # Let's loop over edges and check whether rho of the end points is below and above the threshold density
+                        #     # The closed point could be a corner of the isocontour inside the element.
+                        #     # Let's loop over edges and check whether rho of the end points is below and above the threshold density
+                        #     (xp, dist) = ProjectionIntoIsocontourVertices(mesh, ρₑ, ρₜ, Xₑ, x, v, xp, dist)
 
-                            # for a = 1:length(ρₑ)-1
-                            #     ρ_min, min_idx = findmin([ρₑ[a], ρₑ[a+1]])
-                            #     ρ_max, max_idx = findmax([ρₑ[a], ρₑ[a+1]])
-
-                            #     a_min = a + min_idx - 1
-                            #     a_max = a + max_idx - 1
-
-                            #     if (ρ_min <= ρₜ && ρ_max >= ρₜ)
-
-                            #         ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
-                            #         xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
-
-                            #         # Use normal vector at the center of the element
-                            #         (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
-                            #         norm_dρ_dΞ = norm(dρ_dΞ)
-                            #         n = dρ_dΞ / norm_dρ_dΞ
-
-                            #         dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                            #         if (abs(dist_tmp) < abs(dist[v]))
-                            #             dist[v] = dist_tmp
-                            #             xp[:, v] = xₚ
-                            #         end
-                            #     end
-                            # end 
-                            
-                            # for a in eachindex(ρₑ)
-                            # # for a in 1:4
-                            #     for b in 1:3
-                            #          ρ_min, min_idx = findmin([ρₑ[a], ρₑ[INN[a][b]]])
-                            #          ρ_max, max_idx = findmax([ρₑ[a], ρₑ[INN[a][b]]])
-
-                            #          a_min = [a ,INN[a][b]][min_idx]
-                            #          a_max = [a ,INN[a][b]][max_idx]
-
-                            #          if (ρ_min <= ρₜ && ρ_max >= ρₜ)
-                            #              # if a_min > length(ρₑ) a_min = 1 end
-                            #              # if a_max > length(ρₑ) a_max = 1 end
-
-                            #              ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
-                            #              xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
-
-                            #          #    Use normal vector at the center of the element
-                            #              (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
-                            #              norm_dρ_dΞ = norm(dρ_dΞ)
-                            #              n = dρ_dΞ / norm_dρ_dΞ
-
-                            #              dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                            #              if (abs(dist_tmp) < abs(dist[v]))
-                            #                  dist[v] = dist_tmp
-                            #                  xp[:, v] = xₚ
-                            #              end
-                            #          end
-                            #      end
-                            # end                             
-
-                        end
+                        # end
 
                         v = next[v]
 
@@ -494,19 +455,6 @@ function evalSignedDistances(
             end
         end
     end
-
-#=     Is = Iterators.product(
-        1:grid.N[1], # Notice the range begins with 1 not zero because 
-        0:grid.N[2],
-        0:grid.N[3],
-    )
-
-    for I ∈ Is
-        i = Int(I[3] * (grid.N[1] + 1) * (grid.N[2] + 1) + I[2] * (grid.N[1] + 1) + I[1] + 1)
-        if (dist[i] == big && dist[i-1] < 0.0)
-            dist[i] = -big
-        end
-    end =#
 
     Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
     println("mean of projected distance: ", mean_PD)
