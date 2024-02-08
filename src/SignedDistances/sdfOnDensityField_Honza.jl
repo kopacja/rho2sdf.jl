@@ -125,29 +125,74 @@ function ProjectionIntoIsocontourVertices(
     return xp, dist
 end
 
+function VerticesOnEdges(
+    mesh::Mesh,
+    ρₑ::Vector{Float64},
+    ρₜ::Float64,
+    Xₑ::Matrix)
 
-function ProjectionOnEdgeOfIsocountour(Xₑ::Matrix{Float64}, x::Vector{Float64})
-    # Convert points to vectors
-    vecA = [A[1], A[2]]
-    vecB = [B[1], B[2]]
-    vecP = [P[1], P[2]]
+    edges = mesh.edges
+    nes = mesh.nes
+    NodeOnEdge = zeros(Float64, (length(edges), 3))
+
+    i = 0
+    for edge in edges
+        i = i + 1
+        vrt1 = edge[1]
+        vrt2 = edge[2]
+        ρ_min, min_idx = findmin([ρₑ[vrt1], ρₑ[vrt2]])
+        ρ_max, max_idx = findmax([ρₑ[vrt1], ρₑ[vrt2]])
+
+        a_min = [vrt1, vrt2][min_idx]
+        a_max = [vrt1, vrt2][max_idx]
+        if (ρ_min <= ρₜ && ρ_max >= ρₜ)
+
+            ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
+            xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
+            NodeOnEdge[i, :] = xₚ
+        end
+    end
+    ISE = ((1, 2, 3, 4),
+        (1, 9, 5, 10),
+        (2, 11, 6, 10),
+        (3, 12, 7, 11),
+        (4, 12, 8, 9),
+        (5, 6, 7, 8))
+
+    vector_of_vector_pairs = [Vector{Float64}[] for _ in 1:nes]
+
+    println("NodeOnEdge", NodeOnEdge)
+    println("vector_of_vector_pairs", vector_of_vector_pairs)
+    for i in 1:nes
+        for j in 1:4
+            # if mean(abs.(NodeOnEdge[ISE[i][j])) != 0.
+            if NodeOnEdge[ISE[i][j]] != [0., 0., 0.]
+                vector_of_vector_pairs[i][j] = NodeOnEdge[ISE[i][j],:]
+            end
+        end
+    end
+    return vector_of_vector_pairs
+end
+
+function ProjOnIsoEdge(pairs::Vector, x::Vector{Float64})
+    a = pairs[1]
+    b = pairs[2]
+    p = x
     
     # Calculate the directional vector of the line segment AB
-    AB = vecB - vecA
-    
+    ab = b - a
     # Calculate the vector AP
-    AP = vecP - vecA
+    ap = p - a
     
-    # Project AP onto AB to find the projection vector AP_proj
-    # The projection formula is AP_proj = (AP . AB) / |AB|^2 * AB
-    dotProduct = dot(AP, AB)
-    normABSquared = dot(AB, AB)
-    projectionScalar = dotProduct / normABSquared
+    # Project P onto AB to find the projection vector AP_proj
+    dp = dot(ap, ab)
+    ab2 = dot(ab, ab)
+    P_proj = dp / ab2
 
-    projection = vecA + projectionScalar * AB
-    IsInside = 0 <= projectionScalar <= 1
+    proj = a + P_proj * ab
+    inside = 0 <= P_proj <= 1
     # The projection is inside the segment if the scalar is between 0 and 1 (inclusive)
-    return  0 <= projectionScalar <= 1
+    return inside, proj
 end
 
 function evalSignedDistances(
@@ -339,114 +384,44 @@ function evalSignedDistances(
                         end
                         ####################################x
 
-                        # If projection is not inside the element it is a good idea to try
-                        # to project on the edges and corners of the isosurface              
-                        if (maximum(abs.(Ξ)) > 1.0) # xₚ is NOT in the element
+                        if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
+
+                            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
+                            xₚ = Xₑ * H
+
+                            (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
+                            norm_dρ_dΞ = norm(dρ_dΞ)
+                            n = dρ_dΞ / norm_dρ_dΞ
+
+                            dist_tmp = dot(x - xₚ, n)
+                            if (abs(dist_tmp) < abs(dist[v]))
+                                dist[v] = dist_tmp
+                                xp[:, v] = xₚ
+                            end
+                        else # maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
+
+                            # The closed point could be a corner of the isocontour inside the element.
+                            # Let's loop over edges and check whether rho of the end points is below and above the threshold density
+                            vector_of_vector_pairs = VerticesOnEdges(mesh, ρₑ, ρₜ, Xₑ)
+
+                            (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
+                            norm_dρ_dΞ = norm(dρ_dΞ)
+                            n = dρ_dΞ / norm_dρ_dΞ
                             
-                            # Let's loop  check whether there is a projection on the edges of the density isocontour.
-
-                            # Each segment (face) have not three components ξ₁, ξ₂, ξ₃ but only two and the
-                            # third one is known constant and must be fixed by constraint equation. 
-                            # Following two vectors represents index (1, 2 or 3) of the fixed component and its
-                            # value (-1 or 1):
-                            idx = [3, 2, 1, 2, 1, 3] # Index of the third constant component 
-                            Ξ_ = [-1, -1, 1, 1, -1, 1] #
-
-                            # Loop over segments (nes=6 for hex element)
-                            for sg = 1:nes
-                            # for sg = 1:7
-                                ρₛ = ρₑ[mesh.ISN[sg]]
-
-                                ρₛ_min = minimum(ρₛ)
-                                ρₛ_max = maximum(ρₛ)
-
-                                if (ρₛ_min <= ρₜ && ρₛ_max >= ρₜ) # the boundary cross through the segment
-
-                                    Ξ = zeros(3)
-                                    λ = ones(2)
-                                    Ξ_norm = 2 * Ξ_tol
-                                    r_norm = 2 * r_tol
-                                    iter = 1
-                                    niter = 10
-                                    while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
-
-                                        r4 = Gradient(sfce, Ξ, λ[1], x, Xₑ, ρₑ, ρₜ)
-                                        K4 = Hessian(sfce, Ξ, λ[1], x, Xₑ, ρₑ)
-
-                                        # Fifth equation, e.g. (ξ₁ - 1) = 0 etc., representing constraint of the fixed segment component is added into the residual and tangent matrix
-                                        r = zeros(5)
-                                        r[1:4] = r4
-                                        r[5] = (Ξ[idx[sg]] - Ξ_[sg])
-                                        r[idx[sg]] += λ[2]
-
-                                        K = zeros(5, 5)
-                                        K[1:4, 1:4] = K4
-                                        K[5, idx[sg]] = 1.0
-                                        K[idx[sg], 5] = 1.0
-
-                                        r_norm = norm(r)
-
-                                        # ΔΞ_and_Δλ = K \ -r
-                                        (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
-
-                                        ΔΞ = ΔΞ_and_Δλ[1:3]
-                                        Δλ = ΔΞ_and_Δλ[4:5]
-
-                                        if (maximum(abs.(ΔΞ)) > 1.0)
-                                            ΔΞ *= 0.2/maximum(abs.(ΔΞ))
-                                        end
-
-                                        Ξ += ΔΞ
-                                        λ += Δλ
-
-                                        Ξ_norm = norm(ΔΞ_and_Δλ)
-                                        #println("SG: ", sg , ", iter: ", iter, ", Ξ_norm: ", Ξ_norm, ", r_norm: ", r_norm)
-                                        iter = iter + 1
-                                    end
-                                end
-
-                                if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the segment
-                                    H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
-                                    xₚ = Xₑ * H
-
-                                    (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
-                                    norm_dρ_dΞ = norm(dρ_dΞ)
-                                    n = dρ_dΞ / norm_dρ_dΞ
-
+                            for i in 1:nes
+                                inside, xp = ProjOnIsoEdge(vector_of_vector_pairs[i], x)
+                                if inside 
                                     dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
                                     if (abs(dist_tmp) < abs(dist[v]))
                                         dist[v] = dist_tmp
                                         xp[:, v] = xₚ
                                     end
                                 end
-                            end # for sg
-                                                    
-                        ####################################x
+                            end
+
                             (xp, dist) = ProjectionIntoIsocontourVertices(mesh, ρₑ, ρₜ, Xₑ, x, v, xp, dist)
+
                         end
-
-                        ####################################x
-                        # if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
-
-                        #     H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
-                        #     xₚ = Xₑ * H
-
-                        #     (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
-                        #     norm_dρ_dΞ = norm(dρ_dΞ)
-                        #     n = dρ_dΞ / norm_dρ_dΞ
-
-                        #     dist_tmp = dot(x - xₚ, n)
-                        #     if (abs(dist_tmp) < abs(dist[v]))
-                        #         dist[v] = dist_tmp
-                        #         xp[:, v] = xₚ
-                        #     end
-                        # else # maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
-
-                        #     # The closed point could be a corner of the isocontour inside the element.
-                        #     # Let's loop over edges and check whether rho of the end points is below and above the threshold density
-                        #     (xp, dist) = ProjectionIntoIsocontourVertices(mesh, ρₑ, ρₜ, Xₑ, x, v, xp, dist)
-
-                        # end
 
                         v = next[v]
 
