@@ -161,13 +161,16 @@ function VerticesOnEdges(
 
     vector_of_vector_pairs = [Vector{Float64}[] for _ in 1:nes]
 
-    println("NodeOnEdge", NodeOnEdge)
-    println("vector_of_vector_pairs", vector_of_vector_pairs)
+    # println("NodeOnEdge", NodeOnEdge)
+    # println("vector_of_vector_pairs", vector_of_vector_pairs)
     for i in 1:nes
+        # Insert index i at the first position of each vector within vector_of_vector_pairs
+        # push!(vector_of_vector_pairs[i], [Float64(i)])
         for j in 1:4
-            # if mean(abs.(NodeOnEdge[ISE[i][j])) != 0.
-            if NodeOnEdge[ISE[i][j]] != [0., 0., 0.]
-                vector_of_vector_pairs[i][j] = NodeOnEdge[ISE[i][j],:]
+            vector = NodeOnEdge[ISE[i][j], :]
+            # Check if the vector is not a zero vector before pushing
+            if !all(iszero, vector)
+                push!(vector_of_vector_pairs[i], vector)
             end
         end
     end
@@ -407,17 +410,28 @@ function evalSignedDistances(
                             (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
                             norm_dρ_dΞ = norm(dρ_dΞ)
                             n = dρ_dΞ / norm_dρ_dΞ
-                            
+
                             for i in 1:nes
-                                inside, xp = ProjOnIsoEdge(vector_of_vector_pairs[i], x)
-                                if inside 
-                                    dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                    if (abs(dist_tmp) < abs(dist[v]))
-                                        dist[v] = dist_tmp
-                                        xp[:, v] = xₚ
+                                nop = length(vector_of_vector_pairs[i]) # number of pairs
+                                if nop == 2
+                                    inside, xₚ= ProjOnIsoEdge(vector_of_vector_pairs[i], x)
+                                    if inside 
+                                        dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
+                                        if (abs(dist_tmp) < abs(dist[v]))
+                                            dist[v] = dist_tmp
+                                            xp[:, v] = xₚ
+                                        end
                                     end
+                                elseif nop == 1 || nop > 2
+                                    println("Unexpected number of points on the face")
+                                    println("Id of element: ", el)
+                                    println("Number of pairs: ", nop)
+                                    println("Id of face: ", nes)
+                                    println("vector_of_vector_pairs: ", vector_of_vector_pairs[i]
+)
                                 end
                             end
+                            # println("typeof xp: ", typeof(xp))
 
                             (xp, dist) = ProjectionIntoIsocontourVertices(mesh, ρₑ, ρₜ, Xₑ, x, v, xp, dist)
 
@@ -430,6 +444,8 @@ function evalSignedDistances(
             end
         end
     end
+
+                            println("typeof xp: ", typeof(xp))
 
     Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
     println("mean of projected distance: ", mean_PD)
