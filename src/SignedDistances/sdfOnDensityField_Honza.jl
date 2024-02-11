@@ -84,6 +84,31 @@ function SignCorrection4SDF(dist::Vector{Float64},
     return dist
 end
 
+function edge_intersection(
+    edge::Tuple,                # edge indices
+    ρₑ::Vector{Float64},                # ρ values at all vertices
+    ρₜ::Float64,                        # target ρ value
+    Xₑ::Matrix,                         # coordinates of the nodes of element
+)
+    vrt1, vrt2 = edge                  # extract vertices
+    ρ_min, min_idx = findmin([ρₑ[vrt1], ρₑ[vrt2]])
+    ρ_max, max_idx = findmax([ρₑ[vrt1], ρₑ[vrt2]])
+
+    a_min = [vrt1, vrt2][min_idx]        # vertex with min ρ
+    a_max = [vrt1, vrt2][max_idx]        # vertex with max ρ
+
+    if (ρ_min <= ρₜ && ρ_max >= ρₜ)        # check intersection
+        ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
+        xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
+        # return xₚ
+        return true, xₚ
+    else
+        # return nothing
+        return false, Vector{Float64}()
+    end
+end
+
+
 function ProjectionIntoIsocontourVertices(
     mesh::Mesh,
     ρₑ::Vector{Float64},
@@ -97,19 +122,9 @@ function ProjectionIntoIsocontourVertices(
     edges = mesh.edges
 
     for edge in edges
-        vrt1 = edge[1]
-        vrt2 = edge[2]
-        ρ_min, min_idx = findmin([ρₑ[vrt1], ρₑ[vrt2]])
-        ρ_max, max_idx = findmax([ρₑ[vrt1], ρₑ[vrt2]])
-
-        a_min = [vrt1, vrt2][min_idx]
-        a_max = [vrt1, vrt2][max_idx]# for a in eachindex(ρₑ)
-
-        if (ρ_min <= ρₜ && ρ_max >= ρₜ)
-
-            ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
-            xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
-
+        (intersection, xₚ) = edge_intersection(edge, ρₑ, ρₜ, Xₑ)
+        
+        if intersection == true
             # Use normal vector at the center of the element
             (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
             norm_dρ_dΞ = norm(dρ_dΞ)
@@ -133,32 +148,20 @@ function VerticesOnEdges(
 
     edges = mesh.edges
     nes = mesh.nes
+    ISE = mesh.ISE
     NodeOnEdge = zeros(Float64, (length(edges), 3))
 
     i = 0
     for edge in edges
         i = i + 1
-        vrt1 = edge[1]
-        vrt2 = edge[2]
-        ρ_min, min_idx = findmin([ρₑ[vrt1], ρₑ[vrt2]])
-        ρ_max, max_idx = findmax([ρₑ[vrt1], ρₑ[vrt2]])
+        (intersection, xₚ) = edge_intersection(edge, ρₑ, ρₜ, Xₑ)
 
-        a_min = [vrt1, vrt2][min_idx]
-        a_max = [vrt1, vrt2][max_idx]
-        if (ρ_min <= ρₜ && ρ_max >= ρₜ)
-
-            ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
-            xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
+        if intersection == true
+            # NodeOnEdge[i, :] = xₚ
             NodeOnEdge[i, :] = xₚ
         end
     end
-    ISE = ((1, 2, 3, 4),
-        (1, 9, 5, 10),
-        (2, 11, 6, 10),
-        (3, 12, 7, 11),
-        (4, 12, 8, 9),
-        (5, 6, 7, 8))
-
+    
     vector_of_vector_pairs = [Vector{Float64}[] for _ in 1:nes]
 
     # println("NodeOnEdge", NodeOnEdge)

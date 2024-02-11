@@ -24,6 +24,7 @@ mutable struct Mesh
     nes::Int64 # number of element segments (faces)
     nsn::Int64 # number of face nodes
     edges::NTuple #
+    ISE::NTuple #
     # INN::Vector{Vector{Int64}}
 
     function Mesh(X::Vector{Vector{Float64}}, IEN::Vector{Vector{Int64}}, sfce::Function)
@@ -58,8 +59,14 @@ mutable struct Mesh
                  (5,6), (6,7), (7,8), (8,5), 
                  (1,5), (2,6), (3,7), (4,8))
 
+        ISE = ((1, 2, 3, 4),
+                (1, 9, 5, 10),
+                (2, 11, 6, 10),
+                (3, 12, 7, 11),
+                (4, 12, 8, 9),
+                (5, 6, 7, 8))
 
-        return new(X, IEN, INE, ISN, sfce, nsd, nnp, nen, nel, nes, nsn, edges) #INN)
+        return new(X, IEN, INE, ISN, sfce, nsd, nnp, nen, nel, nes, nsn, edges, ISE) #INN)
     end
 end
 
