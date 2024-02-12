@@ -1,5 +1,11 @@
 
-function ReduceEigenvals(K::Matrix{Float64}, r::Vector{Float64}, Sign::Int, th::Float64 = 1.0e-6)
+# Reduction of the matrix K (eigenvectors) if the eigenvalues are close to zero:
+function ReduceEigenvals(
+    K::Matrix{Float64},
+    r::Vector{Float64},
+    Sign::Int,
+    th::Float64 = 1.0e-6)
+
     Λ = real.(eigvals(K))
     Λ_min = minimum(abs.(Λ))
 
@@ -16,28 +22,32 @@ function ReduceEigenvals(K::Matrix{Float64}, r::Vector{Float64}, Sign::Int, th::
         ΔΞ_and_Δλ = K \ (r .* Sign)
     end
 
-    return ΔΞ_and_Δλ, Λ_min
+    return ΔΞ_and_Δλ, Λ_min                         #??# Λ_min is not necessary - only for debug
 end
 
-function ReturnLocalCoordsIntoTheElement(Ξ::Vector{Float64})
-    Ξ_OutOfElement = 0
-    Ξₘₐₓcomp = maximum(abs.(Ξ))
+# function ReturnLocalCoordsIntoTheElement(           # is not necessary - only for debug
+#     Ξ::Vector{Float64})
 
-    if Ξₘₐₓcomp > 1
-        Ξ = Ξ ./ Ξₘₐₓcomp
-        Ξ_OutOfElement = Ξ_OutOfElement + 1
-        if Ξ_OutOfElement > 5
-            return Ξ, true  # Return a tuple with a flag indicating to break
-        end
-    end
-    return Ξ, false
-end
+#     Ξ_OutOfElement = 0
+#     Ξₘₐₓcomp = maximum(abs.(Ξ))
 
+#     if Ξₘₐₓcomp > 1
+#         Ξ = Ξ ./ Ξₘₐₓcomp
+#         Ξ_OutOfElement = Ξ_OutOfElement + 1
+#         if Ξ_OutOfElement > 5
+#             return Ξ, true  # Return a tuple with a flag indicating to break
+#         end
+#     end
+#     return Ξ, false
+# end
+
+# Selection of regular grid points that have been projected:
 function SelectProjectedNodes(
     mesh::Mesh,
     grid::Grid,
     xp::Matrix{Float64},
     points::Matrix{Float64})
+
     ngp = grid.ngp # number of nodes in grid
     nsd = mesh.nsd # number of spacial dimensions
 
@@ -67,13 +77,15 @@ function SelectProjectedNodes(
     return X, Xp, mean_PD, max_PD
 end
 
+# Correction of the sign of the distance function
+# Prevention of dual contour. Out of the material -> negative sign
 function SignCorrection4SDF(dist::Vector{Float64},
     grid::Grid,
     big::Float64)
     ngp = grid.ngp # number of nodes in grid
 
     Sign = -1
-    for i in 1:ngp
+    for i in 1:ngp # For each grid point
         if dist[i] != big
             Sign = sign(dist[i])
         end
@@ -84,26 +96,52 @@ function SignCorrection4SDF(dist::Vector{Float64},
     return dist
 end
 
+
+function RhoNorm(
+    ρₑ::Vector{Float64},
+    Ξ::Vector{Float64} = [0.0, 0.0, 0.0])
+
+    (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
+    norm_dρ_dΞ = norm(dρ_dΞ)
+    n = dρ_dΞ / norm_dρ_dΞ
+
+    return n
+end
+
+function WriteValue(
+    dist_tmp::Float64,
+    dist::Vector{Float64},
+    xp::Matrix{Float64},
+    xₚ::Vector{Float64},
+    v::Int)
+    
+    if (abs(dist_tmp) < abs(dist[v]))
+        dist[v] = dist_tmp
+        xp[:, v] = xₚ
+    end
+    return dist, xp
+end
+
+## 
 function edge_intersection(
-    edge::Tuple,                # edge indices
+    edge::Tuple,                        # edge indices
     ρₑ::Vector{Float64},                # ρ values at all vertices
     ρₜ::Float64,                        # target ρ value
     Xₑ::Matrix,                         # coordinates of the nodes of element
 )
-    vrt1, vrt2 = edge                  # extract vertices
+    vrt1, vrt2 = edge                   # extract vertices
     ρ_min, min_idx = findmin([ρₑ[vrt1], ρₑ[vrt2]])
     ρ_max, max_idx = findmax([ρₑ[vrt1], ρₑ[vrt2]])
 
-    a_min = [vrt1, vrt2][min_idx]        # vertex with min ρ
-    a_max = [vrt1, vrt2][max_idx]        # vertex with max ρ
+    a_min = [vrt1, vrt2][min_idx]       # vertex with min ρ
+    a_max = [vrt1, vrt2][max_idx]       # vertex with max ρ
 
-    if (ρ_min <= ρₜ && ρ_max >= ρₜ)        # check intersection
+    if (ρ_min <= ρₜ && ρ_max >= ρₜ)     # check intersection
         ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
         xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
-        # return xₚ
+
         return true, xₚ
     else
-        # return nothing
         return false, Vector{Float64}()
     end
 end
@@ -124,17 +162,12 @@ function ProjectionIntoIsocontourVertices(
     for edge in edges
         (intersection, xₚ) = edge_intersection(edge, ρₑ, ρₜ, Xₑ)
         
-        if intersection == true
+        if intersection
             # Use normal vector at the center of the element
-            (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
-            norm_dρ_dΞ = norm(dρ_dΞ)
-            n = dρ_dΞ / norm_dρ_dΞ
-
+            
+            n = RhoNorm(ρₑ)
             dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-            if (abs(dist_tmp) < abs(dist[v]))
-                dist[v] = dist_tmp
-                xp[:, v] = xₚ
-            end
+            (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
         end
     end                             
     return xp, dist
@@ -164,11 +197,7 @@ function VerticesOnEdges(
     
     vector_of_vector_pairs = [Vector{Float64}[] for _ in 1:nes]
 
-    # println("NodeOnEdge", NodeOnEdge)
-    # println("vector_of_vector_pairs", vector_of_vector_pairs)
     for i in 1:nes
-        # Insert index i at the first position of each vector within vector_of_vector_pairs
-        # push!(vector_of_vector_pairs[i], [Float64(i)])
         for j in 1:4
             vector = NodeOnEdge[ISE[i][j], :]
             # Check if the vector is not a zero vector before pushing
@@ -200,6 +229,8 @@ function ProjOnIsoEdge(pairs::Vector, x::Vector{Float64})
     # The projection is inside the segment if the scalar is between 0 and 1 (inclusive)
     return inside, proj
 end
+####
+
 
 function evalSignedDistances(
     mesh::Mesh,
@@ -228,8 +259,6 @@ function evalSignedDistances(
     nel = mesh.nel # number of all elements
     nes = mesh.nes # number of element segments (faces)
     nsn = mesh.nsn # number of face nodes
-    # INN = mesh.INN # Neighbor nodes ID for the corresponding node
-    edges = mesh.edges
     println("number of all elements: ", nel)
 
     ngp = grid.ngp # number of nodes in grid
@@ -394,25 +423,16 @@ function evalSignedDistances(
 
                             H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
                             xₚ = Xₑ * H
-
-                            (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
-                            norm_dρ_dΞ = norm(dρ_dΞ)
-                            n = dρ_dΞ / norm_dρ_dΞ
+                            n = RhoNorm(ρₑ, Ξ)
 
                             dist_tmp = dot(x - xₚ, n)
-                            if (abs(dist_tmp) < abs(dist[v]))
-                                dist[v] = dist_tmp
-                                xp[:, v] = xₚ
-                            end
+                            (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
                         else # maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
 
                             # The closed point could be a corner of the isocontour inside the element.
                             # Let's loop over edges and check whether rho of the end points is below and above the threshold density
                             vector_of_vector_pairs = VerticesOnEdges(mesh, ρₑ, ρₜ, Xₑ)
-
-                            (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, [0.0, 0.0, 0.0])
-                            norm_dρ_dΞ = norm(dρ_dΞ)
-                            n = dρ_dΞ / norm_dρ_dΞ
+                            n = RhoNorm(ρₑ)
 
                             for i in 1:nes
                                 nop = length(vector_of_vector_pairs[i]) # number of pairs
@@ -420,10 +440,7 @@ function evalSignedDistances(
                                     inside, xₚ= ProjOnIsoEdge(vector_of_vector_pairs[i], x)
                                     if inside 
                                         dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                        if (abs(dist_tmp) < abs(dist[v]))
-                                            dist[v] = dist_tmp
-                                            xp[:, v] = xₚ
-                                        end
+                                        (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
                                     end
                                 elseif nop == 1 || nop > 2
                                     println("Unexpected number of points on the face")
