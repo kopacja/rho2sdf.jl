@@ -190,7 +190,6 @@ function VerticesOnEdges(
         (intersection, xₚ) = edge_intersection(edge, ρₑ, ρₜ, Xₑ)
 
         if intersection == true
-            # NodeOnEdge[i, :] = xₚ
             NodeOnEdge[i, :] = xₚ
         end
     end
@@ -210,8 +209,7 @@ function VerticesOnEdges(
 end
 
 function ProjOnIsoEdge(pairs::Vector, x::Vector{Float64})
-    a = pairs[1]
-    b = pairs[2]
+    a, b = pairs
     p = x
     
     # Calculate the directional vector of the line segment AB
@@ -442,13 +440,16 @@ function evalSignedDistances(
                                         dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
                                         (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
                                     end
-                                elseif nop == 1 || nop > 2
+                                elseif nop > 3
+                                    # if nop = 1 -> vertex (it is ok)
+                                    # if nop = 3 -> intersection + vertex (it is NOT ok)
+                                    # if nop = 4 -> 2x intersection (it is NOT ok)
                                     println("Unexpected number of points on the face")
                                     println("Id of element: ", el)
                                     println("Number of pairs: ", nop)
                                     println("Id of face: ", nes)
-                                    println("vector_of_vector_pairs: ", vector_of_vector_pairs[i]
-)
+                                    println("vector_of_vector_pairs: ", vector_of_vector_pairs[i])
+                                    exit()
                                 end
                             end
                             # println("typeof xp: ", typeof(xp))
