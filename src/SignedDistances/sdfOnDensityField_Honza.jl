@@ -140,9 +140,9 @@ function edge_intersection(
         ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
         xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
 
-        return true, xₚ
+        return true, xₚ, ratio
     else
-        return false, Vector{Float64}()
+        return false, Vector{Float64}(), 123.
     end
 end
 
@@ -160,7 +160,7 @@ function ProjectionIntoIsocontourVertices(
     edges = mesh.edges
 
     for edge in edges
-        (intersection, xₚ) = edge_intersection(edge, ρₑ, ρₜ, Xₑ)
+        (intersection, xₚ, ratio) = edge_intersection(edge, ρₑ, ρₜ, Xₑ)
         
         if intersection
             # Use normal vector at the center of the element
@@ -185,11 +185,13 @@ function VerticesOnEdges(
     NodeOnEdge = zeros(Float64, (length(edges), 3))
 
     i = 0
+    ratio = 9.
     for edge in edges
         i = i + 1
-        (intersection, xₚ) = edge_intersection(edge, ρₑ, ρₜ, Xₑ)
+        (intersection, xₚ, ratio) = edge_intersection(edge, ρₑ, ρₜ, Xₑ)
 
-        if intersection == true
+        # if intersection == true && ratio !== 1. && ratio !== 0.
+        if intersection == true 
             NodeOnEdge[i, :] = xₚ
         end
     end
@@ -200,12 +202,12 @@ function VerticesOnEdges(
         for j in 1:4
             vector = NodeOnEdge[ISE[i][j], :]
             # Check if the vector is not a zero vector before pushing
-            if !all(iszero, vector)
+            if !all(iszero, vector) && ratio !== 1. && ratio !== 0.
                 push!(vector_of_vector_pairs[i], vector)
             end
         end
     end
-    return vector_of_vector_pairs
+    return vector_of_vector_pairs, ratio
 end
 
 function ProjOnIsoEdge(pairs::Vector, x::Vector{Float64})
@@ -429,7 +431,7 @@ function evalSignedDistances(
 
                             # The closed point could be a corner of the isocontour inside the element.
                             # Let's loop over edges and check whether rho of the end points is below and above the threshold density
-                            vector_of_vector_pairs = VerticesOnEdges(mesh, ρₑ, ρₜ, Xₑ)
+                            (vector_of_vector_pairs, ratio) = VerticesOnEdges(mesh, ρₑ, ρₜ, Xₑ)
                             n = RhoNorm(ρₑ)
 
                             for i in 1:nes
@@ -440,7 +442,8 @@ function evalSignedDistances(
                                         dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
                                         (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
                                     end
-                                elseif nop > 3
+                                # elseif nop > 3
+                                elseif nop == 1
                                     # if nop = 1 -> vertex (it is ok)
                                     # if nop = 3 -> intersection + vertex (it is NOT ok)
                                     # if nop = 4 -> 2x intersection (it is NOT ok)
@@ -449,7 +452,10 @@ function evalSignedDistances(
                                     println("Number of pairs: ", nop)
                                     println("Id of face: ", nes)
                                     println("vector_of_vector_pairs: ", vector_of_vector_pairs[i])
-                                    exit()
+                                    println("element nodes coordinates: ", Xₑ)
+                                    println("element nodes coordinates: ", Xₑ)
+                                    println("ratio: ", ratio)
+                                    # exit()
                                 end
                             end
                             # println("typeof xp: ", typeof(xp))
