@@ -162,18 +162,12 @@ NodeOnEdge = [0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0; 0
 ρ = [ρₑ[1], ρₑ[2], ρₑ[4], ρₑ[3], ρₑ[5], ρₑ[6], ρₑ[8], ρₑ[7]] .-ρₜ   
 Y = reshape(ρ, (2, 2, 2))
 
-mc1 = MC(Y, Int; x = [-1., 1], y = [-1., 1], z = [-1., 1])
+mc1 = MC(Y, Int; x = [-1., 1], y = [-1., 1], z = [-1., 1]) # cube inicialization (MC not working with general mesh, but with grid)
     
-# fieldnames(typeof(mc1))
+# Perform MC:
 march(mc1)
-# mc1.cube
-# mc1.tv
-# mc1.vert_indices
 triangles = mc1.triangles
 vertices = mc1.vertices
-# mc1.normals
-
-msh = MarchingCubes.makemesh(GeometryBasics, mc1)
 
 """
 - zjistit kterou hranu mi to protíná
@@ -182,20 +176,19 @@ msh = MarchingCubes.makemesh(GeometryBasics, mc1)
 - Co vlastně potřebuji jsou ty trojúhelníky které se nedotýkají
   
 """
-unique_values = unique(reduce(vcat, mc1.triangles))
-
-vertices
-number_of_tri = length(triangles)
-
+# Every triangle is defined by three nodes (ID node) 
+# Im looking if the triangles touching eachother (if they have same/s)
 function have_common_component(vec1, vec2)
     return !isempty(intersect(vec1, vec2))
 end
 
-is_common = false
-common_tri = Int[]
-common_tri2 = Int[]
-tri_prev = triangles[1] # Assuming there's at least one triangle
-triangles
+number_of_tri = length(triangles) # number of all triangle in the element
+common_tri = Int[]                # inicialization for commons triangles
+common_tri2 = Int[]               # -||- in one element there can be max 2 faces with multiple triangles
+tri_prev = triangles[1]           # Assuming there's at least one triangle
+is_common = false                 # for seperating triangle sets
+
+# ID of triangles forming sets
 for i in 2:number_of_tri
     tri = triangles[i]
     if !is_common && have_common_component(tri_prev, tri) # první plocha
@@ -208,116 +201,131 @@ for i in 2:number_of_tri
     tri_prev = tri
 end
 
-common_tri = unique!(common_tri)
-common_tri2 = unique!(common_tri2)
+common_tri = unique!(common_tri)    # removing duplicates
+common_tri2 = unique!(common_tri2)  # removing duplicates
 # ok funguje dobře (testováno)
-triangles[common_tri]
-a = triangles[common_tri2]
 
+# Combinations of possible connestion of vertices (ID of vertices)
+# for commons triangles
 common_tri_uniq_vec1 = unique(reduce(vcat, triangles[common_tri]))
 common_comb1 = collect(combinations(common_tri_uniq_vec1,2))
 
 common_tri_uniq_vec2 = unique(reduce(vcat, triangles[common_tri2]))
 common_comb2 = collect(combinations(common_tri_uniq_vec2,2))
 
+## Find triangles that are alone
 v = collect(1:number_of_tri)
 uncommon_tri = setdiff(v, vcat(common_tri, common_tri2))
-# uncommon_tri = [1,2]
+# Combinations of possible connestion of vertices 
 uncommon_comb = Int[]
-for i in 1:length(uncommon_tri)
+for i in eachindex(uncommon_tri)
     pairs = collect(combinations(collect(triangles[uncommon_tri[i]]),2))
     uncommon_comb = vcat(uncommon_comb, pairs)
 end
 
-triangles
-uncommon_comb
+# All possible connestions:
+vert_connections = vcat(uncommon_comb, common_comb1, common_comb2) ## RESULT (ID of vertices)
+# Does nodes correlate with my element notation?
 
-vcat(uncommon_comb, common_comb1, common_comb2)
-
+# Compute real position of vertices (MC works with cubes, I have general 8 nodes elements)
 number_of_vert = length(vertices)
 vertices_coords = [zeros(Float64, nsd) for _ in 1:number_of_vert]
+ID_edges = zeros(Int, number_of_vert)
 
-# for i in vertices #1:length(vert)
+# To be able to compute position, I need to know on which edge am I:
 for i in 1:number_of_vert
     vert = vertices[i]
     # Cases (which edge?)
     if vert[2] == -1. && vert[3] == -1. # edge 1
-        node₁, node₂ = edges[1]
+        edge_ID = 1
+        node₁, node₂ = edges[edge_ID]
         ratio = (vert[1] + 1) / 2
         vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
 
     elseif vert[1] == 1. && vert[3] == -1. # edge 2
-        node₁, node₂ = edges[2] 
+        edge_ID = 2
+        node₁, node₂ = edges[edge_ID] 
         ratio = (vert[2] + 1) / 2
         vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
 
     elseif vert[2] == 1. && vert[3] == -1. # edge 3
-        node₁, node₂ = edges[3] 
+        edge_ID = 3
+        node₁, node₂ = edges[edge_ID] 
         ratio = (vert[1] + 1) / 2
         vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
 
     elseif vert[1] == -1. && vert[3] == -1. # edge 4
-        node₁, node₂ = edges[4] 
+        edge_ID = 4
+        node₁, node₂ = edges[edge_ID] 
         ratio = (vert[2] + 1) / 2
         vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
 
     elseif vert[2] == -1. && vert[3] == 1. # edge 5
-        node₁, node₂ = edges[5] 
+        edge_ID = 5
+        node₁, node₂ = edges[edge_ID] 
         ratio = (vert[1] + 1) / 2
         vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
 
     elseif vert[1] == 1. && vert[3] == 1. # edge 6
-        node₁, node₂ = edges[6] 
+        edge_ID = 6
+        node₁, node₂ = edges[edge_ID] 
         ratio = (vert[2] + 1) / 2
         vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
 
     elseif vert[2] == 1. && vert[3] == 1. # edge 7
-        node₁, node₂ = edges[7] 
+        edge_ID = 7
+        node₁, node₂ = edges[edge_ID] 
         ratio = (vert[1] + 1) / 2
         vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
 
     elseif vert[1] == -1. && vert[3] == 1. # edge 8
-        node₁, node₂ = edges[8] 
+        edge_ID = 8
+        node₁, node₂ = edges[edge_ID] 
         ratio = (vert[2] + 1) / 2
         vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
 
     elseif vert[1] == -1. && vert[2] == -1. # edge 9
-        node₁, node₂ = edges[9] 
+        edge_ID = 9
+        node₁, node₂ = edges[edge_ID] 
         ratio = (vert[3] + 1) / 2
         vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
 
     elseif vert[1] == 1. && vert[2] == -1. # edge 10
-        node₁, node₂ = edges[10] 
+        edge_ID = 10
+        node₁, node₂ = edges[edge_ID] 
         ratio = (vert[3] + 1) / 2
         vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
 
     elseif vert[1] == 1. && vert[2] == 1. # edge 11
-        node₁, node₂ = edges[11] 
+        edge_ID = 11
+        node₁, node₂ = edges[edge_ID] 
         ratio = (vert[3] + 1) / 2
         vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
 
     elseif vert[1] == -1. && vert[2] == 1. # edge 12
-        node₁, node₂ = edges[12] 
+        edge_ID = 12
+        node₁, node₂ = edges[edge_ID] 
         ratio = (vert[3] + 1) / 2
         vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
     else
         println("chyba při nalezení hrany")
 
     end
-    """
-    řekl bych že zde musím ještě k jednotlivým uzlům doplnit údaj na jaké jsou hraně
-    """
-    # println(ratio)
-    # println(vert_coords)
-    # println(Xₑ[node₁])
 
-    # println(vert_coords)
+    # Checking if the result makes sense
     if Xₑ[node₁] <= vert_coords <= Xₑ[node₂] || Xₑ[node₂] <= vert_coords <= Xₑ[node₁] 
         # println("ok") 
     else
         println("chyba")
     end
+    # Putting it all together:
     vertices_coords[i] = vert_coords
+    ID_edges[i] = edge_ID
 
 end
-vertices_coords
+# RESULT:
+# vertices_coords
+# ID_edges
+#
+# Dále budu pro každý element procházet všechny možné konektivity hran (budu se dívat do tabulky segment-edge)
+# pokud konektivita dává smysl vypočítám hranu na kterou se bude promítat vzdálenostní funkce
