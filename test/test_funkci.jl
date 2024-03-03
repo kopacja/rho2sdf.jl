@@ -3,6 +3,7 @@ using Statistics
 using GeometryBasics
 using MarchingCubes
 using Combinatorics
+using BenchmarkTools
 
 ρₜ = 0.5 # Threshold density (isosurface level)
 
@@ -159,6 +160,13 @@ NodeOnEdge = [0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0; 0
 
     nsd = 3
 
+    ISE = ((1, 2, 3, 4),
+        (1, 9, 5, 10),
+        (2, 11, 6, 10),
+        (3, 12, 7, 11),
+        (4, 12, 8, 9),
+        (5, 6, 7, 8))
+
 ρ = [ρₑ[1], ρₑ[2], ρₑ[4], ρₑ[3], ρₑ[5], ρₑ[6], ρₑ[8], ρₑ[7]] .-ρₜ   
 Y = reshape(ρ, (2, 2, 2))
 
@@ -178,29 +186,28 @@ vertices = mc1.vertices
 """
 # Every triangle is defined by three nodes (ID node) 
 # Im looking if the triangles touching eachother (if they have same/s)
-function have_common_component(vec1, vec2)
-    return !isempty(intersect(vec1, vec2))
-end
+have_common_component(vec1, vec2) = any(x -> x in vec2, vec1)
 
 number_of_tri = length(triangles) # number of all triangle in the element
 common_tri = Int[]                # inicialization for commons triangles
 common_tri2 = Int[]               # -||- in one element there can be max 2 faces with multiple triangles
 tri_prev = triangles[1]           # Assuming there's at least one triangle
-is_common = false                 # for seperating triangle sets
 
 # ID of triangles forming sets
 for i in 2:number_of_tri
     tri = triangles[i]
-    if !is_common && have_common_component(tri_prev, tri) # první plocha
-        common_tri = vcat(common_tri, i-1, i)
-    elseif is_common && have_common_component(tri_prev, tri) # druhá plocha (jsou maximálně dvě v elementu)
-        common_tri2 = vcat(common_tri2, i-1, i)
-    else
-        is_common = true
+    if have_common_component(tri_prev, tri)
+        if isempty(common_tri) || last(common_tri) == i-1
+            push!(common_tri, i-1, i)
+        else
+            push!(common_tri2, i-1, i)
+        end
     end
     tri_prev = tri
 end
-
+tri_prev
+common_tri
+common_tri2
 common_tri = unique!(common_tri)    # removing duplicates
 common_tri2 = unique!(common_tri2)  # removing duplicates
 # ok funguje dobře (testováno)
@@ -323,9 +330,101 @@ for i in 1:number_of_vert
     ID_edges[i] = edge_ID
 
 end
+
 # RESULT:
+# vert_connections
 # vertices_coords
 # ID_edges
 #
 # Dále budu pro každý element procházet všechny možné konektivity hran (budu se dívat do tabulky segment-edge)
 # pokud konektivita dává smysl vypočítám hranu na kterou se bude promítat vzdálenostní funkce
+
+
+function find_matching_ISE_indices(vert_connections, ISE)
+    edges2faceID = zeros(Int, length(vert_connections)) # Ensure it's Int to store indices
+    
+    for (i, vc) in enumerate(vert_connections)
+        vc_set = Set(vc) # Convert to Set for efficient intersection calculation
+        for (j, ise) in enumerate(ISE)
+            # Convert ise to Set only once per iteration for efficiency
+            ise_set = Set(ise)
+            if length(intersect(ise_set, vc_set)) == 2
+                edges2faceID[i] = j
+                break # Break early since we found a match
+            end
+        end
+    end
+    
+    return edges2faceID
+end
+
+edges2faceID = find_matching_ISE_indices(vert_connections, ISE)
+ID_edges
+vertices_coords
+vert_connections
+
+x = [2.1, 2.2, 3.3]
+
+for i in eachindex(edges2faceID)
+    if edges2faceID[i] != 0
+
+
+
+##________________________
+
+# function compute_ratio_and_edge(vert, edges_conditions)
+#     for (edge_ID, conditions) in enumerate(edges_conditions)
+#         x_cond, y_cond, z_cond, ratio_index = conditions
+#         if vert[x_cond[1]] == x_cond[2] && vert[y_cond[1]] == y_cond[2] && vert[z_cond[1]] == z_cond[2]
+#             ratio = (vert[ratio_index] + 1) / 2
+#             return edge_ID, ratio
+#         end
+#     end
+#     println("Error finding edge")
+#     return nothing, nothing
+# end
+
+# function compute_vertices_positions(vertices, edges, Xₑ)
+#     nsd = size(Xₑ[1], 1) # Assuming Xₑ is a collection of coordinate arrays for nodes
+#     number_of_vert = length(vertices)
+#     vertices_coords = [zeros(Float64, nsd) for _ in 1:number_of_vert]
+#     ID_edges = zeros(Int, number_of_vert)
+
+#     edges_conditions = [
+#         ((2, -1.0), (3, -1.0), (1, nothing), 1), # Edge 1
+#         ((1,  1.0), (3, -1.0), (2, nothing), 2), # Edge 2
+#         ((2,  1.0), (3, -1.0), (1, nothing), 2), # Edge 3
+#         ((1, -1.0), (3, -1.0), (2, nothing), 2), # Edge 4
+#         ((2, -1.0), (3,  1.0), (1, nothing), 2), # Edge 5
+#         ((1,  1.0), (3,  1.0), (2, nothing), 2), # Edge 6
+#         ((2,  1.0), (3,  1.0), (1, nothing), 2), # Edge 7
+#         ((1, -1.0), (3,  1.0), (2, nothing), 2), # Edge 8
+#         ((1, -1.0), (2, -1.0), (3, nothing), 2), # Edge 9
+#         ((1,  1.0), (2, -1.0), (3, nothing), 2), # Edge 10
+#         ((1,  1.0), (2,  1.0), (3, nothing), 2), # Edge 11
+#         ((1, -1.0), (2,  1.0), (3, nothing), 2), # Edge 12
+#         # Add other edges conditions following the pattern
+#     ]
+
+#     for i in 1:number_of_vert
+#         vert = vertices[i]
+#         edge_ID, ratio = compute_ratio_and_edge(vert, edges_conditions)
+#         if edge_ID !== nothing
+#             node₁, node₂ = edges[edge_ID]
+#             vert_coords = Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+#             vertices_coords[i] = vert_coords
+#             ID_edges[i] = edge_ID
+#         end
+#     end
+
+#     return vertices_coords, ID_edges
+# end
+
+# # Example usage (assuming `vertices`, `edges`, and `Xₑ` are defined)
+# vertices_coords, ID_edges = compute_vertices_positions(vertices, edges, Xₑ)
+
+#_________________________
+
+        
+
+
