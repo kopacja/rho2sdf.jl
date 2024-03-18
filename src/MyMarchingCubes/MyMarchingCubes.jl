@@ -1,4 +1,4 @@
-module MarchingCubes
+module MyMarchingCubes
 
 export IsocontourEdgesForElement
    
@@ -8,7 +8,8 @@ using GeometryBasics
 using MarchingCubes
 using Combinatorics 
 using Rho2sdf
-using Rho2sdf.MeshGrid
+# using Rho2sdf.MeshGrid
+import Rho2sdf.MeshGrid: Mesh as MGMesh
 
 include("MC4edges.jl")
 

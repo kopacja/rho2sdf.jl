@@ -1,6 +1,7 @@
 
 
-function MC_OnCube(ρ::Vector{Float64})
+function MC_OnCube(ρₑ::Vector{Float64},
+                   ρₜ::Float64)
 
     # Sort to match my elements definitions
     ρ = [ρₑ[1], ρₑ[2], ρₑ[4], ρₑ[3], ρₑ[5], ρₑ[6], ρₑ[8], ρₑ[7]] .-ρₜ   
@@ -13,12 +14,12 @@ function MC_OnCube(ρ::Vector{Float64})
     return (mc.triangles, mc.vertices)
 end
 
-(triangles, vertices) =  MC_OnCube(ρₑ)
+# (triangles, vertices) =  MC_OnCube(ρₑ, ρₜ)
 
 have_common_component(vec1, vec2) = any(x -> x in vec2, vec1)
 
 # Adjusted function to handle empty input
-function get_combinations(triangle_indices)
+function get_combinations(triangle_indices, triangles)
     if isempty(triangle_indices)
         return Int[]
     else
@@ -29,8 +30,7 @@ end
 
 function PossibleEdgeConnections(
     triangles::Vector,
-    vertices::Vector,
-    ISE::NTuple,
+    # ISE::NTuple,
     # mesh::Mesh,
 )
     # ISE = mesh.ISE
@@ -56,8 +56,8 @@ function PossibleEdgeConnections(
     # Since we're always adding pairs, the need for `unique!` is eliminated
     # However, if triangles can repeat in `triangles`, consider reintroducing `unique!`
     
-    common_comb1 = get_combinations(common_tri)
-    common_comb2 = get_combinations(common_tri2)
+    common_comb1 = get_combinations(common_tri, triangles)
+    common_comb2 = get_combinations(common_tri2, triangles)
     
     # The rest of the code remains the same since it already handles empty cases for `uncommon_comb`
     all_tri_indices = 1:number_of_tri
@@ -72,14 +72,14 @@ function PossibleEdgeConnections(
     return vert_connections
 end
 
-vert_connections = PossibleEdgeConnections(triangles, vertices, ISE)
+# vert_connections = PossibleEdgeConnections(triangles, vertices, ISE)
 
 
 
 function EdgeIdDetection(
     vertices::Vector,
     # mesh::Mesh,
-    Xₑ::Vector,
+    Xₑ::Matrix,
     edges::NTuple,
     nsd::Int,
     )
@@ -185,9 +185,12 @@ function EdgeIdDetection(
     return (vertices_coords, ID_edges)
 end
 
-(vertices_coords, ID_edges) = EdgeIdDetection(vertices, Xₑ, edges, nsd)
+# (vertices_coords, ID_edges) = EdgeIdDetection(vertices, Xₑ, edges, nsd)
 
-function find_matching_ISE_indices(vert_connections, ISE)
+function find_matching_ISE_indices(
+    vert_connections::Vector, 
+    ISE::NTuple)
+
     edges2faceID = zeros(Int, length(vert_connections)) # Ensure it's Int to store indices
     
     for (i, vc) in enumerate(vert_connections)
@@ -205,22 +208,31 @@ function find_matching_ISE_indices(vert_connections, ISE)
     return edges2faceID
 end
 
-edges2faceID = find_matching_ISE_indices(vert_connections, ISE)
+# edges2faceID = find_matching_ISE_indices(vert_connections, ISE)
 
 
-function IsocontourEdgesForElement(ρₑ, ISE, nsd, edges, Xₑ)
+function IsocontourEdgesForElement(ρₑ::Vector, ρₜ::Float64, mesh::MGMesh, Xₑ::Matrix)
+    ISE = mesh.ISE
+    nsd = mesh.nsd
+    edges = mesh.edges
 
     # Cutting triangles single cube element based on nodal densities (MS algorithm):
-    (triangles, vertices) =  MC_OnCube(ρₑ)
+    (triangles, vertices) =  MC_OnCube(ρₑ, ρₜ) # POTŘEBUJI
 
     # Possible connections of vertices to forming isocontour edges:
-    vert_connections = PossibleEdgeConnections(triangles, vertices, ISE)
+    vert_connections = PossibleEdgeConnections(triangles) # POTŘEBUJI
 
     # Transform vertices coords from cube to real element:
-    (vertices_coords, ID_edges) = EdgeIdDetection(vertices, Xₑ, edges, nsd)
+    (vertices_coords, ID_edges) = EdgeIdDetection(vertices, Xₑ, edges, nsd) # POTŘEBUJI vertices_coords
+
 
     # Check if the vertices connections forming meaningful pairs and if so assigned ID of face
     edges2faceID = find_matching_ISE_indices(vert_connections, ISE)
 
-    return (edges2faceID, ID_edges, vertices_coords, vert_connections)
+    real_vert_connections = [vert_connections[i] for i in 1:length(edges2faceID) if edges2faceID[i] != 0]
+
+    # return (edges2faceID, ID_edges, vertices_coords, vert_connections)
+    return (vertices_coords, real_vert_connections)
+
+    #WARNING: Pozor na inverzní řešení. V tom případě prohodit hustotu.
 end
