@@ -4,7 +4,8 @@ function MC_OnCube(ρₑ::Vector{Float64},
                    ρₜ::Float64)
 
     # Sort to match my elements definitions
-    ρ = [ρₑ[1], ρₑ[2], ρₑ[4], ρₑ[3], ρₑ[5], ρₑ[6], ρₑ[8], ρₑ[7]] .-ρₜ   
+    ρ = [ρₑ[1], ρₑ[2], ρₑ[4], ρₑ[3], ρₑ[5], ρₑ[6], ρₑ[8], ρₑ[7]] .-ρₜ
+    # ρ = abs.([ρₑ[1], ρₑ[2], ρₑ[4], ρₑ[3], ρₑ[5], ρₑ[6], ρₑ[8], ρₑ[7]] .-1) .-ρₜ
     Y = reshape(ρ, (2, 2, 2)) # Array for MC algorithm
     
     mc = MC(Y, Int; x = [-1., 1], y = [-1., 1], z = [-1., 1]) # cube inicialization (MC not working with general mesh, but with grid)
@@ -75,9 +76,8 @@ end
 # vert_connections = PossibleEdgeConnections(triangles, vertices, ISE)
 
 
-
 function EdgeIdDetection(
-    vertices::Vector,
+    vertices,
     # mesh::Mesh,
     Xₑ::Matrix,
     edges::NTuple,
@@ -100,80 +100,93 @@ function EdgeIdDetection(
             edge_ID = 1
             node₁, node₂ = edges[edge_ID]
             ratio = (vert[1] + 1) / 2
-            vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            # vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            vert_coords =  Xₑ[:,node₁] .+ (Xₑ[:,node₂] .- Xₑ[:,node₁]).*ratio
     
         elseif vert[1] == 1. && vert[3] == -1. # edge 2
             edge_ID = 2
             node₁, node₂ = edges[edge_ID] 
             ratio = (vert[2] + 1) / 2
-            vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            # vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            vert_coords =  Xₑ[:,node₁] .+ (Xₑ[:,node₂] .- Xₑ[:,node₁]).*ratio
     
         elseif vert[2] == 1. && vert[3] == -1. # edge 3
             edge_ID = 3
             node₁, node₂ = edges[edge_ID] 
             ratio = (vert[1] + 1) / 2
-            vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            # vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            vert_coords =  Xₑ[:,node₁] .+ (Xₑ[:,node₂] .- Xₑ[:,node₁]).*ratio
     
         elseif vert[1] == -1. && vert[3] == -1. # edge 4
             edge_ID = 4
             node₁, node₂ = edges[edge_ID] 
             ratio = (vert[2] + 1) / 2
-            vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            # vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            vert_coords =  Xₑ[:,node₁] .+ (Xₑ[:,node₂] .- Xₑ[:,node₁]).*ratio
     
         elseif vert[2] == -1. && vert[3] == 1. # edge 5
             edge_ID = 5
             node₁, node₂ = edges[edge_ID] 
             ratio = (vert[1] + 1) / 2
-            vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            # vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            vert_coords =  Xₑ[:,node₁] .+ (Xₑ[:,node₂] .- Xₑ[:,node₁]).*ratio
     
         elseif vert[1] == 1. && vert[3] == 1. # edge 6
             edge_ID = 6
             node₁, node₂ = edges[edge_ID] 
             ratio = (vert[2] + 1) / 2
-            vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            # vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            vert_coords =  Xₑ[:,node₁] .+ (Xₑ[:,node₂] .- Xₑ[:,node₁]).*ratio
     
         elseif vert[2] == 1. && vert[3] == 1. # edge 7
             edge_ID = 7
             node₁, node₂ = edges[edge_ID] 
             ratio = (vert[1] + 1) / 2
-            vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            # vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            vert_coords =  Xₑ[:,node₁] .+ (Xₑ[:,node₂] .- Xₑ[:,node₁]).*ratio
     
         elseif vert[1] == -1. && vert[3] == 1. # edge 8
             edge_ID = 8
             node₁, node₂ = edges[edge_ID] 
             ratio = (vert[2] + 1) / 2
-            vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            # vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            vert_coords =  Xₑ[:,node₁] .+ (Xₑ[:,node₂] .- Xₑ[:,node₁]).*ratio
     
         elseif vert[1] == -1. && vert[2] == -1. # edge 9
             edge_ID = 9
             node₁, node₂ = edges[edge_ID] 
             ratio = (vert[3] + 1) / 2
-            vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            # vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            vert_coords =  Xₑ[:,node₁] .+ (Xₑ[:,node₂] .- Xₑ[:,node₁]).*ratio
     
         elseif vert[1] == 1. && vert[2] == -1. # edge 10
             edge_ID = 10
             node₁, node₂ = edges[edge_ID] 
             ratio = (vert[3] + 1) / 2
-            vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            # vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            vert_coords =  Xₑ[:,node₁] .+ (Xₑ[:,node₂] .- Xₑ[:,node₁]).*ratio
     
         elseif vert[1] == 1. && vert[2] == 1. # edge 11
             edge_ID = 11
             node₁, node₂ = edges[edge_ID] 
             ratio = (vert[3] + 1) / 2
-            vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            # vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            vert_coords =  Xₑ[:,node₁] .+ (Xₑ[:,node₂] .- Xₑ[:,node₁]).*ratio
     
         elseif vert[1] == -1. && vert[2] == 1. # edge 12
             edge_ID = 12
             node₁, node₂ = edges[edge_ID] 
             ratio = (vert[3] + 1) / 2
-            vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            # vert_coords =  Xₑ[node₁] .+ (Xₑ[node₂] .- Xₑ[node₁]).*ratio
+            vert_coords =  Xₑ[:,node₁] .+ (Xₑ[:,node₂] .- Xₑ[:,node₁]).*ratio
         else
             println("chyba při nalezení hrany")
     
         end
     
         # Checking if the result makes sense
-        if Xₑ[node₁] <= vert_coords <= Xₑ[node₂] || Xₑ[node₂] <= vert_coords <= Xₑ[node₁] 
+        if Xₑ[:,node₁] <= vert_coords <= Xₑ[:,node₂] || Xₑ[:,node₂] <= vert_coords <= Xₑ[:,node₁]
+        # if Xₑ[node₁] <= vert_coords <= Xₑ[node₂] || Xₑ[node₂] <= vert_coords <= Xₑ[node₁] 
             # println("ok") 
         else
             println("chyba")
@@ -211,7 +224,12 @@ end
 # edges2faceID = find_matching_ISE_indices(vert_connections, ISE)
 
 
-function IsocontourEdgesForElement(ρₑ::Vector, ρₜ::Float64, mesh::MGMesh, Xₑ::Matrix)
+function IsocontourEdgesForElement(
+    ρₑ::Vector,
+    ρₜ::Float64,
+    mesh::MGMesh,
+    Xₑ::Matrix)
+
     ISE = mesh.ISE
     nsd = mesh.nsd
     edges = mesh.edges
