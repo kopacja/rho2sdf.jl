@@ -12,6 +12,7 @@ function MC_OnCube(ρₑ::Vector{Float64},
         
     # Perform MC:
     march(mc)
+    # fieldnames(typeof(mc1)) # properties
     return (mc.triangles, mc.vertices)
 end
 
@@ -31,10 +32,7 @@ end
 
 function PossibleEdgeConnections(
     triangles::Vector,
-    # ISE::NTuple,
-    # mesh::Mesh,
 )
-    # ISE = mesh.ISE
 
     # Assuming `triangles` is an array of arrays, where each sub-array contains the vertex IDs of a triangle
     number_of_tri = length(triangles)
