@@ -143,60 +143,109 @@ function Normal2Tri(
     return (N_unit, centre)
 end
 
-function Normal2Tris(
-    vertices_coords::Vector{Vector{Float64}}, # More specific type
-    triangles,
-)
+function findClosestPoint(
+    Xe::Matrix,
+    center::Vector{Float64},
+    normal::Vector{Float64},
+    x::Vector{Float64},
+    )
 
-    normals = Vector{Vector{Float64}}(undef, length(triangles))
-    centres = Vector{Vector{Float64}}(undef, length(triangles))
+    direction = dot(normal, x - center) >= 0 ? 1 : -1  # Určení směru hledání
+    min_distance = Inf
+    closest_index = 0
+    distances = zeros(length(Xe))
 
-    for i in 1:length(triangles)
-        triangle = triangles[i]
-        normals[i], centres[i] = Normal2Tri(vertices_coords, triangle)
-    end
-
-    return (normals, centres)
-end
-
-# normals = Normal2Tris(vertices_coords, triangles)
-
-function findUniqueEdgesAndNormals(triangles, normals, centres)
-    edgesDict = Dict{Tuple{Int, Int}, Tuple{Int, Vector{Float64}, Vector{Float64}}}()
-    
-    for (i, triangle) in enumerate(triangles)
-        # Convert SVector to a regular array for sorting purposes
-        sortedTriangle = sort(collect(triangle))
-        
-        # Assign the current triangle's normal and centre
-        currentNormal = normals[i]
-        currentCentre = centres[i]
-        
-        # Create edges as sorted pairs
-        edges = [(sortedTriangle[1], sortedTriangle[2]), (sortedTriangle[2], sortedTriangle[3]), (sortedTriangle[3], sortedTriangle[1])]
-        
-        for edge in edges
-            if haskey(edgesDict, edge)
-                edgesDict[edge] = (edgesDict[edge][1] + 1, edgesDict[edge][2], edgesDict[edge][3])
-            else
-                edgesDict[edge] = (1, currentNormal, currentCentre)
+    for (index, point) in enumerate(Xe)
+        distance = dot(normal, point - center)
+        distances[index] = distance # Vypočet vzdálenosti ve správném směru
+        if direction > 0
+            # Hledání minimální kladné vzdálenosti
+            if distance >= 0 && distance < min_distance
+                min_distance = distance
+                closest_index = index
+            end
+        else
+            # Hledání minimální záporné vzdálenosti (v absolutní hodnotě)
+            if distance <= 0 && abs(distance) < abs(min_distance)
+                min_distance = distance  # Zde ukládáme zápornou vzdálenost
+                closest_index = index
             end
         end
     end
-    
+
+    return (closest_index, distances)
+end
+
+function SignDetermination(
+    closest_index::Int,
+    ρₑ::Vector{Float64},
+    ρₜ::Float64
+)
+    S = ρₑ[closest_index] >= ρₜ ? 1 : -1
+    return S
+end
+
+function Sign4Triangles(
+    vertices_coords::Vector{Vector{Float64}}, # More specific type
+    triangles,
+    Xe::Matrix{Float64},
+    x::Vector{Float64},
+    ρₑ::Vector{Float64},
+    ρₜ::Float64,
+)
+
+    sign4Triangles = Vector{Int}(undef, length(triangles))
+
+    for i in 1:length(triangles)
+        triangle = triangles[i]
+        (normal, center) = Normal2Tri(vertices_coords, triangle)
+
+        (closest_index, distances) = findClosestPoint(Xe, center, normal, x)
+        sign4Triangles[i] = SignDetermination(closest_index, ρₑ, ρₜ)
+    end
+    #TODO: VÝSTUPEM JE PŘIŘAZENÍ ZNAMÉNKA KE KAŽDÉMU TROJÚHELNÍKU
+
+    return sign4Triangles
+end
+
+# sign4Triangles = Sign4Triangles(vertices_coords, triangles, Xₑ, x)
+
+
+function findUniqueEdgesAndSigns(triangles, sign4Triangles)
+    edgesDict = Dict{Tuple{Int, Int}, Tuple{Int, Int}}()
+
+    for (i, triangle) in enumerate(triangles)
+        # Convert SVector to a regular array for sorting purposes
+        sortedTriangle = sort(collect(triangle))
+
+        # Assign the current triangle's sign
+        currentSign = sign4Triangles[i]
+
+        # Create edges as sorted pairs
+        edges = [(sortedTriangle[1], sortedTriangle[2]), (sortedTriangle[2], sortedTriangle[3]), (sortedTriangle[3], sortedTriangle[1])]
+
+        for edge in edges
+            if haskey(edgesDict, edge)
+                # If edge already exists, just update the count
+                edgesDict[edge] = (edgesDict[edge][1] + 1, edgesDict[edge][2])
+            else
+                # Else, add the new edge with its count set to 1 and its sign
+                edgesDict[edge] = (1, currentSign)
+            end
+        end
+    end
+
     uniqueEdges = Vector{Tuple{Int, Int}}()
-    correspondingNormals = Vector{Vector{Float64}}()
-    correspondingCentres = Vector{Vector{Float64}}()
-    
+    correspondingSigns = Vector{Int}()
+
     for (edge, data) in edgesDict
         if data[1] == 1
             push!(uniqueEdges, edge)
-            push!(correspondingNormals, data[2])
-            push!(correspondingCentres, data[3])
+            push!(correspondingSigns, data[2])
         end
     end
-    
-    return uniqueEdges, correspondingNormals, correspondingCentres
+
+    return uniqueEdges, correspondingSigns
 end
 
 # (uniqueEdges, correspondingNormals) = findUniqueEdgesAndNormals(triangles, normals)
@@ -237,11 +286,13 @@ function IsocontourEdgesForElement(
     ρₑ::Vector,
     ρₜ::Float64,
     mesh::MGMesh,
-    Xₑ::Matrix)
+    Xₑ::Matrix,
+    x::Vector{Float64})
 
     ISE = mesh.ISE
     nsd = mesh.nsd
     edges = mesh.edges
+    nen = mesh.nen
 
     # Cutting triangles single cube element based on nodal densities (MS algorithm):
     (triangles, vertices) =  MC_OnCube(ρₑ, ρₜ) # POTŘEBUJI
@@ -249,24 +300,20 @@ function IsocontourEdgesForElement(
     # Transform vertices coords from cube to real element:
     (vertices_coords, ID_edges) = EdgeIdDetection(vertices, Xₑ, edges, nsd) # POTŘEBUJI vertices_coords
 
-    # # Possible connections of vertices to forming isocontour edges:
-    # vert_connections = PossibleEdgeConnections(triangles) # POTŘEBUJI
-    #
-    # # Check if the vertices connections forming meaningful pairs and if so assigned ID of face
-    # edges2faceID = find_matching_ISE_indices(vert_connections, ISE)
+    sign4Triangles = Sign4Triangles(vertices_coords, triangles, Xₑ, x, ρₑ, ρₜ)
 
-    (normals, centres) = Normal2Tris(vertices_coords, triangles)
-
-    (uniqueEdges, correspondingNormals, correspondingCentres) = findUniqueEdgesAndNormals(triangles, normals, centres)
+    # (uniqueEdges, correspondingNormals, correspondingCentres) = findUniqueEdgesAndNormals(triangles, normals, centres)
+    (uniqueEdges, correspondingSigns) = findUniqueEdgesAndSigns(triangles, sign4Triangles)
 
     # Check if the vertices connections forming meaningful pairs and if so assigned ID of face
     edges2faceID = find_matching_ISE_indices(uniqueEdges, ISE)
 
     real_vert_connections = [uniqueEdges[i] for i in 1:length(edges2faceID) if edges2faceID[i] != 0]
+    real_Signs = [correspondingSigns[i] for i in 1:length(edges2faceID) if edges2faceID[i] != 0]
 
     check_for_zero(edges2faceID)
     
-    return (vertices_coords, real_vert_connections, correspondingNormals, correspondingCentres)
+    return (vertices_coords, real_vert_connections, real_Signs)
 
     #WARNING: Pozor na inverzní řešení. V tom případě prohodit hustotu.
 end
