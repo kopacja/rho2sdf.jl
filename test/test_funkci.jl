@@ -32,19 +32,34 @@ using BenchmarkTools
             (5,6), (6,7), (7,8), (8,5), 
             (1,5), (2,6), (3,7), (4,8))
 
-    # ρₑ = [0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0]
+    ρₑ = [0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0]
     # ρₑ = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0] # 1, 7
-    ρₑ = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0] # dve roviny 4 uzlové
+    # ρₑ = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0] # dve roviny 4 uzlové
     # ρₑ = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1] # 8
+    # ρₑ = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0] # 1-7
+    # ρₑ = [0.0, 0.0, 0.0, 0.0, 1, 1, 1, 1]
+    # ρₑ = [0.0, 0.0, 0.0, 0.0, 0.8, 0.8, 1, 1]
 
     nsd = 3
 
-    ISE = ((1, 2, 3, 4),
-        (1, 9, 5, 10),
-        (2, 11, 6, 10),
-        (3, 12, 7, 11),
-        (4, 12, 8, 9),
-        (5, 6, 7, 8))
+        ρ = [ρₑ[1], ρₑ[2], ρₑ[4], ρₑ[3], ρₑ[5], ρₑ[6], ρₑ[8], ρₑ[7]] .-ρₜ   
+        Y = reshape(ρ, (2, 2, 2)) # Array for MC algorithm
+        
+        mc = MC(Y, Int; x = [-1., 1], y = [-1., 1], z = [-1., 1]) # cube inicialization (MC not working with general mesh, but with grid)
+        fieldnames(typeof(mc))
+        # Perform MC:
+        march(mc)
+
+        mc.cube
+        triangles = mc.triangles
+        vertices = mc.vertices
+        mc.normals
+        mc.nrm
+        mc.normal_sign
+        mc.x
+
+        triangle = triangles[1]
+
 
 function MC_OnCube(ρₑ::Vector{Float64},
                    ρₜ::Float64)
@@ -63,74 +78,6 @@ end
 (triangles, vertices) =  MC_OnCube(ρₑ, ρₜ)
 triangles
 vertices
-
-"""
-- zjistit kterou hranu mi to protíná
-- dopočítat ratio abych zjistil přesnou pozici protnutí 
-
-- Co vlastně potřebuji jsou ty trojúhelníky které se nedotýkají
-  
-"""
-# Every triangle is defined by three nodes (ID node) 
-# Im looking if the triangles touching eachother (if they have same/s)
-have_common_component(vec1, vec2) = any(x -> x in vec2, vec1)
-
-# Adjusted function to handle empty input
-function get_combinations(triangle_indices)
-    if isempty(triangle_indices)
-        return Int[]
-    else
-        unique_vertices = unique(reduce(vcat, triangles[triangle_indices]))
-        return collect(combinations(unique_vertices, 2))
-    end
-end
-
-
-function PossibleEdgeConnections(
-    triangles::Vector,
-)
-    # ISE = mesh.ISE
-
-    # Assuming `triangles` is an array of arrays, where each sub-array contains the vertex IDs of a triangle
-    number_of_tri = length(triangles)
-    common_tri = Int[]
-    common_tri2 = Int[]
-    tri_prev = triangles[1]
-    
-    for i in 2:number_of_tri
-        tri = triangles[i]
-        if have_common_component(tri_prev, tri)
-            if isempty(common_tri) || last(common_tri) == i-1
-                push!(common_tri, i-1, i)
-            else
-                push!(common_tri2, i-1, i)
-            end
-        end
-        tri_prev = tri
-    end
-    tri_prev
-    # Since we're always adding pairs, the need for `unique!` is eliminated
-    # However, if triangles can repeat in `triangles`, consider reintroducing `unique!`
-    
-    common_comb1 = get_combinations(common_tri)
-    common_comb2 = get_combinations(common_tri2)
-    
-    # The rest of the code remains the same since it already handles empty cases for `uncommon_comb`
-    all_tri_indices = 1:number_of_tri
-    uncommon_tri = setdiff(all_tri_indices, union(common_tri, common_tri2))
-    
-    # Calculate uncommon combinations, handling the case where uncommon_comb might be empty
-    uncommon_comb = [collect(combinations(triangles[i], 2)) for i in uncommon_tri]
-    uncommon_comb_flat = isempty(uncommon_comb) ? Int[] : reduce(vcat, uncommon_comb) 
-    
-    # Combine all connections, already handling empty cases correctly
-    vert_connections = vcat(uncommon_comb_flat, common_comb1, common_comb2)
-    return vert_connections
-end
-
-vert_connections = PossibleEdgeConnections(triangles, vertices, ISE)
-
-
 
 function EdgeIdDetection(
     vertices::Vector,
@@ -243,6 +190,103 @@ end
 
 (vertices_coords, ID_edges) = EdgeIdDetection(vertices, Xₑ, edges, nsd)
 
+
+function Normal2Tri(
+    vertices::Vector{Vector{Float64}}, # More specific type for vertices
+    triangle::Vector{Int} # More specific type for triangle indices
+) :: Vector{Float64} # Return type annotation
+    # Extracting vertices based on triangle indices
+    A = vertices[triangle[1]]
+    B = vertices[triangle[2]]
+    C = vertices[triangle[3]]
+
+    # Calculating the normal
+    N = cross(B - A, C - A)
+
+    return N
+end
+
+function Normal2Tris(
+    vertices_coords::Vector{Vector{Float64}}, # More specific type
+    triangles,
+)
+    normals = Vector{Vector{Float64}}(undef, length(triangles))
+
+    for i in 1:length(triangles)
+        triangle = triangles[i]
+        normals[i] = Normal2Tri(vertices_coords, triangle)
+    end
+
+    return normals
+end
+
+normals = Normal2Tris(vertices_coords, triangles)
+
+"""
+- zjistit kterou hranu mi to protíná
+- dopočítat ratio abych zjistil přesnou pozici protnutí 
+
+- Co vlastně potřebuji jsou ty trojúhelníky které se nedotýkají
+  
+"""
+# Every triangle is defined by three nodes (ID node) 
+# Im looking if the triangles touching eachother (if they have same/s)
+have_common_component(vec1, vec2) = any(x -> x in vec2, vec1)
+
+# Adjusted function to handle empty input
+function get_combinations(triangle_indices)
+    if isempty(triangle_indices)
+        return Int[]
+    else
+        unique_vertices = unique(reduce(vcat, triangles[triangle_indices]))
+        return collect(combinations(unique_vertices, 2))
+    end
+end
+
+triangles
+function PossibleEdgeConnections(
+    triangles::Vector,
+)
+    # ISE = mesh.ISE
+
+    # Assuming `triangles` is an array of arrays, where each sub-array contains the vertex IDs of a triangle
+    number_of_tri = length(triangles)
+    common_tri = Int[]
+    common_tri2 = Int[]
+    tri_prev = triangles[1]
+    
+    for i in 2:number_of_tri
+        tri = triangles[i]
+        if have_common_component(tri_prev, tri)
+            if isempty(common_tri) || last(common_tri) == i-1
+                push!(common_tri, i-1, i)
+            else
+                push!(common_tri2, i-1, i)
+            end
+        end
+        tri_prev = tri
+    end
+    tri_prev
+    # Since we're always adding pairs, the need for `unique!` is eliminated
+    # However, if triangles can repeat in `triangles`, consider reintroducing `unique!`
+    
+    common_comb1 = get_combinations(common_tri)
+    common_comb2 = get_combinations(common_tri2)
+    
+    # The rest of the code remains the same since it already handles empty cases for `uncommon_comb`
+    all_tri_indices = 1:number_of_tri
+    uncommon_tri = setdiff(all_tri_indices, union(common_tri, common_tri2))
+    
+    # Calculate uncommon combinations, handling the case where uncommon_comb might be empty
+    uncommon_comb = [collect(combinations(triangles[i], 2)) for i in uncommon_tri]
+    uncommon_comb_flat = isempty(uncommon_comb) ? Int[] : reduce(vcat, uncommon_comb) 
+    
+    # Combine all connections, already handling empty cases correctly
+    vert_connections = vcat(uncommon_comb_flat, common_comb1, common_comb2)
+    return vert_connections
+end
+vert_connections = PossibleEdgeConnections(triangles)
+
 function find_matching_ISE_indices(vert_connections, ISE)
     edges2faceID = zeros(Int, length(vert_connections)) # Ensure it's Int to store indices
     
@@ -292,10 +336,26 @@ end
 (vertices_coords, real_vert_connections) = IsocontourEdgesForElement(ρₑ, ρₜ, edges, Xₑ, ISE, nsd)
 
 
+#########
+using Rho2sdf.SignedDistances
+function RhoNorm(
+    ρₑ::Vector{Float64},
+    Ξ::Vector{Float64} = [0.0, 0.0, 0.0])
 
-    a, b = real_vert_connections[1]
-    coords_a = vertices_coords[a]
-    coords_b = vertices_coords[b]
-bb = [coords_a, coords_b]
+    (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = SignedDistances.ρ_derivatives(ρₑ, Ξ)
+    norm_dρ_dΞ = norm(dρ_dΞ)
+    n = dρ_dΞ / norm_dρ_dΞ
 
-bb[1]
+    return n
+end
+
+# ρₑ = [0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0]
+ρₑ = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0] # 1, 7
+# ρₑ = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0] # dve roviny 4 uzlové
+# ρₑ = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1] # 8
+# ρₑ = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0] # 1-7
+# ρₑ = [0.0, 0.0, 0.0, 0.0, 1, 1, 1, 1]
+# ρₑ = [0.0, 0.0, 0.0, 0.0, 0.8, 0.8, 1, 1]
+
+RhoNorm(ρₑ)
+RhoNorm(ρₑ, [2.0, 0.0, 0.0])
