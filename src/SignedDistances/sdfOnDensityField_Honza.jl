@@ -425,6 +425,8 @@ function evalSignedDistances(
                             xₚ = Xₑ * H
                             n = RhoNorm(ρₑ, Ξ)
 
+                            #WARNING: Může být špatné znaménko u vzdálenosti když element protínají dvě izokontury
+                            #WARNING: otestováno a snad ne
                             dist_tmp = dot(x - xₚ, n)
                             (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
                         else # maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
@@ -435,7 +437,7 @@ function evalSignedDistances(
                             n = RhoNorm(ρₑ)
 
 
-                            (vertices_coords, real_vert_connections) = IsocontourEdgesForElement(ρₑ, ρₜ, mesh, Xₑ)
+                            (vertices_coords, real_vert_connections, real_Signs) = IsocontourEdgesForElement(ρₑ, ρₜ, mesh, Xₑ, x)
 
                             for i in eachindex(real_vert_connections)
                                 a, b = real_vert_connections[i]
@@ -443,11 +445,14 @@ function evalSignedDistances(
                                 coords_b = vertices_coords[b]
                                 inside, xₚ= ProjOnIsoEdge([coords_a, coords_b], x)
 
+                                #WARNING: Může být špatné znaménko u vzdálenosti když element protínají dvě izokontury
                                 if inside 
-                                    dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                    (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
+                                    # dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
+                                    dist_tmp = norm(x - xₚ) * real_Signs[i]
+                                    # println("jop")
+                                    # (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
                                 end
-                             end
+                            end
 
                             # for i in 1:nes
                             #     nop = length(vector_of_vector_pairs[i]) # number of pairs
@@ -486,8 +491,7 @@ function evalSignedDistances(
             end
         end
     end
-
-                            println("typeof xp: ", typeof(xp))
+    println("typeof xp: ", typeof(xp))
 
     Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
     println("mean of projected distance: ", mean_PD)
