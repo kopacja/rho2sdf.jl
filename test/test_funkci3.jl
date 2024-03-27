@@ -106,7 +106,7 @@ function vykresliNormályRhoNormGLMakie()
     # Příprava pro vykreslení normálových vektorů jako šipek
     fig = Figure()
     ax = Axis3(fig[1, 1], xlabel="x", ylabel="y", zlabel="z")
-    quiver!(ax, xs, ys, zs, us, vs, ws, arrow_size=0.05, color=:blue)
+    quiver!(ax, xs, ys, zs, us, vs, ws, arrow_size=0.00005, linewidth=0.002, color=:blue)
     fig
 end
 vykresliNormályRhoNormGLMakie()
