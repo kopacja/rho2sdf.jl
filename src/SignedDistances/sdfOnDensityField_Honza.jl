@@ -65,6 +65,12 @@ function SelectProjectedNodes(
             Xp[count] = xp[:, i]
         end
     end
+  
+    # If count is 0, indicating no points were added, handle gracefully
+    if count == 0
+        println("WARNING: no projected points!")
+        return [], [], NaN, NaN
+    end
 
     # Trim the unused preallocated space
     X = resize!(X, count)
