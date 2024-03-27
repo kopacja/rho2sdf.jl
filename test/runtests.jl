@@ -49,7 +49,12 @@ using LinearAlgebra
                 [-1.0, 1.0, 1.0],
             ] 
             IEN = [[1, 2, 3, 4, 5, 6, 7, 8]]
-            ρₙ = [0.0, 0.0, 0.0, 0.0, 1, 1, 1, 1]
+            # ρₙ = [0.0, 0.0, 0.0, 0.0, 1, 1, 1, 1]
+            # ρₙ = [0.0, 0.0, 0.0, 0.0, 1, 1, 1, 0.5]
+            # ρₙ = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0] # dve roviny 4 uzlové
+            # ρₙ = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1]
+            ρₙ = [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 1]
+            # ρₙ = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0] # 1, 7
 
             ## Generate FEM mesh structure:
             mesh = MeshGrid.Mesh(X, IEN, C3D8_SFaD)
@@ -77,12 +82,12 @@ using LinearAlgebra
         @testset "Sphere" begin
             ## Inputs:
             taskName = "sphere"
-            N = 5  # Number of cells along the longest side
+            N = 60  # Number of cells along the longest side
             ρₜ = 0.5 # Threshold density (isosurface level)
 
             ## Read FEM mesh:
-            # data = matread(taskName * ".mat")
-            data = matread("test/" * taskName * ".mat")
+            data = matread(taskName * ".mat")
+            # data = matread("test/" * taskName * ".mat")
             (X, IEN, rho) = MeshGrid.MeshInformations(data)
 
             ## Generate FEM mesh structure:
