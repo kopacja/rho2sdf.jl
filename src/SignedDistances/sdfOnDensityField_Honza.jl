@@ -272,6 +272,17 @@ function evalSignedDistances(
     dist = big * ones(ngp) # distance field initialization
     xp = zeros(nsd, ngp) # souřadnice bodů vrcholů (3xngp)
 
+    Ξₙ = [
+          [-1, -1, -1],
+          [ 1, -1, -1],
+          [ 1,  1, -1],
+          [-1,  1, -1],
+          [-1, -1,  1],
+          [ 1, -1,  1],
+          [ 1,  1,  1],
+          [-1,  1,  1],
+        ]
+
     for el = 1:nel
 
         println("element ID: ", el)
@@ -401,7 +412,7 @@ function evalSignedDistances(
 
                             r_norm = norm(r)
 
-#= Steepest descent with quadratic line-search
+                            #= Steepest descent with quadratic line-search
                             d = -r[1:3]
                             denom = (d'*K[1:3,1:3]*d)
                             if (abs(denom) > 0.0)
@@ -412,7 +423,7 @@ function evalSignedDistances(
                             ΔΞ_and_Δλ = K \ -r
                             Ξ += α * d
                             λ += ΔΞ_and_Δλ[4]
-=#
+                            =#
                             # ΔΞ_and_Δλ = K \ -r
                             (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
                             Ξ += ΔΞ_and_Δλ[1:3]
@@ -424,69 +435,142 @@ function evalSignedDistances(
                             iter = iter + 1
                         end
                         ####################################x
+                    
+                        # If projection is not inside the element it is a good idea to try
+                        # to project on the edges and corners of the isosurface              
+                        if (maximum(abs.(Ξ)) > 1.0) # xₚ is NOT in the element
 
+                            # Let's loop  check whether there is a projection on the edges of the density isocontour.
+
+                            # Each segment (face) have not three components ξ₁, ξ₂, ξ₃ but only two and the
+                            # third one is known constant and must be fixed by constraint equation.
+                            # Following two vectors represents index (1, 2 or 3) of the fixed component and its
+                            # value (-1 or 1):
+                            idx = [ 3,  2, 1, 2,  1, 3] # Index of the third constant component 
+                            Ξ_  = [-1, -1, 1, 1, -1, 1] #
+
+                            # Loop over segments (nes=6 for hex element)
+                            for sg = 1:nes
+                                ρₛ = ρₑ[mesh.ISN[sg]]
+
+                                ρₛ_min = minimum(ρₛ)
+                                ρₛ_max = maximum(ρₛ)
+
+                                #println("ρₛ_min: ", ρₛ_min , ", ρₛ_max: ", ρₛ_max)
+
+                                ρ_tol = 0.01
+                                if (ρₛ_min <= (ρₜ - ρ_tol) && ρₛ_max >= (ρₜ + ρ_tol)) # the boundary cross through the segment
+
+                                    Ξ = zeros(3)
+                                    Ξ[idx[sg]] = Ξ_[sg];
+
+                                    λ = ones(2)
+                                    Ξ_norm = 2 * Ξ_tol
+                                    r_norm = 2 * r_tol
+                                    iter = 1
+                                    niter = 10
+                                    while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
+
+                                        r4 = Gradient(sfce, Ξ, λ[1], x, Xₑ, ρₑ, ρₜ)
+                                        K4 = Hessian(sfce, Ξ, λ[1], x, Xₑ, ρₑ)
+
+                                        # Fifth equation, e.g. (ξ₁ - 1) = 0 etc., representing constraint of the fixed segment component is added into the residual and tangent matrix
+                                        r = zeros(5)
+                                        r[1:4] = r4
+                                        r[5] = (Ξ[idx[sg]] - Ξ_[sg])
+                                        r[idx[sg]] += λ[2]
+
+                                        K = zeros(5, 5)
+                                        K[1:4, 1:4] = K4
+                                        K[5, idx[sg]] = 1.0
+                                        K[idx[sg], 5] = 1.0
+
+                                        r_norm = norm(r)
+
+                                        ΔΞ_and_Δλ = K \ -r
+                                        (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
+
+                                        ΔΞ = ΔΞ_and_Δλ[1:3]
+                                        Δλ = ΔΞ_and_Δλ[4:5]
+
+                                        Ξ += ΔΞ
+                                        λ += Δλ
+
+                                        if (maximum(abs.(Ξ)) > 10.0) 
+                                            Ξ = Ξ / maximum(abs.(Ξ)) * 10.0
+                                        end
+
+                                        Ξ_norm = norm(ΔΞ_and_Δλ)
+                                        #println("SG: ", sg , ", iter: ", iter, ", Ξ_norm: ", Ξ_norm, ", r_norm: ", r_norm)
+                                        iter = iter + 1
+                                    end
+                                end
+
+                                if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the segment
+                                    H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
+                                    xₚ = Xₑ * H
+
+                                    (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
+                                    norm_dρ_dΞ = norm(dρ_dΞ)
+                                    n = dρ_dΞ / norm_dρ_dΞ
+
+                                    dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
+                                    if (abs(dist_tmp) < abs(dist[v]))
+                                        dist[v] = dist_tmp
+                                        xp[:, v] = xₚ
+                                    end
+                                end
+                            end # for sg
+                        end
+                        
                         if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
 
                             H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
                             xₚ = Xₑ * H
-                            n = RhoNorm(ρₑ, Ξ)
 
-                            #WARNING: Může být špatné znaménko u vzdálenosti když element protínají dvě izokontury
-                            #WARNING: otestováno a snad ne
+                            (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
+                            norm_dρ_dΞ = norm(dρ_dΞ)
+                            n = dρ_dΞ / norm_dρ_dΞ
+
                             dist_tmp = dot(x - xₚ, n)
-                            (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
+                            if (abs(dist_tmp) < abs(dist[v]))
+                                dist[v] = dist_tmp
+                                xp[:, v] = xₚ
+                            end
                         else # maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
 
                             # The closed point could be a corner of the isocontour inside the element.
                             # Let's loop over edges and check whether rho of the end points is below and above the threshold density
-                            (vector_of_vector_pairs, ratio) = VerticesOnEdges(mesh, ρₑ, ρₜ, Xₑ)
-                            n = RhoNorm(ρₑ)
 
+                            edges = ((1,2), (2,3), (3,4), (4,1), 
+                                     (5,6), (6,7), (7,8), (8,5),
+                                     (1,5), (2,6), (3,7), (4,8))
+                            for edge in edges
 
-                            (vertices_coords, real_vert_connections, real_Signs) = IsocontourEdgesForElement(ρₑ, ρₜ, mesh, Xₑ, x)
+                                ρ_min, min_idx = findmin([ρₑ[edge[1]], ρₑ[edge[2]]])
+                                ρ_max, max_idx = findmax([ρₑ[edge[1]], ρₑ[edge[2]]])
 
-                            for i in eachindex(real_vert_connections)
-                                a, b = real_vert_connections[i]
-                                coords_a = vertices_coords[a]
-                                coords_b = vertices_coords[b]
-                                inside, xₚ= ProjOnIsoEdge([coords_a, coords_b], x)
+                                if (ρ_min <= ρₜ && ρ_max >= ρₜ)
 
-                                #WARNING: Může být špatné znaménko u vzdálenosti když element protínají dvě izokontury
-                                if inside 
-                                    # dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                    dist_tmp = norm(x - xₚ) * real_Signs[i]
-                                    # println("jop")
-                                    # (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
+                                    ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
+
+                                    Ξₚ = Ξₙ[edge[min_idx]] + ratio .* (Ξₙ[edge[max_idx]] - Ξₙ[edge[min_idx]])
+
+                                    Hₚ, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξₚ)
+                                    xₚ = Xₑ * Hₚ
+                                    
+                                    # Use normal vector at the center of the element
+                                    (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξₚ)
+                                    norm_dρ_dΞ = norm(dρ_dΞ)
+                                    n = dρ_dΞ / norm_dρ_dΞ
+
+                                    dist_tmp =  sign(dot(x - xₚ, n)) * norm(x - xₚ)
+                                    if (abs(dist_tmp) < abs(dist[v]))
+                                        dist[v] = dist_tmp
+                                        xp[:, v] = xₚ
+                                    end
                                 end
-                            end
-
-                            # for i in 1:nes
-                            #     nop = length(vector_of_vector_pairs[i]) # number of pairs
-                            #     if nop == 2
-                            #         inside, xₚ= ProjOnIsoEdge(vector_of_vector_pairs[i], x)
-                            #         if inside 
-                            #             dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                            #             (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
-                            #         end
-                            #     # elseif nop > 3
-                            #     elseif nop == 1
-                            #         # if nop = 1 -> vertex (it is ok)
-                            #         # if nop = 3 -> intersection + vertex (it is NOT ok)
-                            #         # if nop = 4 -> 2x intersection (it is NOT ok)
-                            #         println("Unexpected number of points on the face")
-                            #         println("Id of element: ", el)
-                            #         println("Number of pairs: ", nop)
-                            #         println("Id of face: ", nes)
-                            #         println("vector_of_vector_pairs: ", vector_of_vector_pairs[i])
-                            #         println("element nodes coordinates: ", Xₑ)
-                            #         println("element nodes coordinates: ", Xₑ)
-                            #         println("ratio: ", ratio)
-                            #         # exit()
-                            #     end
-                            # end
-                            # println("typeof xp: ", typeof(xp))
-
-                            (xp, dist) = ProjectionIntoIsocontourVertices(mesh, ρₑ, ρₜ, Xₑ, x, v, xp, dist)
+                            end 
 
                         end
 
