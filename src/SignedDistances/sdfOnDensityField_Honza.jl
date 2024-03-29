@@ -435,7 +435,18 @@ function evalSignedDistances(
                             iter = iter + 1
                         end
                         ####################################x
-                    
+                        #NOTE: Projection to isocontour:  
+                        if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
+
+                            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
+                            xₚ = Xₑ * H
+                            n = RhoNorm(ρₑ, Ξ)
+
+                            #WARNING: Může být špatné znaménko u vzdálenosti když element protínají dvě izokontury
+                            #WARNING: otestováno a snad ne
+                            dist_tmp = dot(x - xₚ, n)
+                            (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
+                        end
                         # If projection is not inside the element it is a good idea to try
                         # to project on the edges and corners of the isosurface              
                         #NOTE: Projection to edges:
@@ -520,7 +531,7 @@ function evalSignedDistances(
 
                                     dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
                                     
-                                    # (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
+                                    (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
                                 end
                             end # for sg
                         end
@@ -528,15 +539,16 @@ function evalSignedDistances(
                         #NOTE: Projection to isocontour:  
                         if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
 
-                            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
-                            xₚ = Xₑ * H
-
-                            (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
-                            norm_dρ_dΞ = norm(dρ_dΞ)
-                            n = dρ_dΞ / norm_dρ_dΞ
-
-                            dist_tmp = dot(x - xₚ, n)
-                            (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
+                            # H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
+                            # xₚ = Xₑ * H
+                            #
+                            # n = RhoNorm(ρₑ, Ξ)
+                            # # (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
+                            # # norm_dρ_dΞ = norm(dρ_dΞ)
+                            # # n = dρ_dΞ / norm_dρ_dΞ
+                            #
+                            # dist_tmp = dot(x - xₚ, n)
+                            # # (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
                         else # maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
                         #NOTE: Projection to vertices:  
                             # The closed point could be a corner of the isocontour inside the element.
@@ -565,7 +577,7 @@ function evalSignedDistances(
                                     n = dρ_dΞ / norm_dρ_dΞ
 
                                     dist_tmp =  sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                    # (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
+                                    (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
                                 end
                             end 
 
