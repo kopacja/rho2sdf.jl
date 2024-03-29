@@ -438,6 +438,7 @@ function evalSignedDistances(
                     
                         # If projection is not inside the element it is a good idea to try
                         # to project on the edges and corners of the isosurface              
+                        #NOTE: Projection to edges:
                         if (maximum(abs.(Ξ)) > 1.0) # xₚ is NOT in the element
 
                             # Let's loop  check whether there is a projection on the edges of the density isocontour.
@@ -487,7 +488,7 @@ function evalSignedDistances(
 
                                         r_norm = norm(r)
 
-                                        ΔΞ_and_Δλ = K \ -r
+                                        # ΔΞ_and_Δλ = K \ -r
                                         (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
 
                                         ΔΞ = ΔΞ_and_Δλ[1:3]
@@ -514,15 +515,17 @@ function evalSignedDistances(
                                     norm_dρ_dΞ = norm(dρ_dΞ)
                                     n = dρ_dΞ / norm_dρ_dΞ
 
+                                    #WARNING: dρ_dΞ může ve specifických přídech směřovat "podél" izokontury: ρₙ = [1.0, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 1]
+                                    # posere to projekci
+
                                     dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                    if (abs(dist_tmp) < abs(dist[v]))
-                                        dist[v] = dist_tmp
-                                        xp[:, v] = xₚ
-                                    end
+                                    
+                                    # (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
                                 end
                             end # for sg
                         end
                         
+                        #NOTE: Projection to isocontour:  
                         if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
 
                             H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
@@ -533,12 +536,9 @@ function evalSignedDistances(
                             n = dρ_dΞ / norm_dρ_dΞ
 
                             dist_tmp = dot(x - xₚ, n)
-                            if (abs(dist_tmp) < abs(dist[v]))
-                                dist[v] = dist_tmp
-                                xp[:, v] = xₚ
-                            end
+                            (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
                         else # maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
-
+                        #NOTE: Projection to vertices:  
                             # The closed point could be a corner of the isocontour inside the element.
                             # Let's loop over edges and check whether rho of the end points is below and above the threshold density
 
@@ -565,13 +565,11 @@ function evalSignedDistances(
                                     n = dρ_dΞ / norm_dρ_dΞ
 
                                     dist_tmp =  sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                    if (abs(dist_tmp) < abs(dist[v]))
-                                        dist[v] = dist_tmp
-                                        xp[:, v] = xₚ
-                                    end
+                                    # (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
                                 end
                             end 
 
+                            # (xp, dist) = ProjectionIntoIsocontourVertices(mesh, ρₑ, ρₜ, Xₑ, x, v, xp, dist)
                         end
 
                         v = next[v]
