@@ -522,9 +522,7 @@ function evalSignedDistances(
                                     H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
                                     xₚ = Xₑ * H
 
-                                    (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
-                                    norm_dρ_dΞ = norm(dρ_dΞ)
-                                    n = dρ_dΞ / norm_dρ_dΞ
+                                    n = RhoNorm(ρₑ, Ξ)
 
                                     #WARNING: dρ_dΞ může ve specifických přídech směřovat "podél" izokontury: ρₙ = [1.0, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 1]
                                     # posere to projekci
@@ -536,53 +534,34 @@ function evalSignedDistances(
                             end # for sg
                         end
                         
-                        #NOTE: Projection to isocontour:  
-                        if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
-
-                            # H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
-                            # xₚ = Xₑ * H
-                            #
-                            # n = RhoNorm(ρₑ, Ξ)
-                            # # (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
-                            # # norm_dρ_dΞ = norm(dρ_dΞ)
-                            # # n = dρ_dΞ / norm_dρ_dΞ
-                            #
-                            # dist_tmp = dot(x - xₚ, n)
-                            # # (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
-                        else # maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
                         #NOTE: Projection to vertices:  
                             # The closed point could be a corner of the isocontour inside the element.
                             # Let's loop over edges and check whether rho of the end points is below and above the threshold density
 
-                            edges = ((1,2), (2,3), (3,4), (4,1), 
-                                     (5,6), (6,7), (7,8), (8,5),
-                                     (1,5), (2,6), (3,7), (4,8))
-                            for edge in edges
+                        edges = ((1,2), (2,3), (3,4), (4,1), 
+                                 (5,6), (6,7), (7,8), (8,5),
+                                 (1,5), (2,6), (3,7), (4,8))
+                        for edge in edges
 
-                                ρ_min, min_idx = findmin([ρₑ[edge[1]], ρₑ[edge[2]]])
-                                ρ_max, max_idx = findmax([ρₑ[edge[1]], ρₑ[edge[2]]])
+                            ρ_min, min_idx = findmin([ρₑ[edge[1]], ρₑ[edge[2]]])
+                            ρ_max, max_idx = findmax([ρₑ[edge[1]], ρₑ[edge[2]]])
 
-                                if (ρ_min <= ρₜ && ρ_max >= ρₜ)
+                            if (ρ_min <= ρₜ && ρ_max >= ρₜ)
 
-                                    ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
+                                ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
 
-                                    Ξₚ = Ξₙ[edge[min_idx]] + ratio .* (Ξₙ[edge[max_idx]] - Ξₙ[edge[min_idx]])
+                                Ξₚ = Ξₙ[edge[min_idx]] + ratio .* (Ξₙ[edge[max_idx]] - Ξₙ[edge[min_idx]])
 
-                                    Hₚ, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξₚ)
-                                    xₚ = Xₑ * Hₚ
+                                Hₚ, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξₚ)
+                                xₚ = Xₑ * Hₚ
                                     
-                                    # Use normal vector at the center of the element
-                                    (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξₚ)
-                                    norm_dρ_dΞ = norm(dρ_dΞ)
-                                    n = dρ_dΞ / norm_dρ_dΞ
-
-                                    dist_tmp =  sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                                    (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
-                                end
-                            end 
-
-                            # (xp, dist) = ProjectionIntoIsocontourVertices(mesh, ρₑ, ρₜ, Xₑ, x, v, xp, dist)
-                        end
+                                # Use normal vector at the center of the element
+                                n = RhoNorm(ρₑ, Ξₚ)
+                                    
+                                dist_tmp =  sign(dot(x - xₚ, n)) * norm(x - xₚ)
+                                (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
+                            end
+                        end 
 
                         v = next[v]
 
