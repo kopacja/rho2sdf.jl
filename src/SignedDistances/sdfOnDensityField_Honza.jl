@@ -25,22 +25,6 @@ function ReduceEigenvals(
     return ΔΞ_and_Δλ, Λ_min                         #??# Λ_min is not necessary - only for debug
 end
 
-# function ReturnLocalCoordsIntoTheElement(           # is not necessary - only for debug
-#     Ξ::Vector{Float64})
-
-#     Ξ_OutOfElement = 0
-#     Ξₘₐₓcomp = maximum(abs.(Ξ))
-
-#     if Ξₘₐₓcomp > 1
-#         Ξ = Ξ ./ Ξₘₐₓcomp
-#         Ξ_OutOfElement = Ξ_OutOfElement + 1
-#         if Ξ_OutOfElement > 5
-#             return Ξ, true  # Return a tuple with a flag indicating to break
-#         end
-#     end
-#     return Ξ, false
-# end
-
 # Selection of regular grid points that have been projected:
 function SelectProjectedNodes(
     mesh::Mesh,
@@ -102,18 +86,21 @@ function SignCorrection4SDF(dist::Vector{Float64},
     return dist
 end
 
-
+# Compute rho normal for node inside the element based on ρₑ
 function RhoNorm(
     ρₑ::Vector{Float64},
-    Ξ::Vector{Float64} = [0.0, 0.0, 0.0])
+    Ξ::Vector{Float64},
+    )
 
     (dρ_dΞ, d²ρ_dΞ², d³ρ_dΞ³) = ρ_derivatives(ρₑ, Ξ)
+  #TODO: Can be optimized (d²ρ_dΞ², d³ρ_dΞ³ are not used)
     norm_dρ_dΞ = norm(dρ_dΞ)
     n = dρ_dΞ / norm_dρ_dΞ
 
     return n
 end
 
+# Update distance filed if the distance is smaller then the previous one
 function WriteValue(
     dist_tmp::Float64,
     dist::Vector{Float64},
@@ -128,116 +115,7 @@ function WriteValue(
     return dist, xp
 end
 
-## 
-function edge_intersection(
-    edge::Tuple,                        # edge indices
-    ρₑ::Vector{Float64},                # ρ values at all vertices
-    ρₜ::Float64,                        # target ρ value
-    Xₑ::Matrix,                         # coordinates of the nodes of element
-)
-    vrt1, vrt2 = edge                   # extract vertices
-    ρ_min, min_idx = findmin([ρₑ[vrt1], ρₑ[vrt2]])
-    ρ_max, max_idx = findmax([ρₑ[vrt1], ρₑ[vrt2]])
-
-    a_min = [vrt1, vrt2][min_idx]       # vertex with min ρ
-    a_max = [vrt1, vrt2][max_idx]       # vertex with max ρ
-
-    if (ρ_min <= ρₜ && ρ_max >= ρₜ)     # check intersection
-        ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
-        xₚ = Xₑ[:, a_min] + ratio .* (Xₑ[:, a_max] - Xₑ[:, a_min])
-
-        return true, xₚ, ratio
-    else
-        return false, Vector{Float64}(), 123.
-    end
-end
-
-
-function ProjectionIntoIsocontourVertices(
-    mesh::Mesh,
-    ρₑ::Vector{Float64},
-    ρₜ::Float64,
-    Xₑ::Matrix,
-    x::Vector{Float64},
-    v::Int64,
-    xp::Matrix{Float64},
-    dist::Vector{Float64})
-
-    edges = mesh.edges
-
-    for edge in edges
-        (intersection, xₚ, ratio) = edge_intersection(edge, ρₑ, ρₜ, Xₑ)
-        
-        if intersection
-            # Use normal vector at the center of the element
-            
-            n = RhoNorm(ρₑ)
-            dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-            (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
-        end
-    end                             
-    return xp, dist
-end
-
-function VerticesOnEdges(
-    mesh::Mesh,
-    ρₑ::Vector{Float64},
-    ρₜ::Float64,
-    Xₑ::Matrix)
-
-    edges = mesh.edges
-    nes = mesh.nes
-    ISE = mesh.ISE
-    NodeOnEdge = zeros(Float64, (length(edges), 3))
-
-    i = 0
-    ratio = 9.
-    for edge in edges
-        i = i + 1
-        (intersection, xₚ, ratio) = edge_intersection(edge, ρₑ, ρₜ, Xₑ)
-
-        # if intersection == true && ratio !== 1. && ratio !== 0.
-        if intersection == true 
-            NodeOnEdge[i, :] = xₚ
-        end
-    end
-    
-    vector_of_vector_pairs = [Vector{Float64}[] for _ in 1:nes]
-
-    for i in 1:nes
-        for j in 1:4
-            vector = NodeOnEdge[ISE[i][j], :]
-            # Check if the vector is not a zero vector before pushing
-            if !all(iszero, vector) && ratio !== 1. && ratio !== 0.
-                push!(vector_of_vector_pairs[i], vector)
-            end
-        end
-    end
-    return vector_of_vector_pairs, ratio
-end
-
-function ProjOnIsoEdge(pairs::Vector, x::Vector{Float64})
-    a, b = pairs
-    p = x
-    
-    # Calculate the directional vector of the line segment AB
-    ab = b - a
-    # Calculate the vector AP
-    ap = p - a
-    
-    # Project P onto AB to find the projection vector AP_proj
-    dp = dot(ap, ab)
-    ab2 = dot(ab, ab)
-    P_proj = dp / ab2
-
-    proj = a + P_proj * ab
-    inside = 0 <= P_proj <= 1
-    # The projection is inside the segment if the scalar is between 0 and 1 (inclusive)
-    return inside, proj
-end
-####
-
-
+# MAIN FUNCTION for eval SDF
 function evalSignedDistances(
     mesh::Mesh,
     grid::Grid,
@@ -246,7 +124,6 @@ function evalSignedDistances(
 )
 
     points = MeshGrid.generateGridPoints(grid) # uzly pravidelné mřížky
-    # points = reshape([-0.5 -0.5 -0.5], 3,1)
     linkedList = MeshGrid.LinkedList(grid, points) # pro rychlé vyhledávání
 
     head = linkedList.head # ID pravidelné bunky (pozice), index bodu z points
@@ -281,7 +158,7 @@ function evalSignedDistances(
           [ 1, -1,  1],
           [ 1,  1,  1],
           [-1,  1,  1],
-        ]
+         ]
 
     for el = 1:nel
 
@@ -291,12 +168,11 @@ function evalSignedDistances(
         ρₑ_min = minimum(ρₑ)
         ρₑ_max = maximum(ρₑ)
         if (ρₑ_min >= ρₜ) # the boundary does not cross through the element
-            # continue # PRO PŘESKAKUJE HRANIČNÍ ELEMENTY (pouze pro ladění kodu)
             commonEls = []
 
             # cycle through element faces (6)
             for sg = 1:nes
-                commonEls = INE[IEN[mesh.ISN[sg][1], el]] # 
+                commonEls = INE[IEN[mesh.ISN[sg][1], el]]
                 for a = 2:nsn
                     idx = findall(in(INE[IEN[ISN[sg][a], el]]), commonEls) # for how many elements does this face belong ?
                     commonEls = commonEls[idx]
@@ -354,8 +230,7 @@ function evalSignedDistances(
                                         if (P >= 0 && P <= L) # is the perpendicular projection of a node onto an edge in the edge interval?
                                             xₚ = xᵥ + (Et[j] / L) * P
                                             n_edge = n
-                                            # n_edge = EPN[el][j]
-                                            dist_tmp = sign(dot(x - xₚ, n_edge)) * norm(x - xₚ) ## hustý, ale nechápu, asi ok
+                                            dist_tmp = sign(dot(x - xₚ, n_edge)) * norm(x - xₚ)
 
                                             isFaceOrEdge = update_distance!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
                                         end
@@ -367,7 +242,6 @@ function evalSignedDistances(
                                         findmin([norm(x - x₁), norm(x - x₂), norm(x - x₃)]) # which node of the triangle is closer?
                                     xₚ = Xt[:, idx] # the node of triangle
                                     n_vertex = n
-                                    # n_vertex = VPN[IEN[idx, el]]
                                     dist_tmp = dist_tmp * sign(dot(x - xₚ, n_vertex))
 
                                     isFaceOrEdge = update_distance!(dist, dist_tmp, v, xp, xₚ, isFaceOrEdge)
@@ -376,11 +250,11 @@ function evalSignedDistances(
                             end
                         end
                     end
-                    # Subdivide quad into two (or four?) triangles
                 end
             end
-        else # (ρₑ_min < ρₜ)
-            if (ρₑ_max > ρₜ) # Hranice prochází elementem...
+        else
+        #TODO: else -> elseif, delete if
+            if (ρₑ_max > ρₜ) # The boundary (isocontour) goes through the element
 
                 Xₑ = X[:, IEN[:, el]]
 
@@ -396,15 +270,16 @@ function evalSignedDistances(
                     while v != -1
                         x = points[:, v]
 
-                        Ξ = zeros(Float64, 3)  # local coordinates
-                        λ = 1.0              # Lagrange multiplier
+                        Ξ = zeros(Float64, 3)   # local coordinates
+                        λ = 1.0                 # Lagrange multiplier
                         Ξ_tol = 1e-2
                         Ξ_norm = 2 * Ξ_tol
                         r_tol = 1e-2
-                        r_norm = 2 * r_tol   # 
-                        niter = 10           # maximum number of iterations
-                        iter = 1             # iteration form one 
+                        r_norm = 2 * r_tol
+                        niter = 10              # maximum number of iterations
+                        iter = 1                # iteration form one
 
+                        # Local coordinates computation:
                         while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
 
                             K = Hessian(sfce, Ξ, λ, x, Xₑ, ρₑ)
@@ -412,45 +287,28 @@ function evalSignedDistances(
 
                             r_norm = norm(r)
 
-                            #= Steepest descent with quadratic line-search
-                            d = -r[1:3]
-                            denom = (d'*K[1:3,1:3]*d)
-                            if (abs(denom) > 0.0)
-                                α = -d'*r[1:3] / denom
-                            else
-                                α = 1.0
-                            end
-                            ΔΞ_and_Δλ = K \ -r
-                            Ξ += α * d
-                            λ += ΔΞ_and_Δλ[4]
-                            =#
-                            # ΔΞ_and_Δλ = K \ -r
                             (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
                             Ξ += ΔΞ_and_Δλ[1:3]
                             λ += ΔΞ_and_Δλ[4]
 
                             Ξ_norm = norm(ΔΞ_and_Δλ)
 
-                            #println("iter: ", iter, ", Ξ_norm: ", Ξ_norm, ", r_norm: ", r_norm)
                             iter = iter + 1
                         end
-                        ####################################x
-                        #NOTE: Projection to isocontour:  
-                        if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the element
+                        
+                        #NOTE: Projection to isocontour:
+                        if (maximum(abs.(Ξ)) <= 1.0) # Projection (xₚ) is in the element
 
                             H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
                             xₚ = Xₑ * H
                             n = RhoNorm(ρₑ, Ξ)
 
-                            #WARNING: Může být špatné znaménko u vzdálenosti když element protínají dvě izokontury
-                            #WARNING: otestováno a snad ne
                             dist_tmp = dot(x - xₚ, n)
                             (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
                         end
-                        # If projection is not inside the element it is a good idea to try
-                        # to project on the edges and corners of the isosurface              
+                        
                         #NOTE: Projection to edges:
-                        if (maximum(abs.(Ξ)) > 1.0) # xₚ is NOT in the element
+                        if (maximum(abs.(Ξ)) > 1.0) # If projection (xₚ) is NOT in the element
 
                             # Let's loop  check whether there is a projection on the edges of the density isocontour.
 
@@ -468,8 +326,6 @@ function evalSignedDistances(
                                 ρₛ_min = minimum(ρₛ)
                                 ρₛ_max = maximum(ρₛ)
 
-                                #println("ρₛ_min: ", ρₛ_min , ", ρₛ_max: ", ρₛ_max)
-
                                 ρ_tol = 0.01
                                 if (ρₛ_min <= (ρₜ - ρ_tol) && ρₛ_max >= (ρₜ + ρ_tol)) # the boundary cross through the segment
 
@@ -481,6 +337,8 @@ function evalSignedDistances(
                                     r_norm = 2 * r_tol
                                     iter = 1
                                     niter = 10
+
+                                    # Local coordinates computation:
                                     while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
 
                                         r4 = Gradient(sfce, Ξ, λ[1], x, Xₑ, ρₑ, ρₜ)
@@ -555,7 +413,6 @@ function evalSignedDistances(
                                 Hₚ, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξₚ)
                                 xₚ = Xₑ * Hₚ
                                     
-                                # Use normal vector at the center of the element
                                 n = RhoNorm(ρₑ, Ξₚ)
                                     
                                 dist_tmp =  sign(dot(x - xₚ, n)) * norm(x - xₚ)
