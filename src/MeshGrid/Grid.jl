@@ -121,6 +121,7 @@ function generateGridPoints(grid::Grid)::Matrix{Float64}
                 a += 1
             end
         end
+    end
     return X
 end
 
