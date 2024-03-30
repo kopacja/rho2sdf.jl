@@ -35,7 +35,7 @@ using LinearAlgebra
         @testset "Plane" begin
 
             taskName = "plane"
-            N = 5  # Number of cells along the longest side
+            N = 3  # Number of cells along the longest side
             ρₜ = 0.5 # Threshold density (isosurface level)
 
             X = [
@@ -53,7 +53,8 @@ using LinearAlgebra
             # ρₙ = [0.0, 0.0, 0.0, 0.0, 1, 1, 1, 0.5]
             # ρₙ = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0] # dve roviny 4 uzlové
             # ρₙ = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1]
-            ρₙ = [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 1]
+            # ρₙ = [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 1]
+            ρₙ = [1.0, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 1]
             # ρₙ = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0] # 1, 7
 
             ## Generate FEM mesh structure:
