@@ -121,7 +121,6 @@ function generateGridPoints(grid::Grid)::Matrix{Float64}
                 a += 1
             end
         end
-    end
     return X
 end
 
@@ -139,6 +138,31 @@ end
 #     end
 #     return X
 # end
+
+function generateConnectivityArray(grid::Grid)::Vector{Vector{Int64}}
+    N = grid.N .+ 1 # N is now a number of vertex in row not number of cells
+    IEN = [fill(0, 8) for _ in 1:prod(N.-1) ]
+    m = 1
+    for k = 1:N[3]-1
+        for j = 1:N[2]-1
+            for i = 1:N[1]-1
+                IEN[m] = [
+                    Int((k-1) * N[1]*N[2] + (j-1) * N[1] + i ),
+                    Int((k-1) * N[1]*N[2] + (j-1) * N[1] + i+1 ),
+                    Int((k-1) * N[1]*N[2] + j * N[1] + i+1 ),
+                    Int((k-1) * N[1]*N[2] + j * N[1] + i ),
+                    Int(k * N[1]*N[2] + (j-1) * N[1] + i),
+                    Int(k * N[1]*N[2] + (j-1) * N[1] + i+1 ),
+                    Int(k * N[1]*N[2] + j * N[1] + i+1 ),
+                    Int(k * N[1]*N[2] + j * N[1] + i ),
+                ]
+                m = m+1
+            end
+        end
+    end
+    #IEN = reduce(hcat, IEN) # transform Vector of Vectors to Matrix
+    return IEN
+end
 
 
 function calculateMiniAABB_grid(

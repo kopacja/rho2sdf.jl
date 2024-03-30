@@ -9,3 +9,4 @@ Manifest.toml
 *.vtk
 test/xp.csv
 test/xp.vtu
+test/xp.vtu

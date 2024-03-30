@@ -4,7 +4,6 @@ function exportToVTU(
     X::Vector{Vector{Float64}},
     IEN::Vector{Vector{Int64}},
     VTK_CODE::Int64,
-    # rho::Vector{Float64}=nothing,
     rho::Union{Vector{Float64}, Nothing} = nothing
 )
 
