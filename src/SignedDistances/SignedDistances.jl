@@ -9,7 +9,7 @@ using LinearAlgebra
 using DelimitedFiles
 using Rho2sdf.ShapeFunctions
 using Rho2sdf.MeshGrid
-using Rho2sdf.MyMarchingCubes
+# using Rho2sdf.MyMarchingCubes
 using Rho2sdf
 
 include("Derivatives.jl")

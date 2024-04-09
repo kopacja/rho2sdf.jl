@@ -13,8 +13,8 @@ using .ShapeFunctions
 include("MeshGrid/MeshGrid.jl")
 using .MeshGrid
 
-include("MyMarchingCubes/MyMarchingCubes.jl")
-using .MyMarchingCubes
+# include("MyMarchingCubes/MyMarchingCubes.jl")
+# using .MyMarchingCubes
 
 include("SignedDistances/SignedDistances.jl")
 using .SignedDistances

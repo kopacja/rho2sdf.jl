@@ -131,7 +131,7 @@ function evalSignedDistances(
     N = linkedList.grid.N # Number of divisions along each axis of the grid
     AABB_min = linkedList.grid.AABB_min # Minimum coordinates of the Axis-Aligned Bounding Box (AABB)
     AABB_max = linkedList.grid.AABB_max # Maximum coordinates of the AABB
-    δ = 1.1 * grid.cell_size # offset for mini AABB
+    δ = 2.5 * grid.cell_size # offset for mini AABB
 
     X = mesh.X   # vector of nodes positions
     IEN = mesh.IEN # ID element -> ID nodes
@@ -193,11 +193,14 @@ function evalSignedDistances(
                         Xt = [x₁, x₂, x₃]
                         Xt = reduce(hcat, Xt)
 
+                        #NOTE: From this part it is same as in sdfOnTriangularMesh ->
+
                         # Triangle edges
                         Et = calculate_triangle_edges(Xt)
 
                         n = cross(Et[1], Et[2]) # norm of triangle
                         n = n / norm(n) # unit norm
+                        #TODO: DOPLNIT EPN, VPN
 
                         # Nodes of mini AABB grid:
                         Is = MeshGrid.calculateMiniAABB_grid(Xt, δ, N, AABB_min, AABB_max, nsd)
@@ -287,6 +290,7 @@ function evalSignedDistances(
 
                             r_norm = norm(r)
 
+                            # ΔΞ_and_Δλ = K \ -r
                             (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
                             Ξ += ΔΞ_and_Δλ[1:3]
                             λ += ΔΞ_and_Δλ[4]
