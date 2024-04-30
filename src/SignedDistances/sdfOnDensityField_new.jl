@@ -115,6 +115,46 @@ function WriteValue(
   return dist, xp
 end
 
+function compute_coords(
+  x::Vector,
+  ρₜ::Float64,
+  Xₑ::Matrix,
+  ρₑ::Vector,
+)
+  model = Model(Ipopt.Optimizer)
+  set_silent(model)
+  # unset_silent(model)
+
+  set_optimizer_attribute(model, "tol", 1e-6)
+  set_optimizer_attribute(model, "max_iter", 50)
+  set_optimizer_attribute(model, "acceptable_tol", 1e-6)
+
+  @variable(model, ξ₁, lower_bound = -1.0, upper_bound = 1.0)
+  @variable(model, ξ₂, lower_bound = -1.0, upper_bound = 1.0)
+  @variable(model, ξ₃, lower_bound = -1.0, upper_bound = 1.0)
+  # set_start_value(ξ₁, 0.1)
+  # set_start_value(ξ₂, 0.1)
+  # set_start_value(ξ₃, 0.1)
+
+  N8 = [
+    -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+    1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+    -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+    1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+    1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+    -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+    1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+    -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+  ]
+  # @NLobjective(model, Min, sqrt(sum((x[i] - sum(Xₑ[i,k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x))))
+  @NLobjective(model, Min, sum((x[i] - sum(Xₑ[i, k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x)))
+  @NLconstraint(model, sum(ρₑ[k] * N8[k] for k in 1:length(N8)) == ρₜ)
+  optimize!(model)
+
+  return value.([ξ₁, ξ₂, ξ₃])
+end
+
+
 # MAIN FUNCTION for eval SDF
 function evalSignedDistances(
   mesh::Mesh,
@@ -150,16 +190,6 @@ function evalSignedDistances(
   dist = big * ones(ngp) # distance field initialization
   xp = zeros(nsd, ngp) # souřadnice bodů vrcholů (3xngp)
 
-  Ξₙ = [
-    [-1, -1, -1],
-    [1, -1, -1],
-    [1, 1, -1],
-    [-1, 1, -1],
-    [-1, -1, 1],
-    [1, -1, 1],
-    [1, 1, 1],
-    [-1, 1, 1],
-  ]
   # Tri mesh for pseudonormals:
   tri_mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh)
   EN = NodePosition3D(tri_mesh)
@@ -288,166 +318,24 @@ function evalSignedDistances(
             x = points[:, v]
 
             Ξ = zeros(Float64, 3)   # local coordinates
-            λ = 1.0                 # Lagrange multiplier
-            Ξ_tol = 1e-2
-            Ξ_norm = 2 * Ξ_tol
-            r_tol = 1e-2
-            r_norm = 2 * r_tol
-            niter = 10              # maximum number of iterations
-            iter = 1                # iteration form one
 
-            # Local coordinates computation:
-            while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
+            Ξ = compute_coords(x, ρₜ, Xₑ, ρₑ)
 
-              K = Hessian(sfce, Ξ, λ, x, Xₑ, ρₑ)
-              r = Gradient(sfce, Ξ, λ, x, Xₑ, ρₑ, ρₜ)
+            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
+            xₚ = Xₑ * H
+            n = RhoNorm(ρₑ, Ξ)
 
-              r_norm = norm(r)
-
-              # ΔΞ_and_Δλ = K \ -r
-              (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
-              Ξ += ΔΞ_and_Δλ[1:3]
-              λ += ΔΞ_and_Δλ[4]
-
-              Ξ_norm = norm(ΔΞ_and_Δλ)
-
-              iter = iter + 1
+            if sign(dot(x - xₚ, n)) == 0
+              println("Nornal zero sign!")
+              IDmin = argmin(mapslices(norm, (Xₑ .- x), dims=1))[2]
+              Sign = ρₑ[IDmin] < ρₜ ? -1 : 1
+              dist_tmp = Sign * norm(x - xₚ)
+            else
+              dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
             end
+            # dist_tmp = dot(x - xₚ, n)
 
-            #NOTE: Projection to isocontour:
-            if (maximum(abs.(Ξ)) <= 1.0) # Projection (xₚ) is in the element
-
-              H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
-              xₚ = Xₑ * H
-              n = RhoNorm(ρₑ, Ξ)
-
-              dist_tmp = dot(x - xₚ, n)
-              (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
-            end
-
-            #NOTE: Projection to edges:
-            if (maximum(abs.(Ξ)) > 1.0) # If projection (xₚ) is NOT in the element
-
-              # Let's loop  check whether there is a projection on the edges of the density isocontour.
-
-              # Each segment (face) have not three components ξ₁, ξ₂, ξ₃ but only two and the
-              # third one is known constant and must be fixed by constraint equation.
-              # Following two vectors represents index (1, 2 or 3) of the fixed component and its
-              # value (-1 or 1):
-              idx = [3, 2, 1, 2, 1, 3] # Index of the third constant component 
-              Ξ_ = [-1, -1, 1, 1, -1, 1] #
-
-              # Loop over segments (nes=6 for hex element)
-              for sg = 1:nes
-                ρₛ = ρₑ[mesh.ISN[sg]]
-
-                ρₛ_min = minimum(ρₛ)
-                ρₛ_max = maximum(ρₛ)
-
-                ρ_tol = 0.01
-                if (ρₛ_min <= (ρₜ - ρ_tol) && ρₛ_max >= (ρₜ + ρ_tol)) # the boundary cross through the segment
-
-                  Ξ = zeros(3)
-                  Ξ[idx[sg]] = Ξ_[sg]
-
-                  λ = ones(2)
-                  Ξ_norm = 2 * Ξ_tol
-                  r_norm = 2 * r_tol
-                  iter = 1
-                  niter = 10
-
-                  # Local coordinates computation:
-                  while ((Ξ_norm ≥ Ξ_tol || r_norm ≥ r_tol) && iter ≤ niter)
-
-                    r4 = Gradient(sfce, Ξ, λ[1], x, Xₑ, ρₑ, ρₜ)
-                    K4 = Hessian(sfce, Ξ, λ[1], x, Xₑ, ρₑ)
-
-                    # Fifth equation, e.g. (ξ₁ - 1) = 0 etc., representing constraint of the fixed segment component is added into the residual and tangent matrix
-                    r = zeros(5)
-                    r[1:4] = r4
-                    r[5] = (Ξ[idx[sg]] - Ξ_[sg])
-                    r[idx[sg]] += λ[2]
-
-                    K = zeros(5, 5)
-                    K[1:4, 1:4] = K4
-                    K[5, idx[sg]] = 1.0
-                    K[idx[sg], 5] = 1.0
-
-                    r_norm = norm(r)
-
-                    # ΔΞ_and_Δλ = K \ -r
-                    (ΔΞ_and_Δλ, Λ_min) = ReduceEigenvals(K, r, -1)
-
-                    ΔΞ = ΔΞ_and_Δλ[1:3]
-                    Δλ = ΔΞ_and_Δλ[4:5]
-
-                    Ξ += ΔΞ
-                    λ += Δλ
-
-                    # if (maximum(abs.(Ξ)) > 10.0) 
-                    #     Ξ = Ξ / maximum(abs.(Ξ)) * 10.0
-                    # end
-
-                    Ξ_norm = norm(ΔΞ_and_Δλ)
-                    #println("SG: ", sg , ", iter: ", iter, ", Ξ_norm: ", Ξ_norm, ", r_norm: ", r_norm)
-                    iter = iter + 1
-                  end
-                end
-
-                if (maximum(abs.(Ξ)) <= 1.0) # xₚ is in the segment
-                  H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
-                  xₚ = Xₑ * H
-
-                  n = RhoNorm(ρₑ, Ξ)
-
-                  #WARNING: dρ_dΞ může ve specifických přídech směřovat "podél" izokontury: ρₙ = [1.0, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 1]
-                  # posere to projekci
-
-                  if sign(dot(x - xₚ, n)) == 0
-                    println("Edge zero sign!")
-                  end
-
-                  dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                  (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
-                end
-              end # for sg
-            end
-
-            #NOTE: Projection to vertices:  
-            # The closed point could be a corner of the isocontour inside the element.
-            # Let's loop over edges and check whether rho of the end points is below and above the threshold density
-
-            edges = ((1, 2), (2, 3), (3, 4), (4, 1),
-              (5, 6), (6, 7), (7, 8), (8, 5),
-              (1, 5), (2, 6), (3, 7), (4, 8))
-            for edge in edges
-
-              ρ_min, min_idx = findmin([ρₑ[edge[1]], ρₑ[edge[2]]])
-              ρ_max, max_idx = findmax([ρₑ[edge[1]], ρₑ[edge[2]]])
-
-              if (ρ_min <= ρₜ && ρ_max >= ρₜ)
-
-                ratio = (ρₜ - ρ_min) / (ρ_max - ρ_min)
-
-                Ξₚ = Ξₙ[edge[min_idx]] + ratio .* (Ξₙ[edge[max_idx]] - Ξₙ[edge[min_idx]])
-
-                Hₚ, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξₚ)
-                xₚ = Xₑ * Hₚ
-
-                n = RhoNorm(ρₑ, Ξₚ)
-
-                if sign(dot(x - xₚ, n)) == 0
-                  println("Vertex zero sign!")
-                  IDmin = argmin(mapslices(norm, (Xₑ .- x), dims=1))[2]
-                  Sign = ρₑ[IDmin] < ρₜ ? -1 : 1
-                  dist_tmp = Sign * norm(x - xₚ)
-                else
-                  dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
-                end
-
-                (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
-              end
-            end
+            (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
 
             v = next[v]
 

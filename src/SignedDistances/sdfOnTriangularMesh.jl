@@ -159,6 +159,21 @@ function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
         end
     end
 
+    Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
+    println("mean of projected distance: ", mean_PD)
+    println("maximum projected distance: ", max_PD)
+
+    nnp = size(Xg, 1)
+
+    IEN = [[i; i + nnp] for i = 1:nnp]
+    X = vec([Xg Xp])
+
+    Rho2sdf.exportToVTU("lines_STL.vtu", X, IEN, 3)
+
+    IEN = [[i] for i = 1:nnp]
+    Rho2sdf.exportToVTU("Xg_STL.vtu", Xg, IEN, 1)
+    Rho2sdf.exportToVTU("Xp_STL.vtu", Xp, IEN, 1)
+
     return dist
 end
 

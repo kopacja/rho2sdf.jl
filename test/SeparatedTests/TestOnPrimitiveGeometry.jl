@@ -6,7 +6,7 @@ using Rho2sdf.PrimitiveGeometries
 using Rho2sdf.ShapeFunctions
 using Rho2sdf.MeshGrid
 using Rho2sdf.SignedDistances
-using Rho2sdf.MarchingCubes
+# using Rho2sdf.MarchingCubes
 using Rho2sdf.DataExport
 using MAT
 using SymPy
@@ -15,12 +15,12 @@ using JLD
 
      
 # taskName = "cube" 
-# taskName = "block" 
-taskName = "sphere" 
+taskName = "block"
+# taskName = "sphere" 
     
 # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("cube", 4)
-# (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("block", [9,1,1])
-(X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 9)
+(X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("block", [9,1,1])
+# (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 9)
 
 mesh = MeshGrid.Mesh(X, IEN, C3D8_SFaD)
 ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
