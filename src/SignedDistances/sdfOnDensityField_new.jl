@@ -115,6 +115,46 @@ function WriteValue(
   return dist, xp
 end
 
+function compute_coords(
+  x::Vector,
+  ρₜ::Float64,
+  Xₑ::Matrix,
+  ρₑ::Vector,
+)
+  model = Model(Ipopt.Optimizer)
+  set_silent(model)
+  # unset_silent(model)
+
+  set_optimizer_attribute(model, "tol", 1e-6)
+  set_optimizer_attribute(model, "max_iter", 50)
+  set_optimizer_attribute(model, "acceptable_tol", 1e-6)
+
+  @variable(model, ξ₁, lower_bound = -1.0, upper_bound = 1.0)
+  @variable(model, ξ₂, lower_bound = -1.0, upper_bound = 1.0)
+  @variable(model, ξ₃, lower_bound = -1.0, upper_bound = 1.0)
+  # set_start_value(ξ₁, 0.1)
+  # set_start_value(ξ₂, 0.1)
+  # set_start_value(ξ₃, 0.1)
+
+  N8 = [
+    -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+    1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+    -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+    1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+    1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+    -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+    1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+    -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+  ]
+  # @NLobjective(model, Min, sqrt(sum((x[i] - sum(Xₑ[i,k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x))))
+  @NLobjective(model, Min, sum((x[i] - sum(Xₑ[i, k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x)))
+  @NLconstraint(model, sum(ρₑ[k] * N8[k] for k in 1:length(N8)) == ρₜ)
+  optimize!(model)
+
+  return value.([ξ₁, ξ₂, ξ₃])
+end
+
+
 # MAIN FUNCTION for eval SDF
 function evalSignedDistances(
   mesh::Mesh,
@@ -150,16 +190,6 @@ function evalSignedDistances(
   dist = big * ones(ngp) # distance field initialization
   xp = zeros(nsd, ngp) # souřadnice bodů vrcholů (3xngp)
 
-  Ξₙ = [
-    [-1, -1, -1],
-    [1, -1, -1],
-    [1, 1, -1],
-    [-1, 1, -1],
-    [-1, -1, 1],
-    [1, -1, 1],
-    [1, 1, 1],
-    [-1, 1, 1],
-  ]
   # Tri mesh for pseudonormals:
   tri_mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh)
   EN = NodePosition3D(tri_mesh)
@@ -289,47 +319,22 @@ function evalSignedDistances(
 
             Ξ = zeros(Float64, 3)   # local coordinates
 
-            function compute_coords(x::Vector, ρₜ::Float64, Xₑ::Matrix, ρₙ::Vector)
-              model = Model(Ipopt.Optimizer)
-              set_silent(model)
-              # unset_silent(model)
-              set_optimizer_attribute(model, "tol", 1e-6)
-              set_optimizer_attribute(model, "max_iter", 50)
-              set_optimizer_attribute(model, "acceptable_tol", 1e-6)
-
-              @variable(model, ξ₁, lower_bound = -1.0, upper_bound = 1.0)
-              @variable(model, ξ₂, lower_bound = -1.0, upper_bound = 1.0)
-              @variable(model, ξ₃, lower_bound = -1.0, upper_bound = 1.0)
-              # set_start_value(ξ₁, 0.1)
-              # set_start_value(ξ₂, 0.1)
-              # set_start_value(ξ₃, 0.1)
-
-              N8 = [
-                -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
-                1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
-                -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
-                1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
-                1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
-                -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
-                1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
-                -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
-              ]
-              # @NLobjective(model, Min, sqrt(sum((x[i] - sum(Xₑ[i,k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x))))
-              @NLobjective(model, Min, sum((x[i] - sum(Xₑ[i, k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x)))
-              @NLconstraint(model, sum(ρₙ[k] * N8[k] for k in 1:length(N8)) == ρₜ)
-              optimize!(model)
-
-              return value.([ξ₁, ξ₂, ξ₃])
-
-            end
-
-            Ξ = compute_coords(x, ρₜ, Xₑ, ρₙ)
+            Ξ = compute_coords(x, ρₜ, Xₑ, ρₑ)
 
             H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
             xₚ = Xₑ * H
             n = RhoNorm(ρₑ, Ξ)
 
-            dist_tmp = dot(x - xₚ, n)
+            if sign(dot(x - xₚ, n)) == 0
+              println("Nornal zero sign!")
+              IDmin = argmin(mapslices(norm, (Xₑ .- x), dims=1))[2]
+              Sign = ρₑ[IDmin] < ρₜ ? -1 : 1
+              dist_tmp = Sign * norm(x - xₚ)
+            else
+              dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
+            end
+            # dist_tmp = dot(x - xₚ, n)
+
             (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
 
             v = next[v]
