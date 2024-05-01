@@ -325,15 +325,15 @@ function evalSignedDistances(
             xₚ = Xₑ * H
             n = RhoNorm(ρₑ, Ξ)
 
+            # Sign can be zero of norm is zero:
             if sign(dot(x - xₚ, n)) == 0
-              println("Nornal zero sign!")
-              IDmin = argmin(mapslices(norm, (Xₑ .- x), dims=1))[2]
+              println("Normal zero sign!")
+              IDmin = argmin(mapslices(norm, (Xₑ .- x), dims=1))[2] # trying to find closest node for point x and looking for its density
               Sign = ρₑ[IDmin] < ρₜ ? -1 : 1
               dist_tmp = Sign * norm(x - xₚ)
             else
               dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
             end
-            # dist_tmp = dot(x - xₚ, n)
 
             (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
 
