@@ -182,7 +182,6 @@ function MC_SurfaceTriangularMesh(
   ρₙ::Vector{Float64},
   ρₜ::Float64,
   mesh::MGMesh,
-  Xₑ::Matrix,
 )
 
   X = mesh.X
@@ -206,6 +205,8 @@ function MC_SurfaceTriangularMesh(
     ρₑ_min = minimum(ρₑ)
     ρₑ_max = maximum(ρₑ)
     if (ρₑ_max > ρₜ) && (ρₑ_min < ρₜ) # The boundary (isocontour) goes through the element
+
+      Xₑ = X[:, IEN[:, el]]
       (Coords4Triangles, triangles) = MC4trianglesInElement(ρₑ, ρₜ, mesh, Xₑ)
 
       not = length(Coords4Triangles) # number of trinagles in the element
