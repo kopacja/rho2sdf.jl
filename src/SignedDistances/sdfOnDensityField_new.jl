@@ -132,9 +132,9 @@ function compute_coords(
   @variable(model, ξ₁, lower_bound = -1.0, upper_bound = 1.0)
   @variable(model, ξ₂, lower_bound = -1.0, upper_bound = 1.0)
   @variable(model, ξ₃, lower_bound = -1.0, upper_bound = 1.0)
-  # set_start_value(ξ₁, 0.1)
-  # set_start_value(ξ₂, 0.1)
-  # set_start_value(ξ₃, 0.1)
+  set_start_value(ξ₁, 0.0)
+  set_start_value(ξ₂, 0.0)
+  set_start_value(ξ₃, 0.0)
 
   N8 = [
     -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
@@ -154,6 +154,66 @@ function compute_coords(
   return value.([ξ₁, ξ₂, ξ₃])
 end
 
+function compute_coords_new(
+  x::Vector,
+  ρₜ::Float64,
+  Xₑ::Matrix,
+  ρₑ::Vector,
+  # starting_points::Vector{Tuple{Float64, Float64, Float64}}
+)
+  starting_points = [
+    (0.0, 0.0, 0.0),
+    (-0.5, -0.5, -0.5),
+    (0.5, -0.5, -0.5),
+    (0.5, 0.5, -0.5),
+    (-0.5, 0.5, -0.5),
+    (-0.5, -0.5, 0.5),
+    (0.5, -0.5, 0.5),
+    (0.5, 0.5, 0.5),
+    (-0.5, 0.5, 0.5),
+  ]
+  
+  best_solution = nothing
+  best_objective = Inf
+
+  for (ξ₁_start, ξ₂_start, ξ₃_start) in starting_points
+    model = Model(Ipopt.Optimizer)
+    set_silent(model)
+
+    set_optimizer_attribute(model, "tol", 1e-6)
+    set_optimizer_attribute(model, "max_iter", 50)
+    set_optimizer_attribute(model, "acceptable_tol", 1e-6)
+
+    @variable(model, ξ₁, lower_bound = -1.0, upper_bound = 1.0, start = ξ₁_start)
+    @variable(model, ξ₂, lower_bound = -1.0, upper_bound = 1.0, start = ξ₂_start)
+    @variable(model, ξ₃, lower_bound = -1.0, upper_bound = 1.0, start = ξ₃_start)
+
+    N8 = [
+      -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+      1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+      -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+      1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+      1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+      -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+      1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+      -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+    ]
+    @NLobjective(model, Min, sum((x[i] - sum(Xₑ[i, k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x)))
+    @NLconstraint(model, sum(ρₑ[k] * N8[k] for k in 1:length(N8)) == ρₜ)
+    optimize!(model)
+
+    current_objective = objective_value(model)
+    current_solution = value.([ξ₁, ξ₂, ξ₃])
+
+    if current_objective < best_objective
+      best_solution = current_solution
+      best_objective = current_objective
+    end
+  end
+
+  return best_solution
+end
+
 
 # MAIN FUNCTION for eval SDF
 function evalSignedDistances(
@@ -171,6 +231,7 @@ function evalSignedDistances(
   N = linkedList.grid.N # Number of divisions along each axis of the grid
   AABB_min = linkedList.grid.AABB_min # Minimum coordinates of the Axis-Aligned Bounding Box (AABB)
   AABB_max = linkedList.grid.AABB_max # Maximum coordinates of the AABB
+  #TODO: δ nemůžu násobit grid cell size skalárem -> ale nejdelší hrana nepravidelného elementu * skalár!
   δ = 2.5 * grid.cell_size # offset for mini AABB
 
   X = mesh.X   # vector of nodes positions
@@ -325,16 +386,25 @@ function evalSignedDistances(
             xₚ = Xₑ * H
             n = RhoNorm(ρₑ, Ξ)
 
-            # Sign can be zero of norm is zero:
+            # # Sign can be zero of norm is zero:
+            # if sign(dot(x - xₚ, n)) == 0
+            #   println("Normal zero sign!")
+            #   IDmin = argmin(mapslices(norm, (Xₑ .- x), dims=1))[2] # trying to find closest node for point x and looking for its density
+            #   Sign = ρₑ[IDmin] < ρₜ ? -1 : 1
+            #   dist_tmp = Sign * norm(x - xₚ)
+            # else
+            #   dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
+            # end
+
             if sign(dot(x - xₚ, n)) == 0
               println("Normal zero sign!")
-              IDmin = argmin(mapslices(norm, (Xₑ .- x), dims=1))[2] # trying to find closest node for point x and looking for its density
-              Sign = ρₑ[IDmin] < ρₜ ? -1 : 1
-              dist_tmp = Sign * norm(x - xₚ)
-            else
-              dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
             end
+            dist_tmp = sign(dot(x - xₚ, n)) * norm(x - xₚ)
 
+            # IDmin = argmin(mapslices(norm, (Xₑ .- x), dims=1))[2] # trying to find closest node for point x and looking for its density
+            # Sign = ρₑ[IDmin] < ρₜ ? -1 : 1
+            # dist_tmp = Sign * norm(x - xₚ)
+            #
             (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
 
             v = next[v]
