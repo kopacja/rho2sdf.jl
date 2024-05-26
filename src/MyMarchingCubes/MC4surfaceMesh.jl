@@ -102,7 +102,13 @@ function MC_SurfaceTriangularMesh(
 
   X = mesh.X
   IEN = mesh.IEN # ID element -> nodes
+  INE = mesh.INE # ID node -> ID elements
+  ISN = mesh.ISN # connectivity face - edges
+  # nsd = mesh.nsd # number of special dimension
   nel = mesh.nel # number of elements
+  nes = mesh.nes # number of element segments (faces) 6
+  nsn = mesh.nsn # number of segment nodes (kolik má stěna uzlů) 4
+  sfce = mesh.sfce
 
   X_new = Vector{Vector{Float64}}()
   # push!(X_new, vec(X[:, 1]))
@@ -114,7 +120,58 @@ function MC_SurfaceTriangularMesh(
 
     ρₑ_min = minimum(ρₑ)
     ρₑ_max = maximum(ρₑ)
-    if (ρₑ_max > ρₜ) && (ρₑ_min < ρₜ) # The boundary (isocontour) goes through the element
+
+    #NOTE: Boundary can go on a face of the element:
+    if (ρₑ_min > ρₜ)
+
+      commonEls = []
+
+      # cycle through element faces (6)
+      for sg = 1:nes
+        commonEls = INE[IEN[mesh.ISN[sg][1], el]]
+        for a = 2:nsn
+          idx = findall(in(INE[IEN[ISN[sg][a], el]]), commonEls) # for how many elements does this face belong ?
+          commonEls = commonEls[idx]
+        end
+
+        if (length(commonEls) == 1) # = is a part of the outer boundary of the body
+          Xs = X[:, IEN[ISN[sg], el]]
+          Xc = vec(mean(Xs, dims=2))
+
+          for a = 1:nsn # cycle through number of all nodals belong to face
+
+            IEN_el = zeros(Int64, 3)
+
+            # coordinates of nodes of the triangle
+            x₁ = Xs[:, a]
+            x₂ = Xs[:, (a%nsn)+1]
+            x₃ = Xc
+
+            # println("x₃: ", x₃)
+
+            # coordinates of the vertices of the triangle
+            Xt = [x₁, x₂, x₃]
+
+            # println("Xt: ", Xt)
+
+            for i = 1:3
+              a = findfirst(x -> norm(x - Xt[i]) < 1.0e-5, X_new)
+              if (a === nothing)
+                # println("X_new: ", X_new)
+                # println("Xt[i]: ", Xt[i])
+                push!(X_new, Xt[i])
+                IEN_el[i] = length(X_new)
+              else
+                IEN_el[i] = a[1]
+              end
+            end
+            push!(IEN_new, IEN_el)
+          end # a = 1:nsn
+        end # if (length(commonEls) == 1)
+      end # sg
+
+    #NOTE: Boundary goes through the elements:
+    elseif (ρₑ_max > ρₜ) #&& (ρₑ_min < ρₜ)
 
       Xₑ = X[:, IEN[:, el]]
       (Coords4Triangles, triangles) = MC4trianglesInElement(ρₑ, ρₜ, Xₑ)
