@@ -115,46 +115,8 @@ function WriteValue(
   return dist, xp
 end
 
+
 function compute_coords(
-  x::Vector,
-  ρₜ::Float64,
-  Xₑ::Matrix,
-  ρₑ::Vector,
-)
-  model = Model(Ipopt.Optimizer)
-  set_silent(model)
-  # unset_silent(model)
-
-  set_optimizer_attribute(model, "tol", 1e-6)
-  set_optimizer_attribute(model, "max_iter", 50)
-  set_optimizer_attribute(model, "acceptable_tol", 1e-6)
-
-  @variable(model, ξ₁, lower_bound = -1.0, upper_bound = 1.0)
-  @variable(model, ξ₂, lower_bound = -1.0, upper_bound = 1.0)
-  @variable(model, ξ₃, lower_bound = -1.0, upper_bound = 1.0)
-  set_start_value(ξ₁, 0.0)
-  set_start_value(ξ₂, 0.0)
-  set_start_value(ξ₃, 0.0)
-
-  N8 = [
-    -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
-    1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
-    -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
-    1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
-    1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
-    -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
-    1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
-    -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
-  ]
-  # @NLobjective(model, Min, sqrt(sum((x[i] - sum(Xₑ[i,k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x))))
-  @NLobjective(model, Min, sum((x[i] - sum(Xₑ[i, k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x)))
-  @NLconstraint(model, sum(ρₑ[k] * N8[k] for k in 1:length(N8)) == ρₜ)
-  optimize!(model)
-
-  return value.([ξ₁, ξ₂, ξ₃])
-end
-
-function compute_coords_new(
   x::Vector,
   ρₜ::Float64,
   Xₑ::Matrix,
@@ -163,16 +125,16 @@ function compute_coords_new(
 )
   starting_points = [
     (0.0, 0.0, 0.0),
-    (-0.5, -0.5, -0.5),
-    (0.5, -0.5, -0.5),
-    (0.5, 0.5, -0.5),
-    (-0.5, 0.5, -0.5),
-    (-0.5, -0.5, 0.5),
-    (0.5, -0.5, 0.5),
-    (0.5, 0.5, 0.5),
-    (-0.5, 0.5, 0.5),
+    # (-0.5, -0.5, -0.5),
+    # (0.5, -0.5, -0.5),
+    # (0.5, 0.5, -0.5),
+    # (-0.5, 0.5, -0.5),
+    # (-0.5, -0.5, 0.5),
+    # (0.5, -0.5, 0.5),
+    # (0.5, 0.5, 0.5),
+    # (-0.5, 0.5, 0.5),
   ]
-  
+
   best_solution = nothing
   best_objective = Inf
 
@@ -214,6 +176,59 @@ function compute_coords_new(
   return best_solution
 end
 
+
+# Newton-Raphson metoda
+function find_local_coordinates(
+  sfce::Function,
+  global_coords, # Xe
+  node_coords, # x
+)
+
+  ξ = [0.0, 0.0, 0.0]  # Initial guess
+  tolerance = 1e-8
+  max_iterations = 100
+  X = node_coords[1, :]
+  Y = node_coords[2, :]
+  Z = node_coords[3, :]
+
+  for iter in 1:max_iterations
+    N, dN_dξ, d²N_dξ², d³N_dξ³ = sfce(ξ) # tvarové funkce a jejich derivace
+
+    # Compute global coordinates from shape functions
+    x = dot(N, X)
+    y = dot(N, Y)
+    z = dot(N, Z)
+
+    # Residuals
+    R = [x - global_coords[1], y - global_coords[2], z - global_coords[3]]
+
+    # Check convergence
+    if norm(R) < tolerance
+      return ξ
+    end
+
+    J = dN_dξ' * node_coords'
+
+    # Update ξ
+    Δξ = ReduceEigenvals(J, R, -1)
+    # Δξ = -J \ R
+    ξ += Δξ
+  end
+
+  error("Newton-Raphson method did not converge")
+end
+
+# Function to create AABB from a set of points
+function compute_aabb(points::Matrix{Float64})
+  min_bounds = minimum(points, dims=2)
+  max_bounds = maximum(points, dims=2)
+  return min_bounds, max_bounds
+end
+
+# Function to check if a point is inside the AABB
+function is_point_inside_aabb(x::Vector{Float64}, min_bounds, max_bounds)
+  return all(min_bounds .<= x) && all(x .<= max_bounds)
+end
 
 # MAIN FUNCTION for eval SDF
 function evalSignedDistances(
@@ -258,6 +273,7 @@ function evalSignedDistances(
   println("VPN", size(VPN))
   println("EPN", size(EPN))
 
+  # if false
   for el = 1:nel
 
     println("element ID: ", el)
@@ -414,6 +430,57 @@ function evalSignedDistances(
       end
     end
   end
+  # end
+
+  signs = -1 * ones(ngp)
+  for i in 1:ngp # cycle trought all grid points
+    found = false  # Flag to indicate if we need to skip to the next i
+    x = points[:, i]
+
+    IDmin = argmin(mapslices(norm, (X .- x), dims=1))[2] # find ID of node (of mesh) that is closest to grid point x
+    none = length(INE[IDmin]) # number of neighbour elements (that are connected to the node)
+
+    for j in 1:none
+      el = INE[IDmin][j]
+
+      Xₑ = X[:, IEN[:, el]]
+      # Compute the AABB
+      min_bounds, max_bounds = compute_aabb(Xₑ)
+
+      # Check if the point x is inside the AABB
+      inside = is_point_inside_aabb(x, min_bounds, max_bounds)
+
+      if inside
+        local_coords = find_local_coordinates(sfce, x, Xₑ)
+
+        if all(-1.000001 .<= local_coords .<= 1.000001)
+
+          H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(local_coords) # tvarové funkce a jejich derivace
+          ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
+          ρ = H ⋅ ρₑ
+
+          if ρ >= ρₜ
+            # println("inside")
+            signs[i] = 1
+          end
+          found = true
+          break
+        end
+      end
+      if found
+        break
+      end
+    end
+
+    # find closest node of regular grid
+    # cycle through all elements that connect to the node
+    # check if the node is inside AABB of the element
+    # if yes -> compute local coords
+    # break??
+    # compute rho and if > \rho_t -> +1
+
+  end
+
   println("typeof xp: ", typeof(xp))
 
   Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
@@ -432,6 +499,8 @@ function evalSignedDistances(
   Rho2sdf.exportToVTU("Xp.vtu", Xp, IEN, 1)
 
   # dist = SignCorrection4SDF(dist, grid, big)
+  dist = abs.(dist) .* signs
+  # dist = signs
 
   return dist, xp
 
