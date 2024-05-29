@@ -189,7 +189,7 @@ function is_point_inside_aabb(x::Vector{Float64}, min_bounds, max_bounds)
   return all(min_bounds .<= x) && all(x .<= max_bounds)
 end
 
-function IsProjestedOnFullSegment(
+function IsProjectedOnFullSegment(
   sfce::Function,
   Xₑ::Matrix,
   xₚ::Vector,
@@ -202,24 +202,25 @@ function IsProjestedOnFullSegment(
   v::Int,
   x::Vector,
 )
-
   local_coords = find_local_coordinates(sfce, Xₑ, xₚ)
+  max_local = maximum(local_coords)
+  min_local = minimum(local_coords)
 
-  if maximum(local_coords) < 1.001 && minimum(local_coords) > -1.001
-
-    H, _, _, _ = sfce(local_coords) # tvarové funkce a jejich derivace
-    ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
+  if max_local < 1.001 && min_local > -1.001
+    H, _, _, _ = sfce(local_coords) # shape functions and their derivatives
+    ρₑ = view(ρₙ, IEN[:, el]) # view for better performance
     ρ = H ⋅ ρₑ
 
-    if ρ >= ρₜ# stěna elementu je "plná"
-      # println("inside")
+    if ρ >= ρₜ
       dist_tmp = norm(x - xₚ)
       (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
       return true
     end
   else
-    println("Chyba! Projekce mimo stěnu elementu")
+    println("Error! Projection outside the element face")
   end
+
+  return false
 end
 
 
@@ -430,26 +431,26 @@ function evalSignedDistances(
                   if (minimum(λ) >= 0.0) # xₚ is in the triangle, projection node x inside triangle 
                     xₚ = λ[1] * x₁ + λ[2] * x₂ + λ[3] * x₃
 
-                    # isFaceOrEdge = IsProjestedOnFullSegment(sfce, Xₑ, xₚ, el, IEN, ρₙ, ρₜ, dist, xp, v, x)
+                    isFaceOrEdge = IsProjectedOnFullSegment(sfce, Xₑ, xₚ, el, IEN, ρₙ, ρₜ, dist, xp, v, x)
 
-                    local_coords = find_local_coordinates(sfce, Xₑ, xₚ)
-
-                    if maximum(local_coords) < 1.001 && minimum(local_coords) > -1.001
-
-                      H, _, _, _ = sfce(local_coords) # tvarové funkce a jejich derivace
-                      # H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(local_coords) # tvarové funkce a jejich derivace
-                      ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
-                      ρ = H ⋅ ρₑ
-
-                      if ρ >= ρₜ# stěna elementu je "plná"
-                        # println("inside")
-                        dist_tmp = norm(x - xₚ)
-                        (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
-                        isFaceOrEdge = true
-                      end
-                    else
-                      println("Chyba! Projekce mimo stěnu elementu")
-                    end
+                    # local_coords = find_local_coordinates(sfce, Xₑ, xₚ)
+                    #
+                    # if maximum(local_coords) < 1.001 && minimum(local_coords) > -1.001
+                    #
+                    #   H, _, _, _ = sfce(local_coords) # tvarové funkce a jejich derivace
+                    #   # H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(local_coords) # tvarové funkce a jejich derivace
+                    #   ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
+                    #   ρ = H ⋅ ρₑ
+                    #
+                    #   if ρ >= ρₜ# stěna elementu je "plná"
+                    #     # println("inside")
+                    #     dist_tmp = norm(x - xₚ)
+                    #     (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
+                    #     isFaceOrEdge = true
+                    #   end
+                    # else
+                    #   println("Chyba! Projekce mimo stěnu elementu")
+                    # end
 
                   else
 
@@ -461,26 +462,26 @@ function evalSignedDistances(
                       if (P >= 0 && P <= L) # is the perpendicular projection of a node onto an edge in the edge interval?
                         xₚ = xᵥ + (Et[j] / L) * P
 
-                        # isFaceOrEdge = IsProjestedOnFullSegment(sfce, Xₑ, xₚ, el, IEN, ρₙ, ρₜ, dist, xp, v, x)
+                        isFaceOrEdge = IsProjectedOnFullSegment(sfce, Xₑ, xₚ, el, IEN, ρₙ, ρₜ, dist, xp, v, x)
 
-                        local_coords = find_local_coordinates(sfce, Xₑ, xₚ)
-
-                        if maximum(local_coords) < 1.001 && minimum(local_coords) > -1.001
-
-                          # H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(local_coords) # tvarové funkce a jejich derivace
-                          H, _, _, _ = sfce(local_coords) # tvarové funkce a jejich derivace
-                          ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
-                          ρ = H ⋅ ρₑ
-
-                          if ρ >= ρₜ# stěna elementu je "plná"
-                            # println("inside")
-                            dist_tmp = norm(x - xₚ)
-                            (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
-                            isFaceOrEdge = true
-                          end
-                        else
-                          println("Chyba! Projekce mimo stěnu elementu")
-                        end
+                        # local_coords = find_local_coordinates(sfce, Xₑ, xₚ)
+                        #
+                        # if maximum(local_coords) < 1.001 && minimum(local_coords) > -1.001
+                        #
+                        #   # H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(local_coords) # tvarové funkce a jejich derivace
+                        #   H, _, _, _ = sfce(local_coords) # tvarové funkce a jejich derivace
+                        #   ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
+                        #   ρ = H ⋅ ρₑ
+                        #
+                        #   if ρ >= ρₜ# stěna elementu je "plná"
+                        #     # println("inside")
+                        #     dist_tmp = norm(x - xₚ)
+                        #     (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
+                        #     isFaceOrEdge = true
+                        #   end
+                        # else
+                        #   println("Chyba! Projekce mimo stěnu elementu")
+                        # end
 
                       end
                     end
@@ -488,28 +489,30 @@ function evalSignedDistances(
                   # Remaining cases:
                   # NOTE: Projection is on the triangle vertices:
                   if (isFaceOrEdge == false)
-                    dist_tmp, idx =
-                      findmin([norm(x - x₁), norm(x - x₂), norm(x - x₃)]) # which node of the triangle is closer?
-                    xₚ = Xt[:, idx] # the node of triangle
+                    idx = argmin([norm(x - x₁), norm(x - x₂), norm(x - x₃)]) # find the index of the closest node
+                    # dist_tmp, idx =
+                    #   findmin([norm(x - x₁), norm(x - x₂), norm(x - x₃)]) # which node of the triangle is closer?
 
-                    # isFaceOrEdge = IsProjestedOnFullSegment(sfce, Xₑ, xₚ, el, IEN, ρₙ, ρₜ, dist, xp, v, x)
-                    local_coords = find_local_coordinates(sfce, Xₑ, xₚ)
+                    xₚ = Xt[:, idx] # the node of the triangle
 
-                    if maximum(local_coords) < 1.001 && minimum(local_coords) > -1.001
-
-                      # H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(local_coords) # tvarové funkce a jejich derivace
-                      H, _, _, _ = sfce(local_coords) # tvarové funkce a jejich derivace
-                      ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
-                      ρ = H ⋅ ρₑ
-
-                      if ρ >= ρₜ# stěna elementu je "plná"
-                        # println("inside")
-                        dist_tmp = norm(x - xₚ)
-                        (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
-                      end
-                    else
-                      println("Chyba! Projekce mimo stěnu elementu")
-                    end
+                    isFaceOrEdge = IsProjectedOnFullSegment(sfce, Xₑ, xₚ, el, IEN, ρₙ, ρₜ, dist, xp, v, x)
+                    # local_coords = find_local_coordinates(sfce, Xₑ, xₚ)
+                    #
+                    # if maximum(local_coords) < 1.001 && minimum(local_coords) > -1.001
+                    #
+                    #   # H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(local_coords) # tvarové funkce a jejich derivace
+                    #   H, _, _, _ = sfce(local_coords) # tvarové funkce a jejich derivace
+                    #   ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
+                    #   ρ = H ⋅ ρₑ
+                    #
+                    #   if ρ >= ρₜ# stěna elementu je "plná"
+                    #     # println("inside")
+                    #     dist_tmp = norm(x - xₚ)
+                    #     (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
+                    #   end
+                    # else
+                    #   println("Chyba! Projekce mimo stěnu elementu")
+                    # end
 
                   end
                   v = next[v]
@@ -536,7 +539,7 @@ function evalSignedDistances(
             Ξ = zeros(Float64, 3)   # local coordinates
 
             Ξ = compute_coords(x, ρₜ, Xₑ, ρₑ)
-            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(Ξ)
+            H, _, _, _ = sfce(Ξ)
             xₚ = Xₑ * H
             dist_tmp = norm(x - xₚ)
 
@@ -574,7 +577,7 @@ function evalSignedDistances(
 
         if all(-1.000001 .<= local_coords .<= 1.000001)
 
-          H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(local_coords) # tvarové funkce a jejich derivace
+          H, _, _, _ = sfce(local_coords) # tvarové funkce a jejich derivace
           ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
           ρ = H ⋅ ρₑ
 
