@@ -210,7 +210,7 @@ function find_local_coordinates(
     J = dN_dξ' * node_coords'
 
     # Update ξ
-    Δξ = ReduceEigenvals(J, R, -1)
+    (Δξ, Δξ_min) = ReduceEigenvals(J, R, -1)
     # Δξ = -J \ R
     ξ += Δξ
   end
@@ -381,6 +381,146 @@ function evalSignedDistances(
       if (ρₑ_max > ρₜ) # The boundary (isocontour) goes through the element
 
         Xₑ = X[:, IEN[:, el]]
+
+        # NOTE: two isocountour in one element:
+
+        # cycle through element faces (6)
+        for sg = 1:nes
+          commonEls = INE[IEN[mesh.ISN[sg][1], el]]
+          for a = 2:nsn
+            idx = findall(in(INE[IEN[ISN[sg][a], el]]), commonEls) # for how many elements does this face belong ?
+            commonEls = commonEls[idx]
+          end
+
+          if (length(commonEls) == 1) # = is a part of the outer boundary of the body
+            Xs = X[:, IEN[ISN[sg], el]]
+            Xc = vec(mean(Xs, dims=2))
+
+            for a = 1:nsn # cycle through number of all nodals belong to face
+
+              # coordinates of nodes of the triangle
+              x₁ = Xs[:, a]
+              x₂ = Xs[:, (a%nsn)+1]
+              x₃ = Xc
+              # println(typeof(x₁))
+              # exit()
+
+              # coordinates of the vertices of the triangle
+              Xt = [x₁ x₂ x₃]
+
+              # finding coresponding triangle:
+              ID_tri = find_triangle_position(EN, [x₁ x₂ x₃])
+
+              #NOTE: From this part it is same as in sdfOnTriangularMesh ->
+
+              # Triangle edges
+              Et = calculate_triangle_edges(Xt)
+
+              n = cross(Et[1], Et[2]) # norm of triangle
+              n = n / norm(n) # unit norm
+
+              # Nodes of mini AABB grid:
+              Is = MeshGrid.calculateMiniAABB_grid(Xt, δ, N, AABB_min, AABB_max, nsd)
+
+              for I ∈ Is # cycle through the nodes of the mini AABB grid
+                ii = Int( # node ID
+                  I[3] * (N[1] + 1) * (N[2] + 1) + I[2] * (N[1] + 1) + I[1] + 1,
+                )
+                v = head[ii]
+                while v != -1
+                  x = points[:, v]
+                  λ = barycentricCoordinates(x₁, x₂, x₃, n, x)
+
+                  xₚ = zeros(nsd) # projection
+
+                  isFaceOrEdge = false # projection check
+
+                  # NOTE: Projection is inside triangle:
+                  if (minimum(λ) >= 0.0) # xₚ is in the triangle, projection node x inside triangle 
+                    xₚ = λ[1] * x₁ + λ[2] * x₂ + λ[3] * x₃
+
+                    local_coords = find_local_coordinates(sfce, xₚ, Xₑ)
+
+                    if maximum(local_coords) < 1.001 && minimum(local_coords) > -1.001
+
+                      H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(local_coords) # tvarové funkce a jejich derivace
+                      ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
+                      ρ = H ⋅ ρₑ
+
+                      if ρ >= ρₜ# stěna elementu je "plná"
+                        # println("inside")
+                        dist_tmp = norm(x - xₚ)
+                        (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
+                        isFaceOrEdge = true
+                      end
+                    else
+                      println("Chyba! Projekce mimo stěnu elementu")
+                    end
+
+                  else
+
+                    # NOTE: Projection is on the triangle edges:
+                    for j = 1:3
+                      L = norm(Et[j]) # length of j triangle edge
+                      xᵥ = Xt[:, j]
+                      P = dot(x - xᵥ, Et[j] / L) # skalar product of vector (vertex&node) and norm edge
+                      if (P >= 0 && P <= L) # is the perpendicular projection of a node onto an edge in the edge interval?
+                        xₚ = xᵥ + (Et[j] / L) * P
+
+                        local_coords = find_local_coordinates(sfce, xₚ, Xₑ)
+
+                        if maximum(local_coords) < 1.001 && minimum(local_coords) > -1.001
+
+                          H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(local_coords) # tvarové funkce a jejich derivace
+                          ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
+                          ρ = H ⋅ ρₑ
+
+                          if ρ >= ρₜ# stěna elementu je "plná"
+                            # println("inside")
+                            dist_tmp = norm(x - xₚ)
+                            (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
+                            isFaceOrEdge = true
+                          end
+                        else
+                          println("Chyba! Projekce mimo stěnu elementu")
+                        end
+
+                      end
+                    end
+                  end
+                  # Remaining cases:
+                  # NOTE: Projection is on the triangle vertices:
+                  if (isFaceOrEdge == false)
+                    dist_tmp, idx =
+                      findmin([norm(x - x₁), norm(x - x₂), norm(x - x₃)]) # which node of the triangle is closer?
+                    xₚ = Xt[:, idx] # the node of triangle
+
+                    local_coords = find_local_coordinates(sfce, xₚ, Xₑ)
+
+                    if maximum(local_coords) < 1.001 && minimum(local_coords) > -1.001
+
+                      H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = sfce(local_coords) # tvarové funkce a jejich derivace
+                      ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
+                      ρ = H ⋅ ρₑ
+
+                      if ρ >= ρₜ# stěna elementu je "plná"
+                        # println("inside")
+                        dist_tmp = norm(x - xₚ)
+                        (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v)
+                      end
+                    else
+                      println("Chyba! Projekce mimo stěnu elementu")
+                    end
+
+                  end
+                  v = next[v]
+                end
+              end
+            end
+          end
+        end
+
+        # NOTE: isocountour going trought element:
 
         Is = MeshGrid.calculateMiniAABB_grid(Xₑ, δ, N, AABB_min, AABB_max, nsd)
 
