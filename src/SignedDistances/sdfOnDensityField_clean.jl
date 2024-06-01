@@ -93,14 +93,14 @@ function compute_coords(
 )
   starting_points = [
     (0.0, 0.0, 0.0),
-    # (-0.5, -0.5, -0.5),
-    # (0.5, -0.5, -0.5),
-    # (0.5, 0.5, -0.5),
-    # (-0.5, 0.5, -0.5),
-    # (-0.5, -0.5, 0.5),
-    # (0.5, -0.5, 0.5),
-    # (0.5, 0.5, 0.5),
-    # (-0.5, 0.5, 0.5),
+    (-0.5, -0.5, -0.5),
+    (0.5, -0.5, -0.5),
+    (0.5, 0.5, -0.5),
+    (-0.5, 0.5, -0.5),
+    (-0.5, -0.5, 0.5),
+    (0.5, -0.5, 0.5),
+    (0.5, 0.5, 0.5),
+    (-0.5, 0.5, 0.5),
   ]
 
   best_solution = nothing
@@ -174,7 +174,11 @@ function find_local_coordinates(
     ξ += Δξ
   end
 
-  error("Newton-Raphson method did not converge")
+  return ([10.0, 10.0, 10.0])
+
+  println("NR method for local coords did not converge")
+  println("Xₑ: ", Xₑ)
+  println("xₙ: ", xₙ)
 end
 
 # Function to create AABB from a set of points
@@ -255,8 +259,8 @@ function evalSignedDistances(
   println("number of all elements: ", nel)
 
   ngp = grid.ngp # number of nodes in grid
-  # big = -1.0e10
-  big = 1.0e10
+  big = -1.0e10
+  # big = 1.0e10
   dist = big * ones(ngp) # distance field initialization
   xp = zeros(nsd, ngp) # souřadnice bodů vrcholů (3xngp)
 
@@ -268,6 +272,7 @@ function evalSignedDistances(
   println("EPN", size(EPN))
 
   for el = 1:nel
+  # for el = 16489:nel
 
     println("element ID: ", el)
     ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
@@ -555,7 +560,9 @@ function evalSignedDistances(
   # end
 
   signs = -1 * ones(ngp)
+  println("number of grid points: ", ngp)
   for i in 1:ngp # cycle trought all grid points
+    # println("grid point ID: ", i)
     found = false  # Flag to indicate if we need to skip to the next i
     x = points[:, i]
 
@@ -574,8 +581,12 @@ function evalSignedDistances(
 
       if inside
         local_coords = find_local_coordinates(sfce, Xₑ, x)
+        max_local = maximum(local_coords)
+        min_local = minimum(local_coords)
 
-        if all(-1.000001 .<= local_coords .<= 1.000001)
+        if max_local < 1.0001 && min_local > -1.0001
+
+          # if all(-1.000001 .<= local_coords .<= 1.000001)
 
           H, _, _, _ = sfce(local_coords) # tvarové funkce a jejich derivace
           ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
@@ -613,11 +624,6 @@ function evalSignedDistances(
   Rho2sdf.exportToVTU("Xg.vtu", Xg, IEN, 1)
   Rho2sdf.exportToVTU("Xp.vtu", Xp, IEN, 1)
 
-  for i in 1:ngp
-    if dist[i] < 0
-      println("Dist menší jak 0: ", dist[i])
-    end
-  end
 
   dist = abs.(dist) .* signs
 
