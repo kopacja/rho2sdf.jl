@@ -18,7 +18,8 @@ using Rho2sdf
 include("Derivatives.jl")
 include("PseudoNormals.jl")
 include("sdfOnTriangularMesh.jl")
-include("sdfOnDensityField_new.jl")
+include("sdfOnDensityField_clean.jl")
+# include("sdfOnDensityField_new.jl")
 # include("sdfOnDensityField.jl")
 
 
