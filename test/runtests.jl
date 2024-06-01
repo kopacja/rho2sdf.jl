@@ -8,6 +8,7 @@ using Rho2sdf.SignedDistances
 using Rho2sdf.MyMarchingCubes
 using Rho2sdf.DataExport
 using MAT
+using JLD2
 using LinearAlgebra
 
 @testset "Rho2sdf.jl" begin
@@ -16,12 +17,12 @@ using LinearAlgebra
   # @time @testset "MeshGridTest" begin include("MeshGridTest/runtests.jl") end
   # @time @testset "SignedDistancesTest" begin include("SignedDistancesTest/runtests.jl") end
   # @time @testset "SeparatedTests" begin include("SeparatedTests/runtests.jl") end
-  @time @testset "MC4surfaceTests" begin include("MyMarchingCubesTests/runtests.jl") end
+  # @time @testset "MC4surfaceTests" begin include("MyMarchingCubesTests/runtests.jl") end
   #
   ### Tests on geometries: ###
   # @testset "TestOnLegGripper" begin include("SeparatedTests/TestOnLegGripper.jl") end
   # @testset "TestOnLegGripperSTL" begin include("SeparatedTests/TestOnLegGripperSTL.jl") end
-  @testset "TestOnGripperMC" begin include("SeparatedTests/TestOnGripperMC.jl") end
+  # @testset "TestOnGripperMC" begin include("SeparatedTests/TestOnGripperMC.jl") end
   # @testset "TestOnPrimitiveGeometry" begin include("SeparatedTests/TestOnPrimitiveGeometry.jl") end
   # end
   # exit()
@@ -94,22 +95,15 @@ using LinearAlgebra
       N = 20  # Number of cells along the longest side
       ρₜ = 0.5 # Threshold density (isosurface level)
 
-      (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("block", [2,1,1])
-      println("X: ", X)
-      ρₙ = [0., 0., 0.5, 0.5, 1., 1., 1., 1., 0., 0., 0.5, 0.5]
-     
+      (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("block", [2, 1, 1])
+      # ρₙ = [0.0, 0.0, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5]
+
       mesh = MeshGrid.Mesh(X, IEN, C3D8_SFaD)
-      println("mesh.X: ", mesh.X)
       # ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
 
       # Modif ρₙ:
-      # ρₙ = [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-      # ρₙ = [0., 0., 1., 1., 1., 1., 1., 1., 0., 0., 1., 1.]
-      # ρₙ = [0., 0., 0.5, 0.5, 1., 1., 1., 1., 0., 0., 0.5, 0.5]
-      ρₙ = [0., 0., 0.5, 0.5, 0.5, 0.5, 1., 1., 0., 0., 0.5, 0.5]
-      # println("rho: ", ρₙ)
-      # println("type of rho: ", typeof(ρₙ))
-      
+      ρₙ = [0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5]
+
       VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
       Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
 
@@ -117,8 +111,13 @@ using LinearAlgebra
       X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
       sdf_grid = MeshGrid.Grid(X_min, X_max, N, 2) # cartesian grid
 
+      sleep(5)
+
       ## SDF from densities:
       (sdf_dists, xp) = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ, ρₜ)
+
+      @save "$(taskName)_sdf.jld2" sdf_dists
+      @save "$(taskName)_sdf_grid.jld2" sdf_grid
 
       ## Export to VTK:
       Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf.vtk", sdf_grid, sdf_dists, "distance")
@@ -164,7 +163,7 @@ using LinearAlgebra
     @testset "Chapadlo" begin
       ## Inputs:
       taskName = "chapadlo"
-      N = 50  # Number of cells along the longest side
+      N = 60  # Number of cells along the longest side
       ρₜ = 0.5 # Threshold density (isosurface level)
 
       ## Read FEM mesh:
@@ -186,13 +185,16 @@ using LinearAlgebra
       X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
       X_min[2] = 0
       X_min[3] = 50
-      sdf_grid = MeshGrid.Grid(X_min, X_max, N, 0) # cartesian grid
+      sdf_grid = MeshGrid.Grid(X_min, X_max, N, 3) # cartesian grid
 
       ## SDF from densities:
       (sdf_dists, xp) = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ, ρₜ)
 
       ## Export to VTK:
       Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf.vtk", sdf_grid, sdf_dists, "distance")
+    
+      @save "$(taskName)_sdf.jld2" sdf_dists
+      @save "$(taskName)_sdf_grid.jld2" sdf_grid
     end
   end
 end
