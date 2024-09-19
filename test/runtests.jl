@@ -35,7 +35,8 @@ using LinearAlgebra
 RUN_PLANE = false
 RUN_BLOCK = false
 RUN_SPHERE = false
-RUN_CHAPADLO = true
+RUN_CHAPADLO = false
+RUN_CHAPADLO_cele = true
 
 if (RUN_PLANE)
   @testset "Plane" begin
@@ -184,10 +185,11 @@ if (RUN_CHAPADLO)
     Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
 
     ## Grid:
-    X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
+    # X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
     # X_min[2] = 0
     # X_min[3] = 50
-    sdf_grid = MeshGrid.Grid(X_min, X_max, N, 3) # cartesian grid
+    # sdf_grid = MeshGrid.Grid(X_min, X_max, N, 3) # cartesian grid
+    sdf_grid = MeshGrid.interactive_sdf_grid_setup(mesh)
 
     ## SDF from densities:
     (sdf_dists, xp) = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ, ρₜ)
@@ -197,6 +199,41 @@ if (RUN_CHAPADLO)
 
     @save "$(taskName)_cele_sdf.jld2" sdf_dists
     @save "$(taskName)_cele_sdf_grid.jld2" sdf_grid
+  end
+end
+
+if (RUN_CHAPADLO_cele)
+  @testset "Chapadlo" begin
+    ## Inputs:
+    taskName = "chapadlo"
+    ρₜ = 0.5 # Threshold density (isosurface level)
+
+    ## Read FEM mesh:
+    data = matread(taskName * ".mat")
+    (X, IEN, rho) = MeshGrid.MeshInformations(data)
+
+    ## Generate FEM mesh structure:
+    mesh = MeshGrid.Mesh(X, IEN, C3D8_SFaD)
+    
+    ## Grid:
+    # sdf_grid = MeshGrid.interactive_sdf_grid_setup(mesh)
+    sdf_grid = MeshGrid.noninteractive_sdf_grid_setup(mesh, 2.)
+
+    ## Map elemental densities to the nodes:
+    ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
+
+    VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
+    Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
+
+    ## SDF from densities:
+    (sdf_dists, xp) = SignedDistances.evalSignedDistances(mesh, sdf_grid, ρₙ, ρₜ)
+
+    ## Export to VTK:
+    B = sdf_grid.cell_size
+    Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf_CellSize-" * (round(B, digits=4)) * ".vtk", sdf_grid, sdf_dists, "distance")
+
+    @save "$(taskName)_cele_sdf_CellSize$(round(B, digits=4)).jld2" sdf_dists
+    @save "$(taskName)_cele_sdf_grid_CellSize$(round(B, digits=4)).jld2" sdf_grid
   end
 end
 end
