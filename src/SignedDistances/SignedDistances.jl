@@ -8,6 +8,9 @@ using Statistics
 using LinearAlgebra
 using DelimitedFiles
 using JuMP
+using ProgressMeter
+using LazySets
+using JLD2
 import Ipopt
 
 using Rho2sdf.ShapeFunctions
