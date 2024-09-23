@@ -606,7 +606,7 @@ function evalSignedDistances(
                   if (minimum(λ) >= 0.0) # xₚ is in the triangle, projection node x inside triangle 
                     xₚ = λ[1] * x₁ + λ[2] * x₂ + λ[3] * x₃
 
-                    isFaceOrEdge = IsProjectedOnFullSegment(sfce, Xₑ, xₚ, el, IEN, ρₙ, ρₜ, dist, xp, v, tid, x)
+                    isFaceOrEdge = IsProjectedOnFullSegment(sfce, Xₑ, xₚ, el, IEN, ρₙ, ρₜ, dist_local, xp_local, v, tid, x)
                   else
 
                     # NOTE: Projection is on the triangle edges:
@@ -617,7 +617,7 @@ function evalSignedDistances(
                       if (P >= 0 && P <= L) # is the perpendicular projection of a node onto an edge in the edge interval?
                         xₚ = xᵥ + (Et[j] / L) * P
 
-                        isFaceOrEdge = IsProjectedOnFullSegment(sfce, Xₑ, xₚ, el, IEN, ρₙ, ρₜ, dist, xp, v, tid, x)
+                        isFaceOrEdge = IsProjectedOnFullSegment(sfce, Xₑ, xₚ, el, IEN, ρₙ, ρₜ, dist_local, xp_local, v, tid, x)
                       end
                     end
                   end
@@ -628,7 +628,7 @@ function evalSignedDistances(
 
                     xₚ = Xt[:, idx] # the node of the triangle
 
-                    isFaceOrEdge = IsProjectedOnFullSegment(sfce, Xₑ, xₚ, el, IEN, ρₙ, ρₜ, dist, xp, v, tid, x)
+                    isFaceOrEdge = IsProjectedOnFullSegment(sfce, Xₑ, xₚ, el, IEN, ρₙ, ρₜ, dist_local, xp_local, v, tid, x)
                   end
                   v = next[v]
                 end
