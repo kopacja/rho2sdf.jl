@@ -349,8 +349,8 @@ function IsProjectedOnFullSegment(
   IEN::Matrix,
   ρₙ::Vector,
   ρₜ::Float64,
-  dist::Vector,
-  xp::Matrix,
+  dist_local::Vector{Vector{Float64}},
+  xp_local::Vector{Matrix{Float64}},
   v::Int,
   tid::Int,
   x::Vector,
@@ -366,7 +366,7 @@ function IsProjectedOnFullSegment(
 
     if ρ >= ρₜ
       dist_tmp = norm(x - xₚ)
-      (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v, tid)
+      (dist_local, xp_local) = WriteValue(dist_tmp, dist_local, xp_local, xₚ, v, tid)
       return true
     end
   else
@@ -618,6 +618,7 @@ function evalSignedDistances(
                         xₚ = xᵥ + (Et[j] / L) * P
 
                         isFaceOrEdge = IsProjectedOnFullSegment(sfce, Xₑ, xₚ, el, IEN, ρₙ, ρₜ, dist, xp, v, tid, x)
+                      end
                     end
                   end
                   # Remaining cases:
@@ -657,7 +658,7 @@ function evalSignedDistances(
             xₚ = Xₑ * H
             dist_tmp = norm(x - xₚ)
 
-            (dist, xp) = WriteValue(dist_tmp, dist, xp, xₚ, v, tid)
+            (dist_local, xp_local) = WriteValue(dist_tmp, dist_local, xp_local, xₚ, v, tid)
 
             v = next[v]
 
