@@ -92,75 +92,207 @@ end
 
 
 function compute_coords(
-  x::Vector,
-  ρₜ::Float64,
-  Xₑ::Matrix,
-  ρₑ::Vector,
-  # starting_points::Vector{Tuple{Float64, Float64, Float64}}
-)
-  starting_points = [
-    (0.0, 0.0, 0.0),
-    # (-0.5, -0.5, -0.5),
-    # (0.5, -0.5, -0.5),
-    # (0.5, 0.5, -0.5),
-    # (-0.5, 0.5, -0.5),
-    # (-0.5, -0.5, 0.5),
-    # (0.5, -0.5, 0.5),
-    # (0.5, 0.5, 0.5),
-    # (-0.5, 0.5, 0.5),
-  ]
-
-  best_solution = nothing
-  best_objective = Inf
-
-  for (ξ₁_start, ξ₂_start, ξ₃_start) in starting_points
-    model = Model(Ipopt.Optimizer)
-    set_silent(model)
-
-    set_optimizer_attribute(model, "tol", 1e-6)
-    set_optimizer_attribute(model, "max_iter", 50)
-    set_optimizer_attribute(model, "acceptable_tol", 1e-6)
-    # set_optimizer_attribute(model, "num_threads", 1)
-
-
-    @variable(model, ξ₁, lower_bound = -1.0, upper_bound = 1.0, start = ξ₁_start)
-    @variable(model, ξ₂, lower_bound = -1.0, upper_bound = 1.0, start = ξ₂_start)
-    @variable(model, ξ₃, lower_bound = -1.0, upper_bound = 1.0, start = ξ₃_start)
-
-    N8 = [
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+    x::Vector,
+    ρₜ::Float64,
+    Xₑ::Matrix,
+    ρₑ::Vector,
+    starting_points::Vector{Tuple{Float64, Float64, Float64}} = [
+        (0.0, 0.0, 0.0),
+        (-0.5, -0.5, -0.5),
+        (0.5, -0.5, -0.5),
+        (0.5, 0.5, -0.5),
+        (-0.5, 0.5, -0.5),
+        (-0.5, -0.5, 0.5),
+        (0.5, -0.5, 0.5),
+        (0.5, 0.5, 0.5),
+        (-0.5, 0.5, 0.5),
     ]
-    @NLobjective(model, Min, sum((x[i] - sum(Xₑ[i, k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x)))
-    @NLconstraint(model, sum(ρₑ[k] * N8[k] for k in 1:length(N8)) == ρₜ)
-    optimize!(model)
-
-    current_objective = objective_value(model)
-    current_solution = value.([ξ₁, ξ₂, ξ₃])
-
-    if current_objective < best_objective
-      best_solution = current_solution
-      best_objective = current_objective
+)
+    function objective(ξ::Vector, grad::Vector)
+        ξ₁, ξ₂, ξ₃ = ξ
+        N8 = [
+            -1/8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+             1/8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+            -1/8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+             1/8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+             1/8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+            -1/8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+             1/8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+            -1/8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+        ]
+        return sum(
+            (x[i] - sum(Xₑ[i, k] * N8[k] for k in 1:length(N8)))^2
+            for i in 1:length(x)
+        )
     end
-  end
 
-  return best_solution
+    function constraint(ξ::Vector, grad::Vector)
+        ξ₁, ξ₂, ξ₃ = ξ
+        N8 = [
+            -1/8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+             1/8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+            -1/8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+             1/8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+             1/8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+            -1/8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+             1/8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+            -1/8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+        ]
+        return sum(ρₑ[k] * N8[k] for k in 1:length(N8)) - ρₜ
+    end
+
+    best_solution = nothing
+    best_objective = Inf
+
+    for start_point in starting_points
+        opt = Opt(:LN_COBYLA, 3)
+        opt.lower_bounds = [-1.0, -1.0, -1.0]
+        opt.upper_bounds = [1.0, 1.0, 1.0]
+        opt.xtol_rel = 1e-6
+        opt.maxeval = 500
+        opt.min_objective = objective
+        equality_constraint!(opt, constraint, 1e-8)
+
+        (minf, minx, ret) = optimize(opt, collect(start_point))
+
+        if minf < best_objective
+            # best_objective = minf
+            best_solution = minx
+        end
+    end
+
+    return best_solution
 end
 
-# # Newton-Raphson method
+
+# function compute_coords(
+#   x::Vector,
+#   ρₜ::Float64,
+#   Xₑ::Matrix,
+#   ρₑ::Vector,
+#   # starting_points::Vector{Tuple{Float64, Float64, Float64}}
+# )
+#   starting_points = [
+#     (0.0, 0.0, 0.0),
+#     # (-0.5, -0.5, -0.5),
+#     # (0.5, -0.5, -0.5),
+#     # (0.5, 0.5, -0.5),
+#     # (-0.5, 0.5, -0.5),
+#     # (-0.5, -0.5, 0.5),
+#     # (0.5, -0.5, 0.5),
+#     # (0.5, 0.5, 0.5),
+#     # (-0.5, 0.5, 0.5),
+#   ]
+#
+#   best_solution = nothing
+#   best_objective = Inf
+#
+#   for (ξ₁_start, ξ₂_start, ξ₃_start) in starting_points
+#     model = Model(Ipopt.Optimizer)
+#     set_silent(model)
+#
+#     set_optimizer_attribute(model, "tol", 1e-6)
+#     set_optimizer_attribute(model, "max_iter", 50)
+#     set_optimizer_attribute(model, "acceptable_tol", 1e-6)
+#     # set_optimizer_attribute(model, "num_threads", 1)
+#
+#
+#     @variable(model, ξ₁, lower_bound = -1.0, upper_bound = 1.0, start = ξ₁_start)
+#     @variable(model, ξ₂, lower_bound = -1.0, upper_bound = 1.0, start = ξ₂_start)
+#     @variable(model, ξ₃, lower_bound = -1.0, upper_bound = 1.0, start = ξ₃_start)
+#
+#     N8 = [
+#       -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+#       -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+#       -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+#       1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+#       -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+#     ]
+#     @NLobjective(model, Min, sum((x[i] - sum(Xₑ[i, k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x)))
+#     @NLconstraint(model, sum(ρₑ[k] * N8[k] for k in 1:length(N8)) == ρₜ)
+#     optimize!(model)
+#
+#     current_objective = objective_value(model)
+#     current_solution = value.([ξ₁, ξ₂, ξ₃])
+#
+#     if current_objective < best_objective
+#       best_solution = current_solution
+#       best_objective = current_objective
+#     end
+#   end
+#
+#   return best_solution
+# end
+
+function find_local_coordinates(
+    sfce::Function,
+    Xₑ::Matrix,
+    xₙ::Vector
+)
+    starting_points = [
+        (0.0, 0.0, 0.0),
+        (-0.5, -0.5, -0.5),
+        (0.5, -0.5, -0.5),
+        (0.5, 0.5, -0.5),
+        (-0.5, 0.5, -0.5),
+        (-0.5, -0.5, 0.5),
+        (0.5, -0.5, 0.5),
+        (0.5, 0.5, 0.5),
+        (-0.5, 0.5, 0.5)
+    ]
+
+    function objective(ξ::Vector, grad::Vector)
+        ξ₁, ξ₂, ξ₃ = ξ
+        N = [
+            -1/8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+             1/8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+            -1/8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+             1/8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+             1/8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+            -1/8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+             1/8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+            -1/8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+        ]
+        x = Xₑ * N
+        R = x - xₙ
+        return sum(R[i]^2 for i in 1:3)
+    end
+
+    best_solution = nothing
+    best_objective = Inf
+
+    for start_point in starting_points
+        opt = Opt(:LN_COBYLA, 3)
+        opt.lower_bounds = [-10.2, -10.2, -10.2]
+        opt.upper_bounds = [10.2, 10.2, 10.2]
+        opt.xtol_rel = 1e-6
+        opt.maxeval = 50
+        opt.min_objective = objective
+
+        (minf, minx, ret) = optimize(opt, collect(start_point))
+
+        if minf < best_objective
+            best_objective = minf
+            best_solution = minx
+        end
+    end
+
+    if best_solution === nothing
+        return (false, [10.0, 10.0, 10.0])
+    else
+        return (true, best_solution)
+    end
+end
+
 # function find_local_coordinates(
 #   sfce::Function,
 #   Xₑ::Matrix, # Xe
-#   xₙ::Vector, # x
+#   xₙ::Vector  # x
 # )
 #
-#   # Define starting points
 #   starting_points = [
 #     (0.0, 0.0, 0.0),
 #     (-0.5, -0.5, -0.5),
@@ -170,158 +302,59 @@ end
 #     (-0.5, -0.5, 0.5),
 #     (0.5, -0.5, 0.5),
 #     (0.5, 0.5, 0.5),
-#     (-0.5, 0.5, 0.5),
+#     (-0.5, 0.5, 0.5)
 #   ]
 #
-#   tolerance = 1e-8
-#   max_iterations = 40
-#   n = 1
+#   best_solution = nothing
+#   best_objective = Inf
 #
-#   for start in starting_points
-#     ξ = [start[1], start[2], start[3]]  # Initial guess
+#   for (ξ₁_start, ξ₂_start, ξ₃_start) in starting_points
+#     model = Model(Ipopt.Optimizer)
+#     set_silent(model)
 #
-#     for iter in 1:max_iterations
-#       N, dN_dξ, _, _ = sfce(ξ) # Shape functions and their derivatives
+#     set_optimizer_attribute(model, "tol", 1e-6)
+#     set_optimizer_attribute(model, "max_iter", 50)
+#     set_optimizer_attribute(model, "acceptable_tol", 1e-6)
+#     # set_optimizer_attribute(model, "num_threads", 1)
 #
-#       # Compute global coordinates from shape functions
-#       x = Xₑ * N
-#       R = x - xₙ
+#     @variable(model, ξ₁, lower_bound = -10.2, upper_bound = 10.2, start = ξ₁_start)
+#     @variable(model, ξ₂, lower_bound = -10.2, upper_bound = 10.2, start = ξ₂_start)
+#     @variable(model, ξ₃, lower_bound = -10.2, upper_bound = 10.2, start = ξ₃_start)
 #
-#       # Check convergence
-#       if norm(R) < tolerance
-#         if n > 1
-#           println("Xₑ: ", Xₑ)
-#           println("xₙ: ", xₙ)
-#           println("NR konvergoval z jiného počátečního bodu!")
-#         end
-#         return ξ
-#       end
 #
-#       J = Xₑ * dN_dξ
+#     N = [
+#       -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+#       -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+#       -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+#       1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+#       -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+#     ]
 #
-#       # Update ξ
-#       Δξ = -J \ R
-#       ξ += Δξ
+#     x = Xₑ * N
+#     R = x - xₙ
+#
+#     @objective(model, Min, sum(R[i]^2 for i in 1:3))
+#     optimize!(model)
+#
+#     solution = [value(ξ₁), value(ξ₂), value(ξ₃)]
+#     obj_value = objective_value(model)
+#
+#     if obj_value < best_objective
+#       best_objective = obj_value
+#       best_solution = solution
 #     end
-#     n = n + 1
 #   end
 #
-#   # println("NR method for local coords did not converge for any starting point")
-#   # println("Xₑ: ", Xₑ)
-#   # println("xₙ: ", xₙ)
-#
-#   return ([10.0, 10.0, 10.0])
+#   if best_solution === nothing
+#     # println("Optimization did not converge to a solution")
+#     return (false, [10.0, 10.0, 10.0])
+#   else
+#     return (true, best_solution)
+#   end
 # end
-
-# Newton-Raphson method
-function find_local_coordinates_NR(
-  sfce::Function,
-  Xₑ::Matrix, # Xe
-  xₙ::Vector, # x
-)
-
-  ξ = [0.0, 0.0, 0.0]  # Initial guess
-  tolerance = 1e-8
-  max_iterations = 40
-
-  for iter in 1:max_iterations
-    N, dN_dξ, _, _ = sfce(ξ) # Shape functions and their derivatives
-
-    # Compute global coordinates from shape functions
-    x = Xₑ * N
-    R = x - xₙ
-
-    # Check convergence
-    if norm(R) < tolerance
-      return (true, ξ)
-    end
-
-    J = Xₑ * dN_dξ
-    if det(J) < 0.05
-      # println("det J: ", det(J))
-    end
-
-    # Update ξ
-    Δξ = -J \ R
-    ξ += Δξ
-  end
-  # println("NR method for local coords did not converge")
-  # println("Xₑ: ", Xₑ)
-  # println("xₙ: ", xₙ)
-  # println("ξ: ", ξ)
-
-  return (false, ξ)
-  # return ([10.0, 10.0, 10.0])
-end
-
-function find_local_coordinates(
-  sfce::Function,
-  Xₑ::Matrix, # Xe
-  xₙ::Vector  # x
-)
-
-  starting_points = [
-    (0.0, 0.0, 0.0),
-    # (-0.5, -0.5, -0.5),
-    # (0.5, -0.5, -0.5),
-    # (0.5, 0.5, -0.5),
-    # (-0.5, 0.5, -0.5),
-    # (-0.5, -0.5, 0.5),
-    # (0.5, -0.5, 0.5),
-    # (0.5, 0.5, 0.5),
-    # (-0.5, 0.5, 0.5)
-  ]
-
-  best_solution = nothing
-  best_objective = Inf
-
-  for (ξ₁_start, ξ₂_start, ξ₃_start) in starting_points
-    model = Model(Ipopt.Optimizer)
-    set_silent(model)
-
-    set_optimizer_attribute(model, "tol", 1e-6)
-    set_optimizer_attribute(model, "max_iter", 50)
-    set_optimizer_attribute(model, "acceptable_tol", 1e-6)
-    # set_optimizer_attribute(model, "num_threads", 1)
-
-    @variable(model, ξ₁, lower_bound = -10.2, upper_bound = 10.2, start = ξ₁_start)
-    @variable(model, ξ₂, lower_bound = -10.2, upper_bound = 10.2, start = ξ₂_start)
-    @variable(model, ξ₃, lower_bound = -10.2, upper_bound = 10.2, start = ξ₃_start)
-
-
-    N = [
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
-    ]
-
-    x = Xₑ * N
-    R = x - xₙ
-
-    @objective(model, Min, sum(R[i]^2 for i in 1:3))
-    optimize!(model)
-
-    solution = [value(ξ₁), value(ξ₂), value(ξ₃)]
-    obj_value = objective_value(model)
-
-    if obj_value < best_objective
-      best_objective = obj_value
-      best_solution = solution
-    end
-  end
-
-  if best_solution === nothing
-    # println("Optimization did not converge to a solution")
-    return (false, [10.0, 10.0, 10.0])
-  else
-    return (true, best_solution)
-  end
-end
 
 ###_________
 
@@ -687,8 +720,9 @@ function evalSignedDistances(
   end
   signs = -1 * ones(ngp)
 
-  for i in 1:ngp # cycle trought all grid points
-    # @showprogress 1 "Computing sign for grid points..." for i in 1:ngp # cycle through all grid points
+  # for i in 1:ngp # cycle trought all grid points
+  @threads for i in 1:ngp
+  # @showprogress 1 "Computing sign for grid points..." for i in 1:ngp # cycle through all grid points
     # println("grid point ID: ", i)
     found = false  # Flag to indicate if we need to skip to the next i
     x = points[:, i]
@@ -735,9 +769,9 @@ function evalSignedDistances(
           #   found = true
           #   break
           # else
-          if !NotConv
+          # if !NotConv
             # println("point: ", i)
-          end
+          # end
           max_local = max_local_new
         end
       end
@@ -756,14 +790,14 @@ function evalSignedDistances(
 
   end
 
-  # @save "Z_Chapadlo_xp.jld2" xp
-  # @save "Z_Chapadlo_dist.jld2" dist
-  # @save "Z_Chapadlo_mesh.jld2" mesh
-  # @save "Z_Chapadlo_grid.jld2" grid
-  # @save "Z_Chapadlo_points.jld2" points
+  @save "Z_Chapadlo_xp.jld2" xp
+  @save "Z_Chapadlo_dist.jld2" dist
+  @save "Z_Chapadlo_mesh.jld2" mesh
+  @save "Z_Chapadlo_grid.jld2" grid
+  @save "Z_Chapadlo_points.jld2" points
 
-  # @save "Z_Chapadlo_signs.jld2" signs
-  #
+  @save "Z_Chapadlo_signs.jld2" signs
+  
   # @load "Z_Chapadlo_xp.jld2" xp
   # @load "Z_Chapadlo_dist.jld2" dist
   # @load "Z_Chapadlo_mesh.jld2" mesh
