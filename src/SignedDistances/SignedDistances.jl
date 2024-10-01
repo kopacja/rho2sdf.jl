@@ -11,6 +11,8 @@ using ProgressMeter
 using LazySets
 using JLD2
 using NLopt
+# using JuMP
+# import Ipopt
 
 using Rho2sdf.ShapeFunctions
 using Rho2sdf.MeshGrid
