@@ -98,14 +98,14 @@ function compute_coords(
   ρₑ::Vector,
   starting_points::Vector{Tuple{Float64,Float64,Float64}}=[
     (0.0, 0.0, 0.0),
-    # (-0.5, -0.5, -0.5),
-    # (0.5, -0.5, -0.5),
-    # (0.5, 0.5, -0.5),
-    # (-0.5, 0.5, -0.5),
-    # (-0.5, -0.5, 0.5),
-    # (0.5, -0.5, 0.5),
-    # (0.5, 0.5, 0.5),
-    # (-0.5, 0.5, 0.5),
+    (-0.5, -0.5, -0.5),
+    (0.5, -0.5, -0.5),
+    (0.5, 0.5, -0.5),
+    (-0.5, 0.5, -0.5),
+    (-0.5, -0.5, 0.5),
+    (0.5, -0.5, 0.5),
+    (0.5, 0.5, 0.5),
+    (-0.5, 0.5, 0.5),
   ]
 )
   function objective(ξ::Vector, grad::Vector)
@@ -120,10 +120,9 @@ function compute_coords(
       1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
       -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
     ]
-    return sum(
-      (x[i] - sum(Xₑ[i, k] * N[k] for k in 1:length(N)))^2
-      for i in 1:length(x)
-    )
+    x_pred = Xₑ * N
+    # return sum((x - x_pred) .^ 2)
+    return sum(abs.(x - x_pred))
   end
 
   function constraint(ξ::Vector, grad::Vector)
@@ -138,7 +137,7 @@ function compute_coords(
       1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
       -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
     ]
-    return sum(ρₑ[k] * N[k] for k in 1:length(N)) - ρₜ
+    return sum(ρₑ .* N) - ρₜ
   end
 
   best_solution = nothing
@@ -146,17 +145,21 @@ function compute_coords(
 
   for start_point in starting_points
     opt = Opt(:LN_COBYLA, 3)
+    # opt = Opt(:LN_AUGLAG_EQ, 3)
+    # local_opt = Opt(:LN_COBYLA, 3)
     opt.lower_bounds = [-1.0, -1.0, -1.0]
     opt.upper_bounds = [1.0, 1.0, 1.0]
     opt.xtol_rel = 1e-6
     opt.maxeval = 500
     opt.min_objective = objective
+    opt.maxtime = 1.0
+    # opt.local_optimizer = local_opt
     equality_constraint!(opt, constraint, 1e-8)
 
     (minf, minx, ret) = optimize(opt, collect(start_point))
 
     if minf < best_objective
-      # best_objective = minf
+      best_objective = minf
       best_solution = minx
     end
   end
@@ -170,21 +173,21 @@ function find_local_coordinates(
   Xₑ::Matrix,
   xₙ::Vector
 )
-  starting_points::Vector{Tuple{Float64,Float64,Float64}}=[
+  starting_points::Vector{Tuple{Float64,Float64,Float64}} = [
     (0.0, 0.0, 0.0),
-    # (-0.5, -0.5, -0.5),
-    # (0.5, -0.5, -0.5),
-    # (0.5, 0.5, -0.5),
-    # (-0.5, 0.5, -0.5),
-    # (-0.5, -0.5, 0.5),
-    # (0.5, -0.5, 0.5),
-    # (0.5, 0.5, 0.5),
-    # (-0.5, 0.5, 0.5)
+    (-0.5, -0.5, -0.5),
+    (0.5, -0.5, -0.5),
+    (0.5, 0.5, -0.5),
+    (-0.5, 0.5, -0.5),
+    (-0.5, -0.5, 0.5),
+    (0.5, -0.5, 0.5),
+    (0.5, 0.5, 0.5),
+    (-0.5, 0.5, 0.5)
   ]
 
   function objective(ξ::Vector, grad::Vector)
     ξ₁, ξ₂, ξ₃ = ξ
-   N = [
+    N = [
       -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
       1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
       -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
@@ -196,21 +199,22 @@ function find_local_coordinates(
     ]
     x = Xₑ * N
     R = x - xₙ
-    return sum(R[i]^2 for i in 1:3)
+    return sum(abs.(R))
+    # return sum(R[i]^2 for i in 1:3)
   end
 
   best_solution = nothing
   best_objective = Inf
 
   for start_point in starting_points
-    opt = Opt(:LN_COBYLA, 3)
     # opt = Opt(:LN_COBYLA, 3)
-    # opt = Opt(:LN_COBYLA, 3)
-    opt.lower_bounds = [-10.3, -10.3, -10.3]
-    opt.upper_bounds = [10.3, 10.3, 10.3]
+    opt = Opt(:LD_MMA, 3) # -> dává blbé výsledky
+    opt.lower_bounds = [-5.0, -5.0, -5.0]
+    opt.upper_bounds = [5.0, 5.0, 5.0]
     opt.xtol_rel = 1e-6
-    opt.maxeval = 50
+    opt.maxeval = 500
     opt.min_objective = objective
+    opt.maxtime = 1.0
 
     (minf, minx, ret) = optimize(opt, collect(start_point))
 
