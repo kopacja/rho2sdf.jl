@@ -10,3 +10,4 @@ Manifest.toml
 test/xp.csv
 test/xp.vtu
 test/xp.vtu
+*.jld2
