@@ -579,7 +579,6 @@ function evalSignedDistances(
     xp[:, i] = xp_local[min_idx][:, i]
   end
 
-  signs = -1 * ones(ngp)
 
   @save "Z_Chapadlo_xp.jld2" xp
   @save "Z_Chapadlo_dist.jld2" dist
@@ -595,70 +594,41 @@ function evalSignedDistances(
   # println("finish")
   # sleep(10)
   # exit()
-  @threads for i in 1:ngp
-    found = false  # Flag to indicate if we need to skip to the next i
-    x = points[:, i]
-    # NotConv = false
-    max_local = 10.0
+  signs = -1 * ones(ngp)
 
-    IDmin = argmin(mapslices(norm, (X .- x), dims=1))[2] # find ID of node (of mesh) that is closest to grid point x
-    none = length(INE[IDmin]) # number of neighbour elements (that are connected to the node)
-    # ρₙₑ = ρₙ[IEN[:, none]] # # nodal densities of none elements
-    ρₙₑ = ρₙ[IEN[:, INE[IDmin]]] # # nodal densities of none elements
-    if maximum(ρₙₑ) < ρₜ # empty element -> jump to another i
+  @threads for i in 1:ngp
+    x = @view points[:, i]
+    max_local = 10.0
+    IDmin = argmin(mapslices(norm, (X .- x), dims=1))[2] # Find ID of the node (in mesh) closest to grid point x
+    none = length(INE[IDmin]) # Number of neighboring elements (connected to the node)
+    ρₙₑ = ρₙ[IEN[:, INE[IDmin]]] # Nodal densities of none elements
+    if maximum(ρₙₑ) < ρₜ # Empty elements -> skip to next i
       continue
     end
-
+    # Loop through all elements that are part of the node X[:, IDmin]
     for j in 1:none
       el = INE[IDmin][j]
-
-      Xₑ = X[:, IEN[:, el]]
-      # Compute the AABB
+      Xₑ = @view X[:, IEN[:, el]] # Coordinates of the element nodes
+      # Compute the Axis-Aligned Bounding Box (AABB)
       min_bounds, max_bounds = compute_aabb(Xₑ)
-
       # Check if the point x is inside the AABB
-      inside = is_point_inside_aabb(x, min_bounds, max_bounds)
-
-      if inside
-        # if InOut(Xₑ, x)
-
-        (NotConv, local_coords) = find_local_coordinates(sfce, Xₑ, x)
+      if is_point_inside_aabb(x, min_bounds, max_bounds)
+        (Conv, local_coords) = find_local_coordinates(sfce, Xₑ, x)
         max_local_new = maximum(abs.(local_coords))
-        # max_local = maximum(local_coords)
-        # min_local = minimum(local_coords)
-        #
-        # if max_local < 1.0001 && min_local > -1.0001
+
         if max_local_new < 1.2 && max_local > max_local_new
-
-          H, _, _, _ = sfce(local_coords) # tvarové funkce a jejich derivace
-          ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
+          H, _, _, _ = sfce(local_coords) # Shape functions and their derivatives
+          ρₑ = ρₙ[IEN[:, el]] # Nodal densities for one element
           ρ = H ⋅ ρₑ
-
           if ρ >= ρₜ
-            # println("inside")
             signs[i] = 1.0
           end
-          #   found = true
-          #   break
-          # else
-          # if !NotConv
-          # println("point: ", i)
-          # end
           max_local = max_local_new
         end
       end
-      # if !found && NotConv && mean(ρₙₑ) > ρₜ && j == none
-      #   println("point: ", i)
-      # end
-      # if found
-      #   break
-      # end
     end
 
-    # if !found
-    #   println("node position not detected: ")
-    #   println("id of grid point: ", i)
-    # end
+    # Progress bar:
     count = atomic_add!(counter_nodes, 1)
     if count % update_interval_nodes == 0
       if Threads.threadid() == 1
