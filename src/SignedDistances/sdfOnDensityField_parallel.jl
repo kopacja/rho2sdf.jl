@@ -154,8 +154,8 @@ end
 
 function find_local_coordinates(
   sfce::Function,
-  Xₑ::Matrix,
-  xₙ::Vector
+  Xₑ,
+  xₙ
 )
   starting_points::Vector{Tuple{Float64,Float64,Float64}} = [
     (0.0, 0.0, 0.0),
@@ -171,6 +171,8 @@ function find_local_coordinates(
 
   function objective(ξ::Vector, grad::Vector)
     ξ₁, ξ₂, ξ₃ = ξ
+
+    # Compute N(ξ)
     N = [
       -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
       1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
@@ -181,16 +183,88 @@ function find_local_coordinates(
       1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
       -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
     ]
-    x = Xₑ * N
-    R = x - xₙ
-    return sum(abs.(R))
+
+    d¹N_dξ¹ = zeros(Float64, 8, 3)
+    d¹N_dξ¹[1, :] = [
+      -0.125 * (ξ₂ - 1) * (ξ₃ - 1)
+      -0.125 * (ξ₁ - 1) * (ξ₃ - 1)
+      -0.125 * (ξ₁ - 1) * (ξ₂ - 1)
+    ]
+
+    d¹N_dξ¹[2, :] = [
+      0.125 * (ξ₂ - 1) * (ξ₃ - 1)
+      0.125 * (ξ₁ + 1) * (ξ₃ - 1)
+      0.125 * (ξ₁ + 1) * (ξ₂ - 1)
+    ]
+
+    d¹N_dξ¹[3, :] = [
+      -0.125 * (ξ₂ + 1) * (ξ₃ - 1)
+      -0.125 * (ξ₁ + 1) * (ξ₃ - 1)
+      -0.125 * (ξ₁ + 1) * (ξ₂ + 1)
+    ]
+
+    d¹N_dξ¹[4, :] = [
+      0.125 * (ξ₂ + 1) * (ξ₃ - 1)
+      0.125 * (ξ₁ - 1) * (ξ₃ - 1)
+      0.125 * (ξ₁ - 1) * (ξ₂ + 1)
+    ]
+
+    d¹N_dξ¹[5, :] = [
+      0.125 * (ξ₂ - 1) * (ξ₃ + 1)
+      0.125 * (ξ₁ - 1) * (ξ₃ + 1)
+      0.125 * (ξ₁ - 1) * (ξ₂ - 1)
+    ]
+
+    d¹N_dξ¹[6, :] = [
+      -0.125 * (ξ₂ - 1) * (ξ₃ + 1)
+      -0.125 * (ξ₁ + 1) * (ξ₃ + 1)
+      -0.125 * (ξ₁ + 1) * (ξ₂ - 1)
+    ]
+
+    d¹N_dξ¹[7, :] = [
+      0.125 * (ξ₂ + 1) * (ξ₃ + 1)
+      0.125 * (ξ₁ + 1) * (ξ₃ + 1)
+      0.125 * (ξ₁ + 1) * (ξ₂ + 1)
+    ]
+
+    d¹N_dξ¹[8, :] = [
+      -0.125 * (ξ₂ + 1) * (ξ₃ + 1)
+      -0.125 * (ξ₁ - 1) * (ξ₃ + 1)
+      -0.125 * (ξ₁ - 1) * (ξ₂ + 1)
+    ]
+
+    # Compute x(ξ)
+    x = Xₑ * N  # x is a 3-element vector
+
+    # Compute residual R = x - xₙ
+    R = x - xₙ  # R is a 3-element vector
+
+    # Compute objective function value f
+    f = dot(R, R)  # Equivalent to sum(R[i]^2 for i in 1:3)
+
+    if length(grad) > 0
+      # Compute the derivatives of N with respect to ξ
+      dN_dξ = zeros(Float64, 8, 3)  # 8 shape functions x 3 variables
+
+      # Assign your computed derivatives to dN_dξ
+      dN_dξ .= d¹N_dξ¹  # Ensure dN_dξ is correctly populated
+
+      # Compute Jacobian J = Xₑ * dN_dξ
+      J = Xₑ * dN_dξ  # J is 3x3
+
+      # Compute gradient grad = 2 * Jᵗ * R
+      grad .= 2 * (J' * R)
+    end
+
+    return f
   end
 
   best_solution = nothing
   best_objective = Inf
 
   for start_point in starting_points
-    opt = Opt(:LN_COBYLA, 3)
+    #   opt = Opt(:LN_COBYLA, 3)
+    opt = Opt(:LD_LBFGS, 3)
     opt.lower_bounds = [-5.0, -5.0, -5.0]
     opt.upper_bounds = [5.0, 5.0, 5.0]
     opt.xtol_rel = 1e-6
@@ -212,6 +286,7 @@ function find_local_coordinates(
     return (true, best_solution)
   end
 end
+
 
 ###_________
 
