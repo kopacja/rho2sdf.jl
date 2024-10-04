@@ -92,80 +92,357 @@ end
 
 
 function compute_coords(
-  x::Vector,
-  ρₜ::Float64,
-  Xₑ::Matrix,
-  ρₑ::Vector,
-  starting_points::Vector{Tuple{Float64,Float64,Float64}}=[
-    (0.0, 0.0, 0.0),
-    (-0.5, -0.5, -0.5),
-    (0.5, -0.5, -0.5),
-    (0.5, 0.5, -0.5),
-    (-0.5, 0.5, -0.5),
-    (-0.5, -0.5, 0.5),
-    (0.5, -0.5, 0.5),
-    (0.5, 0.5, 0.5),
-    (-0.5, 0.5, 0.5),
-  ]
+    x::Vector,
+    ρₜ::Float64,
+    Xₑ::Matrix,
+    ρₑ::Vector,
+    starting_points::Vector{Tuple{Float64,Float64,Float64}}=[
+        (0.0, 0.0, 0.0),
+        (-0.5, -0.5, -0.5),
+        (0.5, -0.5, -0.5),
+        (0.5, 0.5, -0.5),
+        (-0.5, 0.5, -0.5),
+        (-0.5, -0.5, 0.5),
+        (0.5, -0.5, 0.5),
+        (0.5, 0.5, 0.5),
+        (-0.5, 0.5, 0.5),
+    ];
+    cobyla_time_limit::Float64=3.0,
+    ipopt_time_limit::Float64=10.0
 )
-  function objective(ξ::Vector, grad::Vector)
-    ξ₁, ξ₂, ξ₃ = ξ
-    N = [
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
-    ]
-    x_pred = Xₑ * N
-    # return sum((x - x_pred) .^ 2)
-    return sum(abs.(x - x_pred))
-  end
-
-  function constraint(ξ::Vector, grad::Vector)
-    ξ₁, ξ₂, ξ₃ = ξ
-    N = [
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
-    ]
-    return sum(ρₑ .* N) - ρₜ
-  end
-
-  best_solution = nothing
-  best_objective = Inf
-
-  for start_point in starting_points
-    opt = Opt(:LN_COBYLA, 3)
-    # opt = Opt(:LN_AUGLAG_EQ, 3)
-    # local_opt = Opt(:LN_COBYLA, 3)
-    opt.lower_bounds = [-1.0, -1.0, -1.0]
-    opt.upper_bounds = [1.0, 1.0, 1.0]
-    opt.xtol_rel = 1e-6
-    opt.maxeval = 500
-    opt.min_objective = objective
-    opt.maxtime = 1.0
-    # opt.local_optimizer = local_opt
-    equality_constraint!(opt, constraint, 1e-8)
-
-    (minf, minx, ret) = optimize(opt, collect(start_point))
-
-    if minf < best_objective
-      best_objective = minf
-      best_solution = minx
+    function nlopt_objective(ξ::Vector, grad::Vector)
+        ξ₁, ξ₂, ξ₃ = ξ
+        N = [
+            -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+            1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+            -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+            1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+            1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+            -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+            1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+            -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+        ]
+        x_pred = Xₑ * N
+        return sum((x - x_pred) .^ 2)
     end
-  end
 
-  return best_solution
+    function nlopt_constraint(ξ::Vector, grad::Vector)
+        ξ₁, ξ₂, ξ₃ = ξ
+        N = [
+            -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+            1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+            -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+            1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+            1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+            -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+            1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+            -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+        ]
+        return sum(ρₑ .* N) - ρₜ
+    end
+
+    best_solution = nothing
+    best_objective = Inf
+
+    for start_point in starting_points
+        # COBYLA optimization
+        cobyla_result = @task begin
+            opt = Opt(:LN_COBYLA, 3)
+            opt.lower_bounds = [-1.0, -1.0, -1.0]
+            opt.upper_bounds = [1.0, 1.0, 1.0]
+            opt.xtol_rel = 1e-5
+            opt.maxeval = 1000
+            opt.min_objective = nlopt_objective
+            equality_constraint!(opt, nlopt_constraint, 1e-6)
+            NLopt.optimize(opt, collect(start_point))
+        end
+
+        schedule(cobyla_result)
+        start_time = time_ns()
+        while !istaskdone(cobyla_result)
+            if (time_ns() - start_time) / 1e9 > cobyla_time_limit
+                schedule(cobyla_result, InterruptException(), error=true)
+                break
+            end
+            sleep(0.01)
+        end
+
+        if istaskdone(cobyla_result) && !istaskfailed(cobyla_result)
+            minf, minx, ret = fetch(cobyla_result)
+            if (ret == :SUCCESS || ret == :XTOL_REACHED || ret == :FTOL_REACHED) && minf < best_objective
+                best_objective = minf
+                best_solution = minx
+            end
+        end
+
+        # Ipopt optimization (if COBYLA failed or was interrupted)
+        if best_solution === nothing
+            ipopt_result = @task begin
+                model = Model(Ipopt.Optimizer)
+                set_silent(model)
+                set_optimizer_attribute(model, "tol", 1e-6)
+                set_optimizer_attribute(model, "max_iter", 1000)
+                set_optimizer_attribute(model, "acceptable_tol", 1e-6)
+                @variable(model, -1.0 <= ξ[1:3] <= 1.0, start = start_point[i])
+                N8 = [
+                    -1 / 8 * (ξ[1] - 1) * (ξ[2] - 1) * (ξ[3] - 1),
+                    1 / 8 * (ξ[1] + 1) * (ξ[2] - 1) * (ξ[3] - 1),
+                    -1 / 8 * (ξ[1] + 1) * (ξ[2] + 1) * (ξ[3] - 1),
+                    1 / 8 * (ξ[1] - 1) * (ξ[2] + 1) * (ξ[3] - 1),
+                    1 / 8 * (ξ[1] - 1) * (ξ[2] - 1) * (ξ[3] + 1),
+                    -1 / 8 * (ξ[1] + 1) * (ξ[2] - 1) * (ξ[3] + 1),
+                    1 / 8 * (ξ[1] + 1) * (ξ[2] + 1) * (ξ[3] + 1),
+                    -1 / 8 * (ξ[1] - 1) * (ξ[2] + 1) * (ξ[3] + 1)
+                ]
+                @NLobjective(model, Min, sum((x[i] - sum(Xₑ[i, k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x)))
+                @NLconstraint(model, sum(ρₑ[k] * N8[k] for k in 1:length(N8)) == ρₜ)
+                optimize!(model)
+                (objective_value(model), value.(ξ), termination_status(model))
+            end
+
+            schedule(ipopt_result)
+            start_time = time_ns()
+            while !istaskdone(ipopt_result)
+                if (time_ns() - start_time) / 1e9 > ipopt_time_limit
+                    schedule(ipopt_result, InterruptException(), error=true)
+                    break
+                end
+                sleep(0.01)
+            end
+
+            if istaskdone(ipopt_result) && !istaskfailed(ipopt_result)
+                current_objective, current_solution, status = fetch(ipopt_result)
+                if status == MOI.OPTIMAL && current_objective < best_objective
+                    best_solution = current_solution
+                    best_objective = current_objective
+                end
+            end
+        end
+
+        if best_solution !== nothing
+            break
+        end
+    end
+
+    return best_solution
 end
+
+# function compute_coords(
+#   x::Vector,
+#   ρₜ::Float64,
+#   Xₑ::Matrix,
+#   ρₑ::Vector,
+#   starting_points::Vector{Tuple{Float64,Float64,Float64}}=[
+#     (0.0, 0.0, 0.0),
+#     (-0.5, -0.5, -0.5),
+#     (0.5, -0.5, -0.5),
+#     (0.5, 0.5, -0.5),
+#     (-0.5, 0.5, -0.5),
+#     (-0.5, -0.5, 0.5),
+#     (0.5, -0.5, 0.5),
+#     (0.5, 0.5, 0.5),
+#     (-0.5, 0.5, 0.5),
+#   ]
+# )
+#   function nlopt_objective(ξ::Vector, grad::Vector)
+#     ξ₁, ξ₂, ξ₃ = ξ
+#     N = [
+#       -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+#       -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+#       -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+#       1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+#       -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+#     ]
+#     x_pred = Xₑ * N
+#     return sum((x - x_pred) .^ 2)
+#   end
+#
+#   function nlopt_constraint(ξ::Vector, grad::Vector)
+#     ξ₁, ξ₂, ξ₃ = ξ
+#     N = [
+#       -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+#       -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+#       -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+#       1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+#       -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+#     ]
+#     return sum(ρₑ .* N) - ρₜ
+#   end
+#
+#   best_solution = nothing
+#   best_objective = Inf
+#
+#   for start_point in starting_points
+#     # Try COBYLA first
+#     opt = Opt(:LN_COBYLA, 3)
+#     opt.lower_bounds = [-1.0, -1.0, -1.0]
+#     opt.upper_bounds = [1.0, 1.0, 1.0]
+#     opt.xtol_rel = 1e-5
+#     opt.maxeval = 30
+#     # opt.maxtime = 3.0
+#     opt.min_objective = nlopt_objective
+#     equality_constraint!(opt, nlopt_constraint, 1e-6)
+#
+#     (minf, minx, ret) = NLopt.optimize(opt, collect(start_point))
+#
+#     if ret == :SUCCESS || ret == :XTOL_REACHED || ret == :FTOL_REACHED
+#       if minf < best_objective
+#         best_objective = minf
+#         best_solution = minx
+#       end
+#     else
+#       (ξ₁_start, ξ₂_start, ξ₃_start) = start_point
+#       # If COBYLA fails, try JuMP with Ipopt
+#       model = Model(Ipopt.Optimizer)
+#       set_silent(model)
+#       set_optimizer_attribute(model, "tol", 1e-6)
+#       set_optimizer_attribute(model, "max_iter", 50)
+#       set_optimizer_attribute(model, "acceptable_tol", 1e-6)
+#       set_optimizer_attribute(model, "max_cpu_time", 5.0)
+#
+#       @variable(model, ξ₁, lower_bound = -1.0, upper_bound = 1.0, start = ξ₁_start)
+#       @variable(model, ξ₂, lower_bound = -1.0, upper_bound = 1.0, start = ξ₂_start)
+#       @variable(model, ξ₃, lower_bound = -1.0, upper_bound = 1.0, start = ξ₃_start)
+#
+#       # @variable(model, -1.0 <= ξ[1:3] <= 1.0, start = start_point[i])
+#
+#       N8 = [
+#         -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+#         1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+#         -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+#         1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+#         1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+#         -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+#         1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+#         -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+#       ]
+#
+#       @NLobjective(model, Min, sum((x[i] - sum(Xₑ[i, k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x)))
+#       @NLconstraint(model, sum(ρₑ[k] * N8[k] for k in 1:length(N8)) == ρₜ)
+#       # @NLobjective(model, Min, sum((x[i] - sum(Xₑ[i, k] * N8[k] for k in 1:8))^2 for i in 1:length(x)))
+#       # @NLconstraint(model, sum(ρₑ[k] * N8[k] for k in 1:8) == ρₜ)
+#
+#       JuMP.optimize!(model)
+#
+#       current_objective = objective_value(model)
+#       # current_solution = value.(ξ)
+#       current_solution = value.([ξ₁, ξ₂, ξ₃])
+#
+#       if current_objective < best_objective
+#         best_solution = current_solution
+#         best_objective = current_objective
+#       end
+#     end
+#   end
+#
+#   return best_solution
+# end
+#
+
+# function compute_coords(
+#   x::Vector,
+#   ρₜ::Float64,
+#   Xₑ::Matrix,
+#   ρₑ::Vector,
+#   starting_points::Vector{Tuple{Float64,Float64,Float64}}=[
+#     (0.0, 0.0, 0.0),
+#     (-0.5, -0.5, -0.5),
+#     (0.5, -0.5, -0.5),
+#     (0.5, 0.5, -0.5),
+#     (-0.5, 0.5, -0.5),
+#     (-0.5, -0.5, 0.5),
+#     (0.5, -0.5, 0.5),
+#     (0.5, 0.5, 0.5),
+#     (-0.5, 0.5, 0.5),
+#   ]
+# )
+#   # function objective(ξ::Vector)
+#   function objective(ξ::Vector, grad::Vector=Vector{Float64}(undef, 0))
+#     ξ₁, ξ₂, ξ₃ = ξ
+#     N = [
+#       -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+#       -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+#       -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+#       1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+#       -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+#     ]
+#     x_pred = Xₑ * N
+#     return sum((x - x_pred) .^ 2)
+#   end
+#
+#   # function constraint(ξ::Vector)
+#   function constraint(ξ::Vector, grad::Vector=Vector{Float64}(undef, 0))
+#     ξ₁, ξ₂, ξ₃ = ξ
+#     N = [
+#       -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+#       -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+#       1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+#       -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+#       1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+#       -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+#     ]
+#     return sum(ρₑ .* N) - ρₜ
+#   end
+#
+#   best_solution = nothing
+#   best_objective = Inf
+#
+#   for start_point in starting_points
+#     # Nejprve zkusíme LN_COBYLA
+#     opt = Opt(:LN_COBYLA, 3)
+#     opt.lower_bounds = [-1.0, -1.0, -1.0]
+#     opt.upper_bounds = [1.0, 1.0, 1.0]
+#     opt.xtol_rel = 1e-6
+#     opt.maxeval = 500
+#     opt.maxtime = 1.0
+#     opt.min_objective = objective
+#     equality_constraint!(opt, constraint, 1e-8)
+#
+#     (minf, minx, ret) = optimize(opt, collect(start_point))
+#
+#     if ret == :SUCCESS || ret == :XTOL_REACHED || ret == :FTOL_REACHED
+#       if minf < best_objective
+#         best_objective = minf
+#         best_solution = minx
+#       end
+#
+#       # Pokud LN_COBYLA selže, zkusíme LN_AUGLAG_EQ
+#     else
+#       println("funguju!")
+#       opt = Opt(:LN_AUGLAG_EQ, 3)
+#       local_opt = Opt(:LN_NELDERMEAD, 3)  # Můžete také použít LN_COBYLA jako lokální optimalizátor
+#       # local_opt = Opt(:LN_COBYLA, 3)  # Můžete také použít LN_COBYLA jako lokální optimalizátor
+#       opt.local_optimizer = local_opt
+#       opt.lower_bounds = [-1.0, -1.0, -1.0]
+#       opt.upper_bounds = [1.0, 1.0, 1.0]
+#       opt.xtol_rel = 1e-6
+#       opt.maxeval = 1000
+#       opt.maxtime = 3.0
+#       opt.min_objective = objective
+#       equality_constraint!(opt, constraint, 1e-8)
+#
+#       (minf, minx, _) = optimize(opt, collect(start_point))
+#       if minf < best_objective
+#         best_objective = minf
+#         best_solution = minx
+#       end
+#     end
+#   end
+#
+#   return best_solution
+# end
+#
 
 
 function find_local_coordinates(
@@ -207,8 +484,8 @@ function find_local_coordinates(
   best_objective = Inf
 
   for start_point in starting_points
-    # opt = Opt(:LN_COBYLA, 3)
-    opt = Opt(:LD_MMA, 3) # -> dává blbé výsledky
+    opt = Opt(:LN_COBYLA, 3)
+    # opt = Opt(:LD_MMA, 3) # -> dává blbé výsledky
     opt.lower_bounds = [-5.0, -5.0, -5.0]
     opt.upper_bounds = [5.0, 5.0, 5.0]
     opt.xtol_rel = 1e-6
@@ -361,7 +638,8 @@ function evalSignedDistances(
   update_interval_elements = max(1, div(nel, 100))
   update_interval_nodes = max(1, div(ngp, 100))
 
-  Threads.@threads for el in 1:nel
+  # Threads.@threads for el in 1:nel
+  Threads.@threads for el in 768:nel
     println("Element id: ", el)
     tid = Threads.threadid()
 
