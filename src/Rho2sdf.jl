@@ -25,5 +25,7 @@ using .PrimitiveGeometries
 include("DataExport/DataExport.jl")
 using .DataExport
 
+include("SdfSmoothing/SdfSmoothing.jl")
+using .SdfSmoothing
 
 end # module Rho2sdf
