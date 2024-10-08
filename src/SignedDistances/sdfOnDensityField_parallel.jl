@@ -287,18 +287,17 @@ function find_local_coordinates(
   end
 end
 
-
 ###_________
 
 # Function to create AABB from a set of points
-function compute_aabb(points::Matrix{Float64})
+function compute_aabb(points::SubArray)
   min_bounds = minimum(points, dims=2)
   max_bounds = maximum(points, dims=2)
   return min_bounds, max_bounds
 end
 
 # Function to check if a point is inside the AABB
-function is_point_inside_aabb(x::Vector{Float64}, min_bounds, max_bounds)
+function is_point_inside_aabb(x::SubArray, min_bounds, max_bounds)
   return all(min_bounds .<= x) && all(x .<= max_bounds)
 end
 
