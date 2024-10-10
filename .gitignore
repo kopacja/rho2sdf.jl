@@ -1,13 +1,7 @@
-test/chapadlo_sdf.vtk
-Manifest.toml
 *.toml
 *.jld
 *.csv
 *.vtu
-*.csv
-*.vtu
 *.vtk
-test/xp.csv
-test/xp.vtu
-test/xp.vtu
 *.jld2
+*.h5
