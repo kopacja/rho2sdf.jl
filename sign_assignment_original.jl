@@ -1,5 +1,4 @@
 function compute_sign_original(points, X, INE, IEN, ρₙ, ρₜ, ngp, sfce, nel)
-  println("sign assignment by me")
   signs = -1 * ones(ngp)
   @threads for i in 1:ngp
     x = @view points[:, i]
@@ -18,7 +17,7 @@ function compute_sign_original(points, X, INE, IEN, ρₙ, ρₜ, ngp, sfce, nel
       min_bounds, max_bounds = compute_aabb(Xₑ)
       # Check if the point x is inside the AABB
       if is_point_inside_aabb(x, min_bounds, max_bounds)
-        (Conv, local_coords) = find_local_coordinates(sfce, Xₑ, x)
+        (Conv, local_coords) = find_local_coordinates(sfce, Xₑ, x) # Conv -> true/false (converged)
         max_local_new = maximum(abs.(local_coords))
         
         if max_local_new < 1.2 && max_local > max_local_new
