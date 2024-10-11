@@ -1,30 +1,3 @@
-
-# Reduction of the matrix K (eigenvectors) if the eigenvalues are close to zero:
-function ReduceEigenvals(
-  K::Matrix{Float64},
-  r::Vector{Float64},
-  Sign::Int,
-  th::Float64=1.0e-6)
-
-  Λ = real.(eigvals(K))
-  Λ_min = minimum(abs.(Λ))
-
-  if Λ_min < th
-    Φ = real.(eigvecs(K))
-    # Adjust the calculation if necessary
-    idx_below_th = findall(x -> abs(x) < th, Λ)
-    idx = setdiff(1:length(Λ), (idx_below_th))
-    Φ_reduced = Φ[:, idx]
-    ΔΞ̃_and_Δλ̃ = 1.0 ./ Λ[idx] .* (Φ_reduced' * r)
-    ΔΞ_and_Δλ = (Φ_reduced .* Sign) * ΔΞ̃_and_Δλ̃
-
-  else
-    ΔΞ_and_Δλ = K \ (r .* Sign)
-  end
-
-  return ΔΞ_and_Δλ, Λ_min                         #??# Λ_min is not necessary - only for debug
-end
-
 # Selection of regular grid points that have been projected:
 function SelectProjectedNodes(
   mesh::Mesh,
@@ -287,7 +260,6 @@ function find_local_coordinates(
   end
 end
 
-###_________
 
 # Function to create AABB from a set of points
 function compute_aabb(points::SubArray)
@@ -361,16 +333,15 @@ function update_distance_parallel!(dist_local::Vector{Vector{Float64}},
 end
 
 
-
 # MAIN FUNCTION for eval SDF
-function evalSignedDistances(
+function evalDistances(
   mesh::Mesh,
   grid::Grid,
+  points::Matrix,
   ρₙ::Vector{Float64},
   ρₜ::Float64,
 )
 
-  points = MeshGrid.generateGridPoints(grid) # uzly pravidelné mřížky
   linkedList = MeshGrid.LinkedList(grid, points) # pro rychlé vyhledávání
 
   head = linkedList.head # ID pravidelné bunky (pozice), index bodu z points
@@ -390,7 +361,7 @@ function evalSignedDistances(
   nel = mesh.nel # number of all elements
   nes = mesh.nes # number of element segments (faces)
   nsn = mesh.nsn # number of face nodes
-  println("number of all elements: ", nel)
+  # println("number of all elements: ", nel)
 
   ngp = grid.ngp # number of nodes in grid
   big = -1.0e10
@@ -400,7 +371,7 @@ function evalSignedDistances(
   # Tri mesh for pseudonormals:
   tri_mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh)
   EN = NodePosition3D(tri_mesh)
-  VPN, EPN = computePseudoNormals(tri_mesh)
+  _, EPN = computePseudoNormals(tri_mesh)
 
   nthreads = Threads.nthreads()
 
@@ -408,17 +379,14 @@ function evalSignedDistances(
   xp_local = [zeros(nsd, ngp) for _ in 1:nthreads]
 
   p_elements = Progress(nel, 1, "Processing elements: ", 30)
-  p_nodes = Progress(ngp, 1, "Processing grid nodes: ", 30)
 
   # Atomic countery pro oba cykly
   counter_elements = Atomic{Int}(0)
-  counter_nodes = Atomic{Int}(0)
 
   update_interval_elements = max(1, div(nel, 100))
-  update_interval_nodes = max(1, div(ngp, 100))
 
   Threads.@threads for el in 1:nel
-    println("Element id: ", el)
+    # println("Element id: ", el)
     tid = Threads.threadid()
 
     ρₑ = ρₙ[IEN[:, el]] # nodal densities for one element
@@ -515,8 +483,6 @@ function evalSignedDistances(
         end
       end
     else
-      #WARNING:
-      # continue
       #TODO: else -> elseif, delete if
       if (ρₑ_max > ρₜ) # The boundary (isocontour) goes through the element
 
@@ -545,9 +511,6 @@ function evalSignedDistances(
 
               # coordinates of the vertices of the triangle
               Xt = [x₁ x₂ x₃]
-
-              # finding coresponding triangle:
-              ID_tri = find_triangle_position(EN, [x₁ x₂ x₃])
 
               #NOTE: From this part it is same as in sdfOnTriangularMesh ->
 
@@ -649,108 +612,28 @@ function evalSignedDistances(
   # Merging the results after parallel calculation:
   for i in 1:ngp
     min_dist, min_idx = findmin(abs.(getindex.(dist_local, i)))
-    dist[i] = min_dist #* sign(dist_local[min_idx][i])
+    dist[i] = min_dist
     xp[:, i] = xp_local[min_idx][:, i]
   end
 
+  #NOTE: This part is used for checking distance function:
+  
+  # Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
+  # # println("mean of projected distance: ", mean_PD)
+  # # println("maximum projected distance: ", max_PD)
+  #
+  # nnp = size(Xg, 1)
+  #
+  # IEN = [[i; i + nnp] for i = 1:nnp]
+  # X = vec([Xg Xp])
+  #
+  # Rho2sdf.exportToVTU("lines.vtu", X, IEN, 3)
+  #
+  # IEN = [[i] for i = 1:nnp]
+  # Rho2sdf.exportToVTU("Xg.vtu", Xg, IEN, 1)
+  # Rho2sdf.exportToVTU("Xp.vtu", Xp, IEN, 1)
 
-  @save "Z_Chapadlo_xp.jld2" xp
-  @save "Z_Chapadlo_dist.jld2" dist
-  @save "Z_Chapadlo_mesh.jld2" mesh
-  @save "Z_Chapadlo_grid.jld2" grid
-  @save "Z_Chapadlo_points.jld2" points
-
-  # @save "Z_Chapadlo_final_dist.jld2" dist
-  # @save "Z_Chapadlo_final_mesh.jld2" mesh
-  # @save "Z_Chapadlo_final_grid.jld2" grid
-  # @save "Z_Chapadlo_final_points.jld2" points
-  # @save "Z_Chapadlo_final_rho.jld2" ρₙ
-  # println("finish")
-  # sleep(10)
-  # exit()
-  signs = -1 * ones(ngp)
-
-  @threads for i in 1:ngp
-    x = @view points[:, i]
-    max_local = 10.0
-    IDmin = argmin(mapslices(norm, (X .- x), dims=1))[2] # Find ID of the node (in mesh) closest to grid point x
-    none = length(INE[IDmin]) # Number of neighboring elements (connected to the node)
-    ρₙₑ = ρₙ[IEN[:, INE[IDmin]]] # Nodal densities of none elements
-    if maximum(ρₙₑ) < ρₜ # Empty elements -> skip to next i
-      continue
-    end
-    # Loop through all elements that are part of the node X[:, IDmin]
-    for j in 1:none
-      el = INE[IDmin][j]
-      Xₑ = @view X[:, IEN[:, el]] # Coordinates of the element nodes
-      # Compute the Axis-Aligned Bounding Box (AABB)
-      min_bounds, max_bounds = compute_aabb(Xₑ)
-      # Check if the point x is inside the AABB
-      if is_point_inside_aabb(x, min_bounds, max_bounds)
-        (Conv, local_coords) = find_local_coordinates(sfce, Xₑ, x)
-        max_local_new = maximum(abs.(local_coords))
-
-        if max_local_new < 1.2 && max_local > max_local_new
-          H, _, _, _ = sfce(local_coords) # Shape functions and their derivatives
-          ρₑ = ρₙ[IEN[:, el]] # Nodal densities for one element
-          ρ = H ⋅ ρₑ
-          if ρ >= ρₜ
-            signs[i] = 1.0
-          end
-          max_local = max_local_new
-        end
-      end
-    end
-
-    # Progress bar:
-    count = atomic_add!(counter_nodes, 1)
-    if count % update_interval_nodes == 0
-      if Threads.threadid() == 1
-        update!(p_nodes, count)
-      end
-    end
-  end
-  finish!(p_nodes)
-
-  @save "Z_Chapadlo_xp.jld2" xp
-  @save "Z_Chapadlo_dist.jld2" dist
-  @save "Z_Chapadlo_mesh.jld2" mesh
-  @save "Z_Chapadlo_grid.jld2" grid
-  @save "Z_Chapadlo_points.jld2" points
-
-  @save "Z_Chapadlo_signs.jld2" signs
-
-  # @load "Z_Chapadlo_xp.jld2" xp
-  # @load "Z_Chapadlo_dist.jld2" dist
-  # @load "Z_Chapadlo_mesh.jld2" mesh
-  # @load "Z_Chapadlo_grid.jld2" grid
-  # @load "Z_Chapadlo_points.jld2" points
-
-
-  # println("typeof xp: ", typeof(xp))
-
-  Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
-  # println("mean of projected distance: ", mean_PD)
-  # println("maximum projected distance: ", max_PD)
-
-  nnp = size(Xg, 1)
-
-  IEN = [[i; i + nnp] for i = 1:nnp]
-  X = vec([Xg Xp])
-
-  Rho2sdf.exportToVTU("lines.vtu", X, IEN, 3)
-
-  IEN = [[i] for i = 1:nnp]
-  Rho2sdf.exportToVTU("Xg.vtu", Xg, IEN, 1)
-  Rho2sdf.exportToVTU("Xp.vtu", Xp, IEN, 1)
-
-
-  dist = abs.(dist) .* signs
-
-  # @save "Z_Leg_dist.jld2" dist
-  @save "Z_Chapadlo_cele_dist.jld2" dist
-  # @save "Z_Leg_grid.jld2" grid
-  @save "Z_Chapadlo_cele_grid.jld2" grid
+  dist = abs.(dist)
 
   return dist, xp
 
