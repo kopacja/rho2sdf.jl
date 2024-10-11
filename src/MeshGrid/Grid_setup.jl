@@ -101,9 +101,6 @@ function noninteractive_sdf_grid_setup(mesh::Mesh, B::Float64)
   sdf_grid = MeshGrid.Grid(X_min, X_max, N_new, 3)
   println("Number of all grid points: ", sdf_grid.ngp)
 
-  println("sleep for 10")
-  sleep(10)
-
   return sdf_grid
 end
 
