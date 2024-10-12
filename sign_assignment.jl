@@ -14,11 +14,14 @@ using Rho2sdf.SignedDistances
 
 include("sign_assignment_original.jl")
 
-@load "Z_Chapadlo_final_dist.jld2" dist
-@load "Z_Chapadlo_final_mesh.jld2" mesh
-@load "Z_Chapadlo_final_grid.jld2" grid
-@load "Z_Chapadlo_final_points.jld2" points
-@load "Z_Chapadlo_final_rho.jld2" ρₙ
+@load "Z_chapadlo_dist.jld2" sdf_dists
+@load "Z_chapadlo_mesh.jld2" mesh
+@load "Z_chapadlo_grid.jld2" sdf_grid
+@load "Z_chapadlo_points.jld2" points
+@load "Z_chapadlo_rho.jld2" ρₙ
+
+grid = sdf_grid
+dist = sdf_dists
 
 # Function to create AABB from a set of points
 # function compute_aabb(points::Matrix{Float64})
