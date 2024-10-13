@@ -207,9 +207,9 @@ using LinearAlgebra
       Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
 
       ## Grid:
-      # X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
-      # X_min[2] = 0
-      # X_min[3] = 50
+      X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
+      X_min[2] = 0
+      X_min[3] = 50
       sdf_grid = MeshGrid.Grid(X_min, X_max, N, 3) # cartesian grid
       points = MeshGrid.generateGridPoints(sdf_grid) # uzly pravidelné mřížky
 
@@ -229,6 +229,7 @@ using LinearAlgebra
       @save "Z_$(taskName)_grid.jld2" sdf_grid
       @save "Z_$(taskName)_points.jld2" points
       @save "Z_$(taskName)_sdf.jld2" sdf_dists
+      @save "Z_$(taskName)_rho.jld2" ρₙ
 
     end
   end
