@@ -266,7 +266,7 @@ using LinearAlgebra
       sdf_dists = dists .* signs
 
       ## Export to VTK:
-      B = round(my_grid.cell_size, digits=4)
+      B = round(sdf_grid.cell_size, digits=4)
       Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF_CellSize-" * string(B) * ".vtk", sdf_grid, sdf_dists, "distance")
 
       RBFs_smoothing(sdf_dists, sdf_grid, false, 2, taskName) # interpolation == true, aproximation == false, smooth
