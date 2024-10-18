@@ -4,6 +4,7 @@ using Rho2sdf.ShapeFunctions
 using Rho2sdf.MeshGrid
 using Rho2sdf.SignedDistances
 using Rho2sdf.DataExport
+using Rho2sdf.SdfSmoothing
 using MAT
 using JLD2
 using LinearAlgebra
