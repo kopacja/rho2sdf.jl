@@ -38,14 +38,14 @@ sdf_dists = dists .* signs
 
 
 ## Export to VTK:
-B = sdf_grid.cell_size
-Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf_CellSize-" * string(round(B, digits=4)) * ".vtk", sdf_grid, sdf_dists, "distance")
+B = round(my_grid.cell_size, digits=4)
+Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF_B-" * string(B) * ".vtk", sdf_grid, sdf_dists, "distance")
 
 # RBF smoothing:
 RBFs_smoothing(sdf_dists, sdf_grid, false, 2, taskName) # interpolation == true, aproximation == false, smooth
 
-@save "Z_$(taskName)_cele_SDF_CellSize$(round(B, digits=4)).jld2" sdf_dists
-@save "Z_$(taskName)_cele_Grid_CellSize$(round(B, digits=4)).jld2" sdf_grid
-@save "Z_$(taskName)_cele_Points_CellSize$(round(B, digits=4)).jld2" points
-@save "Z_$(taskName)_cele_Mesh_CellSize$(round(B, digits=4)).jld2" mesh
+@save "Z_$(taskName)_cele_SDF_B-$(B).jld2" sdf_dists
+@save "Z_$(taskName)_cele_Grid_B-$(B).jld2" sdf_grid
+@save "Z_$(taskName)_cele_Points_B-$(B).jld2" points
+@save "Z_$(taskName)_cele_Mesh_B-$(B).jld2" mesh
 
