@@ -213,7 +213,7 @@ function RBFs_smoothing(
   fine_LSF_offset_array = vector_to_array(fine_LSF_offset, dim)
 
   # Save SDF data to HDF5 file
-  h5open(taskName * "_" * name * "_SDF_B-" * round(B) * ".h5", "w") do file
+  h5open(taskName * "_" * name * "_SDF_B-" * string(B) * ".h5", "w") do file
     write(file, "/SDF", fine_LSF_offset_array)
     write(file, "/dx", step)
     write(file, "/dy", step)
