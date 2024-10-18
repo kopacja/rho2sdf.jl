@@ -80,13 +80,13 @@ using LinearAlgebra
       sdf_dists = dists .* signs
 
       ## Export to VTK:
-      Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf.vtk", sdf_grid, sdf_dists, "distance")
+      Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF.vtk", sdf_grid, sdf_dists, "distance")
 
       @save "Z_$(taskName)_xp.jld2" xp
-      @save "Z_$(taskName)_mesh.jld2" mesh
-      @save "Z_$(taskName)_grid.jld2" sdf_grid
-      @save "Z_$(taskName)_points.jld2" points
-      @save "Z_$(taskName)_sdf.jld2" sdf_dists
+      @save "Z_$(taskName)_Mesh.jld2" mesh
+      @save "Z_$(taskName)_Grid.jld2" sdf_grid
+      @save "Z_$(taskName)_Points.jld2" points
+      @save "Z_$(taskName)_SDF.jld2" sdf_dists
 
     end
   end
@@ -122,16 +122,17 @@ using LinearAlgebra
       sdf_dists = dists .* signs
 
       ## Export to VTK:
-      Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf.vtk", sdf_grid, sdf_dists, "distance")
+      Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF.vtk", sdf_grid, sdf_dists, "distance")
 
       # RBF smoothing:
       RBFs_smoothing(sdf_dists, sdf_grid, false, 2, taskName) # interpolation == true, aproximation == false, smooth
 
       @save "Z_$(taskName)_xp.jld2" xp
-      @save "Z_$(taskName)_mesh.jld2" mesh
-      @save "Z_$(taskName)_grid.jld2" sdf_grid
-      @save "Z_$(taskName)_points.jld2" points
-      @save "Z_$(taskName)_sdf.jld2" sdf_dists
+      @save "Z_$(taskName)_Mesh.jld2" mesh
+      @save "Z_$(taskName)_Grid.jld2" sdf_grid
+      @save "Z_$(taskName)_Points.jld2" points
+      @save "Z_$(taskName)_SDF.jld2" sdf_dists
+      @save "Z_$(taskName)_rho.jld2" ρₙ
 
     end
   end
@@ -170,16 +171,17 @@ using LinearAlgebra
       sdf_dists = dists .* signs
 
       ## Export to VTK:
-      Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf.vtk", sdf_grid, sdf_dists, "distance")
+      Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF.vtk", sdf_grid, sdf_dists, "distance")
 
       # RBF smoothing:
       RBFs_smoothing(sdf_dists, sdf_grid, false, 2, taskName) # interpolation == true, aproximation == false, smooth
 
       @save "Z_$(taskName)_xp.jld2" xp
-      @save "Z_$(taskName)_mesh.jld2" mesh
-      @save "Z_$(taskName)_grid.jld2" sdf_grid
-      @save "Z_$(taskName)_points.jld2" points
-      @save "Z_$(taskName)_sdf.jld2" sdf_dists
+      @save "Z_$(taskName)_Mesh.jld2" mesh
+      @save "Z_$(taskName)_Grid.jld2" sdf_grid
+      @save "Z_$(taskName)_Points.jld2" points
+      @save "Z_$(taskName)_SDF.jld2" sdf_dists
+      @save "Z_$(taskName)_rho.jld2" ρₙ
 
     end
   end
@@ -219,16 +221,16 @@ using LinearAlgebra
       sdf_dists = dists .* signs
 
       ## Export to VTK:
-      Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf.vtk", sdf_grid, sdf_dists, "distance")
+      Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF.vtk", sdf_grid, sdf_dists, "distance")
 
       # RBF smoothing:
       RBFs_smoothing(sdf_dists, sdf_grid, false, 2, taskName) # interpolation == true, aproximation == false, smooth
 
       @save "Z_$(taskName)_xp.jld2" xp
-      @save "Z_$(taskName)_mesh.jld2" mesh
-      @save "Z_$(taskName)_grid.jld2" sdf_grid
-      @save "Z_$(taskName)_points.jld2" points
-      @save "Z_$(taskName)_sdf.jld2" sdf_dists
+      @save "Z_$(taskName)_Mesh.jld2" mesh
+      @save "Z_$(taskName)_Grid.jld2" sdf_grid
+      @save "Z_$(taskName)_Points.jld2" points
+      @save "Z_$(taskName)_SDF.jld2" sdf_dists
       @save "Z_$(taskName)_rho.jld2" ρₙ
 
     end
@@ -264,17 +266,16 @@ using LinearAlgebra
       sdf_dists = dists .* signs
 
       ## Export to VTK:
-      B = sdf_grid.cell_size
-      Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf_CellSize-" * (round(B, digits=4)) * ".vtk", sdf_grid, sdf_dists, "distance")
+      B = round(my_grid.cell_size, digits=4)
+      Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF_CellSize-" * string(B) * ".vtk", sdf_grid, sdf_dists, "distance")
 
       RBFs_smoothing(sdf_dists, sdf_grid, false, 2, taskName) # interpolation == true, aproximation == false, smooth
 
-      @save "$(taskName)_cele_sdf_CellSize$(round(B, digits=4)).jld2" sdf_dists
-      @save "$(taskName)_cele_sdf_grid_CellSize$(round(B, digits=4)).jld2" sdf_grid
-
-      @save "Z_$(taskName)cele_xp.jld2" xp
-      @save "Z_$(taskName)cele_mesh.jld2" mesh
-      @save "Z_$(taskName)cele_points.jld2" points
+      @save "Z_$(taskName)_cele_xp_B-$(B).jld2" xp
+      @save "Z_$(taskName)_cele_SDF_B-$(B).jld2" sdf_dists
+      @save "Z_$(taskName)_cele_Grid_B-$(B).jld2" sdf_grid
+      @save "Z_$(taskName)_cele_Points_B-$(B).jld2" points
+      @save "Z_$(taskName)_cele_Mesh_B-$(B).jld2" mesh
 
     end
   end
