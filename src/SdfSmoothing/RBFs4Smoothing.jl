@@ -207,12 +207,13 @@ function RBFs_smoothing(
   fine_LSF_offset = fine_LSF .+ th
 
   name = Is_interpolation ? "Interpolation" : "Approximation"
-  Rho2sdf.exportStructuredPointsToVTK(taskName * "_smooth_" * name * ".vtk", my_grid, fine_LSF_offset, "distance", smooth)
+  B = round(my_grid.cell_size, digits = 4)
+  Rho2sdf.exportStructuredPointsToVTK(taskName * "_smooth_B-" * string(B) * "_" * name * ".vtk", my_grid, fine_LSF_offset, "distance", smooth)
 
   fine_LSF_offset_array = vector_to_array(fine_LSF_offset, dim)
 
   # Save SDF data to HDF5 file
-  h5open(taskName * "_" * name * "_sdf_data.h5", "w") do file
+  h5open(taskName * "_" * name * "_SDF_B-" * round(B) * ".h5", "w") do file
     write(file, "/SDF", fine_LSF_offset_array)
     write(file, "/dx", step)
     write(file, "/dy", step)
