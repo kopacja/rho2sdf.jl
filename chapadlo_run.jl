@@ -4,6 +4,7 @@ using Rho2sdf.ShapeFunctions
 using Rho2sdf.MeshGrid
 using Rho2sdf.SignedDistances
 using Rho2sdf.DataExport
+using Rho2sdf.SdfSmoothing
 using MAT
 using JLD2
 using LinearAlgebra
@@ -38,7 +39,7 @@ sdf_dists = dists .* signs
 
 ## Export to VTK:
 B = sdf_grid.cell_size
-Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf_CellSize-" * (round(B, digits=4)) * ".vtk", sdf_grid, sdf_dists, "distance")
+Rho2sdf.exportStructuredPointsToVTK(taskName * "_sdf_CellSize-" * string(round(B, digits=4)) * ".vtk", sdf_grid, sdf_dists, "distance")
 
 # RBF smoothing:
 RBFs_smoothing(sdf_dists, sdf_grid, false, 2, taskName) # interpolation == true, aproximation == false, smooth
