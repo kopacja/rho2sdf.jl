@@ -1,0 +1,166 @@
+# Replace preallocated values with the maximum computed value while preserving sign, Float64 -> Float32
+function process_vector(vec::Vector{Float64})
+  vec_f32 = Float32.(vec)  # Convert input vector to Float32
+  max_val = maximum(abs, filter(x -> abs(x) < 1.0f9, vec_f32))
+  if isempty(max_val)
+    return vec_f32
+  end
+  return @. ifelse(abs(vec_f32) ≈ 1.0f10, sign(vec_f32) * max_val, vec_f32)
+end
+
+# Create a grid based on the number of cells and grid boundaries
+function create_grid(NoC::Vector, grid)
+  nx, ny, nz = NoC .+ 1 # number of grid points for x, y, z
+  xmin, ymin, zmin = Float32.(grid.AABB_min)
+  xmax, ymax, zmax = Float32.(grid.AABB_max)
+
+  x = range(Float32(xmin), Float32(xmax), length=nx)
+  y = range(Float32(ymin), Float32(ymax), length=ny)
+  z = range(Float32(zmin), Float32(zmax), length=nz)
+
+  return [[Float32(x), Float32(y), Float32(z)] for x in x, y in y, z in z]
+end
+
+function create_smooth_grid(grid, smooth::Int)
+  nx, ny, nz = (grid.N * smooth) .+ 1 # number of grid points for x, y, z
+  xmin, ymin, zmin = Float32.(grid.AABB_min)
+  xmax, _, _ = Float32.(grid.AABB_max)
+
+  # Compute steps explicitly
+  dx = (xmax - xmin) / (nx - 1)
+
+  # Generate grid points using explicit arithmetic
+  x = [xmin + (i - 1) * dx for i in 1:nx]
+  y = [ymin + (j - 1) * dx for j in 1:ny]
+  z = [zmin + (k - 1) * dx for k in 1:nz]
+
+  return (dx, [[x_i, y_j, z_k] for x_i in x, y_j in y, z_k in z])
+end
+
+# Define a struct for the Limited Range RBF Kernel
+struct LimitedRangeRBFKernel{T<:Real} <: Kernel
+  σ::T
+  threshold::T
+end
+
+# Define the limited range Gaussian RBF kernel function
+function (k::LimitedRangeRBFKernel)(x::AbstractVector{Float32}, y::AbstractVector{Float32})
+  r = sqrt((x[1] - y[1])^2 + (x[2] - y[2])^2 + (x[3] - y[3])^2)
+  value = exp(-(r / k.σ)^2)
+  return value > k.threshold ? value : 0.0
+end
+
+# Convert vector to 3D array for kernel operations
+function vector_to_array(dist::Vector, N)
+  nx, ny, nz = N
+  result = Array{eltype(dist),3}(undef, nx, ny, nz)
+  @views result[:] .= dist
+  return result
+end
+
+# Compute sparse kernel matrix for efficient operations
+function compute_sparse_kernel_matrix(grid, kernel::LimitedRangeRBFKernel)
+  n = length(grid)
+  I, J, V = Int[], Int[], Float32[]
+
+  for i in 1:n
+    for j in i:n  # Utilize symmetry, compute only upper triangle
+      value = Float32(kernel(grid[i], grid[j]))  # Convert to Float32
+      if value > kernel.threshold
+        push!(I, i)
+        push!(J, j)
+        push!(V, value)
+        if i != j
+          push!(I, j)
+          push!(J, i)
+          push!(V, value)
+        end
+      end
+    end
+  end
+  return sparse(I, J, V, n, n)
+end
+
+# Compute RBF weights on the coarse grid
+function compute_rbf_weights(coarse_grid, coarse_values, kernel::LimitedRangeRBFKernel)
+  # Compute sparse kernel matrix for the coarse grid
+  K = compute_sparse_kernel_matrix(coarse_grid, kernel)
+
+  # Convert coarse_values to Float32
+  coarse_values_f32 = Float32.(vec(coarse_values))
+
+  # Compute weights using conjugate gradient method
+  weights = cg(K, coarse_values_f32)
+
+  return weights
+end
+
+# Perform RBF interpolation on the fine grid using precomputed weights and KD-tree for efficiency
+function rbf_interpolation_kdtree(fine_grid::Array, coarse_grid::Array, weights_f32::Vector{Float32}, kernel::LimitedRangeRBFKernel)
+  kdtree = KDTree(reduce(hcat, coarse_grid))
+  max_distance = Float32(sqrt(-log(kernel.threshold) * kernel.σ^2))
+
+  result = zeros(Float32, length(fine_grid))
+  progress = Atomic{Int}(0)
+  total = length(fine_grid)
+
+  # Function to update and display progress bar
+  function update_progress()
+    new_progress = atomic_add!(progress, 1)
+    if new_progress % 100 == 0 || new_progress == total
+      percent = round(new_progress / total * 100, digits=1)
+      bar = "="^Int(floor(percent / 2))
+      @printf("\rProgress: [%-50s] %.1f%% (%d/%d)", bar, percent, new_progress, total)
+    end
+  end
+
+  Threads.@threads for i in eachindex(fine_grid)
+    idxs, dists = knn(kdtree, fine_grid[i], 124, true)
+    for (j, dist) in zip(idxs, dists)
+      if dist <= max_distance
+        result[i] += weights_f32[j] * exp(-(dist / kernel.σ)^2)
+      end
+    end
+    update_progress()
+  end
+  println()  # New line after completion
+  return result
+end
+
+# Adjust the level-set function to maintain the volume fraction (V_frac)
+function LS_Threshold(s_mat, V_frac::Float64, Exp::Int)
+  eps = 1.0
+  th_low, th_high = minimum(s_mat), maximum(s_mat)
+  n = 0
+  th = 0.0
+
+  while n < 40 && eps > 10.0^(-Exp)
+    th = (th_low + th_high) / 2
+    volume = mean(s_mat .>= th)
+    eps = abs(V_frac - volume)
+
+    if volume > V_frac
+      th_low = th
+    else
+      th_high = th
+    end
+
+    n += 1
+  end
+
+  return -th
+end
+
+# Convert 3D array back to vector
+function array_to_vector(arr::Array{T,3}) where {T}
+  nx, ny, nz = size(arr)
+  result = Vector{T}(undef, nx * ny * nz)
+
+  for k in 1:nz, j in 1:ny, i in 1:nx
+    @inbounds result[(k-1)*ny*nx+(i-1)*nx+j] = arr[i, j, k]
+  end
+
+  return result
+end
+
+
