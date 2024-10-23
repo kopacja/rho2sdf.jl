@@ -172,6 +172,7 @@ function RBFs_smoothing(
   taskName::String,
   threshold::Float64=1e-3
 )
+  name = Is_interpolation ? "Interpolation" : "Approximation"
 
   # SDF - Replace preallocated values with the maximum computed distance:
   dist_modif = process_vector(dist)
@@ -189,6 +190,7 @@ function RBFs_smoothing(
   (step, fine_grid) = create_smooth_grid(my_grid, smooth) # Create fine grid
   println("Original grid size: ", my_grid.N)
   println("Fine grid size: ", dim)
+
   # Define Gaussian kernel using LimitedRangeRBFKernel
   σ = my_grid.cell_size # width of the Gaussian function
   kernel = LimitedRangeRBFKernel(σ, threshold)
@@ -199,15 +201,17 @@ function RBFs_smoothing(
             (@time compute_rbf_weights(coarse_grid, raw_SDF, kernel)) :
             vec(raw_SDF)
 
-  println("Computing interpolation on the fine grid...")
-  @time fine_LSF = rbf_interpolation_kdtree(fine_grid, coarse_grid, weights, kernel)
-  println("Done")
+  println("Computing the LSF zero level to meet the volume condition...")
+  @time LSF = rbf_interpolation_kdtree(coarse_grid, coarse_grid, weights, kernel)
+  th = LS_Threshold(LSF, V_frac, 4)
 
-  th = LS_Threshold(fine_LSF, V_frac, 4)
+  println("Computing $name on the fine grid...")
+  @time fine_LSF = rbf_interpolation_kdtree(fine_grid, coarse_grid, weights, kernel)
+
+  # Shifting LSF to maintain volume
   fine_LSF_offset = fine_LSF .+ th
 
-  name = Is_interpolation ? "Interpolation" : "Approximation"
-  B = round(my_grid.cell_size, digits = 4)
+  B = round(my_grid.cell_size, digits=4)
   Rho2sdf.exportStructuredPointsToVTK(taskName * "_smooth_B-" * string(B) * "_" * name * ".vtk", my_grid, fine_LSF_offset, "distance", smooth)
 
   fine_LSF_offset_array = vector_to_array(fine_LSF_offset, dim)
