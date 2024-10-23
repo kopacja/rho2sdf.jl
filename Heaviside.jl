@@ -25,6 +25,7 @@ function RBFs_smoothing(
   taskName::String,
   threshold::Float64=1e-3
 )
+name = Is_interpolation ? "Interpolation" : "Approximation"
 
   # SDF - Replace preallocated values with the maximum computed distance:
   dist_modif = process_vector(dist)
@@ -52,27 +53,20 @@ function RBFs_smoothing(
             (@time compute_rbf_weights(coarse_grid, raw_SDF, kernel)) :
             vec(raw_SDF)
 
-  println("Computing interpolation on the fine grid...")
+  println("Computing the LSF zero level to meet the volume condition...")
+  @time LSF = rbf_interpolation_kdtree(coarse_grid, coarse_grid, weights, kernel)
+  th = LS_Threshold(LSF, V_frac, 4)
+
+  println("Computing $name on the fine grid...")
   @time fine_LSF = rbf_interpolation_kdtree(fine_grid, coarse_grid, weights, kernel)
   println("Done")
 
-  th = LS_Threshold(fine_LSF, V_frac, 4)
+  # Shifting LSF to maintain volume
   fine_LSF_offset = fine_LSF .+ th
 
-  name = Is_interpolation ? "Interpolation" : "Approximation"
   B = round(my_grid.cell_size, digits=4)
   Rho2sdf.exportStructuredPointsToVTK(taskName * "_smooth_B-" * string(B) * "_" * name * ".vtk", my_grid, fine_LSF_offset, "distance", smooth)
 
-  # fine_LSF_offset_array = vector_to_array(fine_LSF_offset, dim)
-
-  # # Save SDF data to HDF5 file
-  # h5open(taskName * "_" * name * "_SDF_B-" * string(B) * ".h5", "w") do file
-  #   write(file, "/SDF", fine_LSF_offset_array)
-  #   write(file, "/dx", step)
-  #   write(file, "/dy", step)
-  #   write(file, "/dz", step)
-  #   write(file, "/origin", Float32.(my_grid.AABB_min))
-  # end
   return fine_LSF_offset
 end
 
@@ -90,12 +84,16 @@ taskName = "Heaviside"
 name = "Approximation"
 
 # Parametr strmosti (můžete upravit podle potřeby)
-k = 1.
+k = 0.1
 
 # Aplikace úpravy strmosti na všechny hodnoty
 adjusted_sdf_dists = adjust_steepness.(sdf_dists, k)
 
 fine_sdf = RBFs_smoothing(adjusted_sdf_dists, sdf_grid, false, 2, "chapadlo_sdf_$(k)") # interpolation == true, aproximation == false, smooth
+
+# fine_sdf = RBFs_smoothing(sdf_dists, sdf_grid, false, 2, "chapadlo_new") # interpolation == true, aproximation == false, smooth
+# fine_sdf = RBFs_smoothing(sdf_dists, sdf_grid, false, 2, "chapadlo_old") # interpolation == true, aproximation == false, smooth
+
 
 # B = round(sdf_grid.cell_size, digits=4)
 # Rho2sdf.exportStructuredPointsToVTK(taskName * "_smooth_B-" * string(B) * "_" * name * ".vtk", sdf_grid, fine_sdf, "distance", 2)
