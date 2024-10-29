@@ -1,29 +1,39 @@
 using LinearAlgebra
 using WriteVTK
 using StaticArrays
+using JLD2
 
-mutable struct SphereMesh
+mutable struct BlockMesh
     nx::Int
     ny::Int
     nz::Int
-    x::Vector{Float64}
-    y::Vector{Float64}
-    z::Vector{Float64}
-    SDF::Array{Float64,3}
-    X::Vector{Vector{Float64}}    # Souřadnice použitých uzlů
-    IEN::Vector{Vector{Int64}}    # Konektivita elementů
-    node_sdf::Vector{Float64}     # SDF hodnoty pro použité uzly
-    
-    # Pomocná mapa pro sledování použitých uzlů a jejich nových indexů
-    node_map::Dict{Int64, Int64}  # původní_index => nový_index
+    grid::Array{Vector{Float64}, 3}   # 3D pole vektorů souřadnic uzlů
+    SDF::Array{Float64,3}             # SDF hodnoty
+    X::Vector{Vector{Float64}}        # Souřadnice použitých uzlů
+    IEN::Vector{Vector{Int64}}        # Konektivita elementů
+    node_sdf::Vector{Float64}         # SDF hodnoty pro použité uzly
+    node_map::Dict{Int64, Int64}      # původní_index => nový_index
 
-    function SphereMesh(nx::Int=30, ny::Int=30, nz::Int=30)
-        nx > 1 || throw(ArgumentError("nx must be > 1"))
-        ny > 1 || throw(ArgumentError("ny must be > 1"))
-        nz > 1 || throw(ArgumentError("nz must be > 1"))
+    function BlockMesh()
+        # Načtení dat
+        @load "data/Z_block_FineGrid.jld2" fine_grid
+        # @load "src/ImplicitDomainMeshing/data/Z_block_FineGrid.jld2" fine_grid
+        @load "data/Z_block_FineSDF.jld2" fine_sdf
+        # @load "src/ImplicitDomainMeshing/data/Z_block_FineSDF.jld2" fine_sdf
+        
+        # Konverze Float32 na Float64 pro konzistenci
+        grid = Array{Vector{Float64}, 3}(undef, size(fine_grid))
+        for i in eachindex(fine_grid)
+            grid[i] = Vector{Float64}(fine_grid[i])
+        end
+        
+        sdf = Float64.(fine_sdf)
+        
+        nx, ny, nz = size(grid)
         
         mesh = new(nx, ny, nz)
-        setup_grid!(mesh)
+        mesh.grid = grid
+        mesh.SDF = sdf
         mesh.node_map = Dict{Int64, Int64}()
         mesh.X = Vector{Vector{Float64}}()
         mesh.IEN = Vector{Vector{Int64}}()
@@ -32,32 +42,18 @@ mutable struct SphereMesh
     end
 end
 
-# Inicializace výpočetní mřížky
-function setup_grid!(mesh::SphereMesh)
-    mesh.x = collect(range(-1, 1, length=mesh.nx))
-    mesh.y = collect(range(-1, 1, length=mesh.ny))
-    mesh.z = collect(range(-1, 1, length=mesh.nz))
-    
-    mesh.SDF = Array{Float64}(undef, mesh.nx, mesh.ny, mesh.nz)
-    radius = 0.5
-    
-    for i in 1:mesh.nx, j in 1:mesh.ny, k in 1:mesh.nz
-        mesh.SDF[i,j,k] = radius - sqrt(mesh.x[i]^2 + mesh.y[j]^2 + mesh.z[k]^2)
-    end
-end
-
 # Pomocná funkce pro získání původního globálního indexu uzlu z i,j,k indexů
-function get_original_node_id(mesh::SphereMesh, i::Int, j::Int, k::Int)
+function get_original_node_id(mesh::BlockMesh, i::Int, j::Int, k::Int)
     return i + (j-1)*mesh.nx + (k-1)*mesh.nx*mesh.ny
 end
 
 # Pomocná funkce pro získání nebo vytvoření nového indexu uzlu
-function get_or_create_node!(mesh::SphereMesh, i::Int, j::Int, k::Int)
+function get_or_create_node!(mesh::BlockMesh, i::Int, j::Int, k::Int)
     orig_id = get_original_node_id(mesh, i, j, k)
     
     if !haskey(mesh.node_map, orig_id)
         # Vytvoření nového uzlu
-        push!(mesh.X, [mesh.x[i], mesh.y[j], mesh.z[k]])
+        push!(mesh.X, mesh.grid[i,j,k])
         push!(mesh.node_sdf, mesh.SDF[i,j,k])
         mesh.node_map[orig_id] = length(mesh.X)
     end
@@ -66,7 +62,7 @@ function get_or_create_node!(mesh::SphereMesh, i::Int, j::Int, k::Int)
 end
 
 # Získání SDF hodnot pro vrcholy buňky
-function get_cell_sdf_values(mesh::SphereMesh, i::Int, j::Int, k::Int)
+function get_cell_sdf_values(mesh::BlockMesh, i::Int, j::Int, k::Int)
     1 <= i < mesh.nx || throw(BoundsError(mesh.SDF, i))
     1 <= j < mesh.ny || throw(BoundsError(mesh.SDF, j))
     1 <= k < mesh.nz || throw(BoundsError(mesh.SDF, k))
@@ -84,12 +80,12 @@ function get_cell_sdf_values(mesh::SphereMesh, i::Int, j::Int, k::Int)
 end
 
 # Zpracování jedné buňky a vytvoření tetraedrů
-function process_cell!(mesh::SphereMesh, i::Int, j::Int, k::Int)
+function process_cell!(mesh::BlockMesh, i::Int, j::Int, k::Int)
     # Získání SDF hodnot
     sdf_values = get_cell_sdf_values(mesh, i, j, k)
     
     # Kontrola, zda jsou všechny hodnoty SDF kladné
-    if !all(>=(0), sdf_values)
+    if !any(>=(0), sdf_values)
         return
     end
     
@@ -122,7 +118,7 @@ function process_cell!(mesh::SphereMesh, i::Int, j::Int, k::Int)
 end
 
 # Generování sítě
-function generate_mesh!(mesh::SphereMesh)
+function generate_mesh!(mesh::BlockMesh)
     empty!(mesh.X)
     empty!(mesh.IEN)
     empty!(mesh.node_sdf)
@@ -139,9 +135,8 @@ function generate_mesh!(mesh::SphereMesh)
     @info "Vytvořeno $(length(mesh.X)) uzlů a $(length(mesh.IEN)) tetraedrů"
 end
 
-
 # Export do VTK formátu
-function export_vtk(mesh::SphereMesh, filename::String)
+function export_vtk(mesh::BlockMesh, filename::String)
     if !endswith(filename, ".vtu")
         filename = filename * ".vtu"
     end
@@ -164,7 +159,7 @@ end
 
 # Hlavní funkce
 function main()
-    mesh = SphereMesh(30, 30, 30)
+    mesh = BlockMesh()
     @info "Generování sítě..."
     generate_mesh!(mesh)
     @info "Export do VTK..."
