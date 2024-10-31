@@ -13,6 +13,7 @@ mutable struct BlockMesh
   SDF::Array{Float64,3}             # SDF hodnoty
   X::Vector{Vector{Float64}}        # Souřadnice použitých uzlů
   IEN::Vector{Vector{Int64}}        # Konektivita elementů
+  INE::Vector{Vector{Int64}}       # Inverzní konektivita (Node Element)
   node_sdf::Vector{Float64}         # SDF hodnoty pro použité uzly
   node_map::Dict{Int64,Int64}      # původní_index => nový_index
 
@@ -39,6 +40,7 @@ mutable struct BlockMesh
     mesh.node_map = Dict{Int64,Int64}()
     mesh.X = Vector{Vector{Float64}}()
     mesh.IEN = Vector{Vector{Int64}}()
+    mesh.INE = Vector{Vector{Int64}}()
     mesh.node_sdf = Vector{Float64}()
     return mesh
   end
@@ -182,6 +184,8 @@ function generate_mesh!(mesh::BlockMesh)
 
   # Vyčištění nepoužitých uzlů
   cleanup_unused_nodes!(mesh)
+
+  create_INE!(mesh)  # Vytvoří INE v mesh struktuře
 
   @info "Vytvořeno $(length(mesh.X)) uzlů a $(length(mesh.IEN)) tetraedrů"
 end
@@ -334,6 +338,27 @@ function copy_nonzero_vectors!(source, destination)
   end
   return destination
 end
+
+# Funkce pro vytvoření INE
+function create_INE!(mesh::BlockMesh)
+  # Inicializace INE pro každý uzel prázdným vektorem
+  mesh.INE = [Vector{Int64}() for _ in 1:length(mesh.X)]
+
+  # Procházení všech elementů a přiřazení k uzlům
+  for (elem_id, element) in enumerate(mesh.IEN)
+    for node_id in element
+      push!(mesh.INE[node_id], elem_id)
+    end
+  end
+
+  return mesh
+end
+
+# Pomocná funkce pro získání elementů připojených k uzlu
+function get_connected_elements(mesh::BlockMesh, node_id::Int)
+  return mesh.INE[node_id]
+end
+
 
 mesh = BlockMesh()
 @info "Generování sítě..."
