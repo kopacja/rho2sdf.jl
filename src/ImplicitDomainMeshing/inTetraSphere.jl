@@ -359,6 +359,30 @@ function get_connected_elements(mesh::BlockMesh, node_id::Int)
   return mesh.INE[node_id]
 end
 
+function find_elements_by_negative_sdf(mesh::BlockMesh, connected_elements::Vector{Int64})
+  # Inicializace polí pro ukládání ID elementů
+  tet_three_negative = Int64[]  # Pro elementy se 3 zápornými uzly
+  tet_two_negative = Int64[]    # Pro elementy se 2 zápornými uzly
+
+  # Procházení připojených elementů
+  for elem_id in connected_elements
+    # Získání SDF hodnot pro všechny uzly elementu
+    tet_sdf_values = mesh.node_sdf[mesh.IEN[elem_id]]
+
+    # Spočítání počtu záporných hodnot
+    negative_count = count(x -> x < 0.0, tet_sdf_values)
+
+    # Klasifikace elementu podle počtu záporných uzlů
+    if negative_count == 3
+      push!(tet_three_negative, elem_id)
+    elseif negative_count == 2
+      push!(tet_two_negative, elem_id)
+    end
+  end
+
+  return tet_three_negative, tet_two_negative
+end
+
 
 mesh = BlockMesh()
 @info "Generování sítě..."
@@ -371,6 +395,8 @@ function project_nodes_to_isocontour!(mesh::BlockMesh)
   # Iterate through all nodes
   for i in 1:non
     if mesh.node_sdf[i] < 0.0
+      connected_elements = get_connected_elements(mesh, i)  # Získá připojené elementy pro uzel
+
       x = mesh.X[i]
       # Find all connected elements
       elements = find_regular_elements(mesh, x)
@@ -388,49 +414,123 @@ function project_nodes_to_isocontour!(mesh::BlockMesh)
         continue
       end
 
-      nce = length(crossing_indices)
-      x_possibilities = fill([0.0, 0.0, 0.0], nce)
 
-      # Process each crossing element
-      for j in 1:nce
-        element = elements[crossing_indices[j]]
-        sdf_e = element.sdf_values
-        Xₑ = reduce(hcat, element.coords)
+      tet_three_negative, tet_two_negative = find_elements_by_negative_sdf(mesh, connected_elements)
 
-        # Compute projected coordinates
-        try
-          ξ₁, ξ₂, ξ₃ = compute_coords(x, Xₑ, sdf_e)
+      # Výběr vhodného elementu podle priority
+      if !isempty(tet_three_negative)
+        # Doplň tuto část.
+        # Výpočet souřadnic posunutého uzlu na izokonturu.
+        # Postup:
+        # - Nalézt v jakém osmiuzlovým elementu se first(tet_three_negative) nachází -> zjistit souřadnice uzlů tohoto elementu a SDF hodnoty uzlů tohoto elemetu.
+        # - detekovat uzel, která má kladnou SDF v rámci first(tet_three_negative) tetradedra elementu.
+        # - Znám uzlové hodnoty SDF pro pravidelný osmiuzlový elementu -> SDF hodnoty mohu interpolovat v rámci elementu pomocí standratních tvarových funkcí.
+        # - V tomto okamžiku mám dva body (s kladno SDF hodnotou) a bod x = mesh.X. Chci nalézt bod, který je na spojnici těchto dvou bodů a zároveň leží na nulové hladině SDF funkce.
+        # X_new[i] # = souřadnice vypočteného uzlu na izokonturu. 
+        #INFO: 3 uzly:
+        tet_id = first(tet_three_negative)  # ID tetrahedra se 3 zápornými uzly
 
-          # Compute shape functions
-          N = [
-            -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
-            1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
-            -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
-            1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
-            1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
-            -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
-            1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
-            -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
-          ]
+        # Získání uzlů tetrahedra
+        tet_nodes = mesh.IEN[tet_id]
+        tet_sdf_values = mesh.node_sdf[tet_nodes]
 
-          x_new = Xₑ * N
-          x_possibilities[j] = x_new
-        catch e
-          @warn "Failed to compute coordinates for node $i in element $j: $e"
+        # Nalezení uzlu s kladnou SDF hodnotou
+        positive_node_idx = findfirst(x -> x >= 0.0, tet_sdf_values)
+        if positive_node_idx === nothing
+          @warn "Nenalezen uzel s kladnou SDF hodnotou v tetrahedru $tet_id"
           continue
+        end
+
+        # Nalezení pravidelného elementu obsahujícího tento tetrahedr
+        regular_element = nothing
+        for element in elements
+          # Kontrola, zda aktuální element obsahuje všechny uzly tetrahedra
+          contains_all_nodes = true
+          for node in mesh.X[tet_nodes]
+            if !any(e_node -> all(isapprox.(node, e_node)), element.coords)
+              contains_all_nodes = false
+              break
+            end
+          end
+          if contains_all_nodes
+            regular_element = element
+            break
+          end
+        end
+
+        if regular_element === nothing
+          @warn "Nenalezen pravidelný element pro tetrahedr $tet_id"
+          continue
+        end
+
+        # Získání souřadnic a SDF hodnot pro pravidelný element
+        Xₑ = reduce(hcat, regular_element.coords)
+        sdf_e = regular_element.sdf_values
+
+        # Bod s kladnou SDF hodnotou
+        positive_point = mesh.X[tet_nodes[positive_node_idx]]
+        positive_sdf = tet_sdf_values[positive_node_idx]
+
+        # Výpočet průsečíku s nulovou hladinou pomocí lineární interpolace
+        negative_sdf = mesh.node_sdf[i]  # SDF hodnota aktuálního bodu
+        t = negative_sdf / (negative_sdf - positive_sdf)
+
+        # Interpolace souřadnic
+        X_new[i] = x + t * (positive_point - x)
+
+
+      elseif !isempty(tet_two_negative)
+        #INFO: 2 uzly:
+        println("dva uzly")
+        first(tet_two_negative)    # Vrátí ID prvního tetraedra se 2 zápornými uzly
+      else
+        #INFO: 1 uzel:
+        println("jeden uzel")
+        nce = length(crossing_indices)
+        x_possibilities = fill([0.0, 0.0, 0.0], nce)
+
+        # Process each crossing element
+        for j in 1:nce
+          element = elements[crossing_indices[j]]
+          sdf_e = element.sdf_values
+          Xₑ = reduce(hcat, element.coords)
+
+          # Compute projected coordinates
+          try
+            ξ₁, ξ₂, ξ₃ = compute_coords(x, Xₑ, sdf_e)
+
+            # Compute shape functions
+            N = [
+              -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+              1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+              -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+              1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+              1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+              -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+              1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+              -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+            ]
+
+            x_new = Xₑ * N
+            x_possibilities[j] = x_new
+          catch e
+            @warn "Failed to compute coordinates for node $i in element $j: $e"
+            continue
+          end
+        end
+
+        # Filter out zero vectors from failed computations
+        valid_points = filter(p -> !all(iszero, p), x_possibilities)
+
+        if !isempty(valid_points)
+          distances = [euclidean_distance(point, x) for point in valid_points]
+          closest_idx = argmin(distances)
+          X_new[i] = valid_points[closest_idx]
+        else
+          @warn "No valid projections found for node $i at position $(x)"
         end
       end
 
-      # Filter out zero vectors from failed computations
-      valid_points = filter(p -> !all(iszero, p), x_possibilities)
-
-      if !isempty(valid_points)
-        distances = [euclidean_distance(point, x) for point in valid_points]
-        closest_idx = argmin(distances)
-        X_new[i] = valid_points[closest_idx]
-      else
-        @warn "No valid projections found for node $i at position $(x)"
-      end
     end
   end
 
