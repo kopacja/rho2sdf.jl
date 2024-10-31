@@ -392,43 +392,37 @@ function project_nodes_to_isocontour!(mesh::BlockMesh)
   non = length(mesh.X)
   X_new = fill([0.0, 0.0, 0.0], non)
 
+  # Počítadla pro sledování zpracovaných případů
+  processed = Dict{String, Int}()
+  processed["three_negative"] = 0
+  processed["two_negative"] = 0
+  processed["one_negative"] = 0
+
   # Iterate through all nodes
   for i in 1:non
     if mesh.node_sdf[i] < 0.0
-      connected_elements = get_connected_elements(mesh, i)  # Získá připojené elementy pro uzel
-
+      connected_elements = get_connected_elements(mesh, i)
       x = mesh.X[i]
-      # Find all connected elements
       elements = find_regular_elements(mesh, x)
 
       if isempty(elements)
-        @warn "No elements found for node $i at position $(x)"
         continue
       end
 
-      # Find crossing elements (those intersecting the zero level)
+      # Najít elementy protínající nulovou hladinu
       crossing_indices = findall(e -> any(>=(0), e.sdf_values) && any(<(0), e.sdf_values), elements)
 
       if isempty(crossing_indices)
-        @warn "No crossing elements found for node $i at position $(x)"
         continue
       end
 
-
       tet_three_negative, tet_two_negative = find_elements_by_negative_sdf(mesh, connected_elements)
 
-      # Výběr vhodného elementu podle priority
+      # Přidáno logování pro debugging
       if !isempty(tet_three_negative)
-        # Doplň tuto část.
-        # Výpočet souřadnic posunutého uzlu na izokonturu.
-        # Postup:
-        # - Nalézt v jakém osmiuzlovým elementu se first(tet_three_negative) nachází -> zjistit souřadnice uzlů tohoto elementu a SDF hodnoty uzlů tohoto elemetu.
-        # - detekovat uzel, která má kladnou SDF v rámci first(tet_three_negative) tetradedra elementu.
-        # - Znám uzlové hodnoty SDF pro pravidelný osmiuzlový elementu -> SDF hodnoty mohu interpolovat v rámci elementu pomocí standratních tvarových funkcí.
-        # - V tomto okamžiku mám dva body (s kladno SDF hodnotou) a bod x = mesh.X. Chci nalézt bod, který je na spojnici těchto dvou bodů a zároveň leží na nulové hladině SDF funkce.
-        # X_new[i] # = souřadnice vypočteného uzlu na izokonturu. 
-        #INFO: 3 uzly:
-        tet_id = first(tet_three_negative)  # ID tetrahedra se 3 zápornými uzly
+        processed["three_negative"] += 1
+        # Stávající kód pro zpracování tří záporných uzlů
+        tet_id = first(tet_three_negative) # ID tetrahedra se 3 zápornými uzly
 
         # Získání uzlů tetrahedra
         tet_nodes = mesh.IEN[tet_id]
@@ -480,12 +474,43 @@ function project_nodes_to_isocontour!(mesh::BlockMesh)
 
 
       elseif !isempty(tet_two_negative)
-        #INFO: 2 uzly:
-        println("dva uzly")
-        first(tet_two_negative)    # Vrátí ID prvního tetraedra se 2 zápornými uzly
+        processed["two_negative"] += 1
+        println("Zpracovávám konfiguraci se dvěma zápornými uzly pro uzel $i")
+        tet_id = first(tet_two_negative)
+        
+        # Získání uzlů tetrahedru
+        tet_nodes = mesh.IEN[tet_id]
+        tet_sdf_values = mesh.node_sdf[tet_nodes]
+        
+        # Najít uzly s kladnou a zápornou SDF
+        positive_indices = findall(x -> x >= 0.0, tet_sdf_values)
+        negative_indices = findall(x -> x < 0.0, tet_sdf_values)
+        
+        # Použít průměr interpolovaných bodů
+        x_new = zeros(3)
+        count = 0
+        
+        for neg_idx in negative_indices
+          for pos_idx in positive_indices
+            neg_point = mesh.X[tet_nodes[neg_idx]]
+            pos_point = mesh.X[tet_nodes[pos_idx]]
+            neg_sdf = tet_sdf_values[neg_idx]
+            pos_sdf = tet_sdf_values[pos_idx]
+            
+            # Lineární interpolace
+            t = neg_sdf / (neg_sdf - pos_sdf)
+            interpolated_point = neg_point + t * (pos_point - neg_point)
+            
+            x_new += interpolated_point
+            count += 1
+          end
+        end
+        
+        X_new[i] = x_new / count
       else
+        processed["one_negative"] += 1
         #INFO: 1 uzel:
-        println("jeden uzel")
+        println("Zpracovávám konfiguraci s jedním záporným uzlem pro uzel $i")
         nce = length(crossing_indices)
         x_possibilities = fill([0.0, 0.0, 0.0], nce)
 
@@ -533,6 +558,13 @@ function project_nodes_to_isocontour!(mesh::BlockMesh)
 
     end
   end
+
+   # Výpis statistik
+   println("\nStatistiky zpracování:")
+   println("Zpracováno případů s třemi zápornými uzly: $(processed["three_negative"])")
+   println("Zpracováno případů s dvěma zápornými uzly: $(processed["two_negative"])")
+   println("Zpracováno případů s jedním záporným uzlem: $(processed["one_negative"])")
+ 
 
   # Update mesh coordinates
   copy_nonzero_vectors!(X_new, mesh.X)
