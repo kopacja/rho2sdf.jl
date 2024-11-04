@@ -2,6 +2,7 @@ using LinearAlgebra
 using WriteVTK
 using StaticArrays
 using JLD2
+using NLopt
 using JuMP
 import Ipopt
 
@@ -109,14 +110,14 @@ function process_cell!(mesh::BlockMesh, i::Int, j::Int, k::Int)
     get_or_create_node!(mesh, i, j + 1, k + 1)   # back-top-left
   ]
 
-  # Definice tetraedrů
+  # Tetrahedra definitions according to Schläfli orthoscheme
   tet_connectivity = [
-    [1, 2, 4, 6],  # První čtyřstěn
-    [2, 3, 4, 6],  # Druhý čtyřstěn
-    [1, 4, 6, 8],  # Třetí čtyřstěn
-    [1, 6, 5, 8],  # Čtvrtý čtyřstěn
-    [3, 4, 7, 6],  # Pátý čtyřstěn
-    [4, 6, 7, 8]   # Šestý čtyřstěn
+    [1, 2, 3, 7],  # Path 1: x, y, z
+    [1, 2, 6, 7],  # Path 2: x, z, y
+    [1, 4, 3, 7],  # Path 3: y, x, z
+    [1, 4, 8, 7],  # Path 4: y, z, x
+    [1, 5, 6, 7],  # Path 5: z, x, y
+    [1, 5, 8, 7]   # Path 6: z, y, x
   ]
 
   # Vytvoření elementů s novými ID uzlů
@@ -384,16 +385,156 @@ function find_elements_by_negative_sdf(mesh::BlockMesh, connected_elements::Vect
 end
 
 
+function find_local_coordinates(
+  Xₑ,
+  xₙ
+)
+  starting_points::Vector{Tuple{Float64,Float64,Float64}} = [
+    (0.0, 0.0, 0.0),
+    (-0.5, -0.5, -0.5),
+    (0.5, -0.5, -0.5),
+    (0.5, 0.5, -0.5),
+    (-0.5, 0.5, -0.5),
+    (-0.5, -0.5, 0.5),
+    (0.5, -0.5, 0.5),
+    (0.5, 0.5, 0.5),
+    (-0.5, 0.5, 0.5)
+  ]
+
+  function objective(ξ::Vector, grad::Vector)
+    ξ₁, ξ₂, ξ₃ = ξ
+
+    # Compute N(ξ)
+    N = [
+      -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+      1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+      -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+      1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+      1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+      -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+      1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+      -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+    ]
+
+    d¹N_dξ¹ = zeros(Float64, 8, 3)
+    d¹N_dξ¹[1, :] = [
+      -0.125 * (ξ₂ - 1) * (ξ₃ - 1)
+      -0.125 * (ξ₁ - 1) * (ξ₃ - 1)
+      -0.125 * (ξ₁ - 1) * (ξ₂ - 1)
+    ]
+
+    d¹N_dξ¹[2, :] = [
+      0.125 * (ξ₂ - 1) * (ξ₃ - 1)
+      0.125 * (ξ₁ + 1) * (ξ₃ - 1)
+      0.125 * (ξ₁ + 1) * (ξ₂ - 1)
+    ]
+
+    d¹N_dξ¹[3, :] = [
+      -0.125 * (ξ₂ + 1) * (ξ₃ - 1)
+      -0.125 * (ξ₁ + 1) * (ξ₃ - 1)
+      -0.125 * (ξ₁ + 1) * (ξ₂ + 1)
+    ]
+
+    d¹N_dξ¹[4, :] = [
+      0.125 * (ξ₂ + 1) * (ξ₃ - 1)
+      0.125 * (ξ₁ - 1) * (ξ₃ - 1)
+      0.125 * (ξ₁ - 1) * (ξ₂ + 1)
+    ]
+
+    d¹N_dξ¹[5, :] = [
+      0.125 * (ξ₂ - 1) * (ξ₃ + 1)
+      0.125 * (ξ₁ - 1) * (ξ₃ + 1)
+      0.125 * (ξ₁ - 1) * (ξ₂ - 1)
+    ]
+
+    d¹N_dξ¹[6, :] = [
+      -0.125 * (ξ₂ - 1) * (ξ₃ + 1)
+      -0.125 * (ξ₁ + 1) * (ξ₃ + 1)
+      -0.125 * (ξ₁ + 1) * (ξ₂ - 1)
+    ]
+
+    d¹N_dξ¹[7, :] = [
+      0.125 * (ξ₂ + 1) * (ξ₃ + 1)
+      0.125 * (ξ₁ + 1) * (ξ₃ + 1)
+      0.125 * (ξ₁ + 1) * (ξ₂ + 1)
+    ]
+
+    d¹N_dξ¹[8, :] = [
+      -0.125 * (ξ₂ + 1) * (ξ₃ + 1)
+      -0.125 * (ξ₁ - 1) * (ξ₃ + 1)
+      -0.125 * (ξ₁ - 1) * (ξ₂ + 1)
+    ]
+
+    # Compute x(ξ)
+    x = Xₑ * N  # x is a 3-element vector
+
+    # Compute residual R = x - xₙ
+    R = x - xₙ  # R is a 3-element vector
+
+    # Compute objective function value f
+    f = dot(R, R)  # Equivalent to sum(R[i]^2 for i in 1:3)
+
+    if length(grad) > 0
+      # Compute the derivatives of N with respect to ξ
+      dN_dξ = zeros(Float64, 8, 3)  # 8 shape functions x 3 variables
+
+      # Assign your computed derivatives to dN_dξ
+      dN_dξ .= d¹N_dξ¹  # Ensure dN_dξ is correctly populated
+
+      # Compute Jacobian J = Xₑ * dN_dξ
+      J = Xₑ * dN_dξ  # J is 3x3
+
+      # Compute gradient grad = 2 * Jᵗ * R
+      grad .= 2 * (J' * R)
+    end
+
+    return f
+  end
+
+  best_solution = nothing
+  best_objective = Inf
+
+  for start_point in starting_points
+    #   opt = Opt(:LN_COBYLA, 3)
+    opt = Opt(:LD_LBFGS, 3)
+    opt.lower_bounds = [-5.0, -5.0, -5.0]
+    opt.upper_bounds = [5.0, 5.0, 5.0]
+    opt.xtol_rel = 1e-6
+    opt.maxeval = 500
+    opt.min_objective = objective
+    opt.maxtime = 1.0
+
+    (minf, minx, ret) = NLopt.optimize(opt, collect(start_point))
+
+    if minf < best_objective
+      best_objective = minf
+      best_solution = minx
+    end
+  end
+
+  if best_solution === nothing
+    return (false, [10.0, 10.0, 10.0])
+  else
+    return (true, best_solution)
+  end
+end
+
+
 mesh = BlockMesh()
 @info "Generování sítě..."
 generate_mesh!(mesh)
+# mesh.INE[5]
+
+# connected_elements = get_connected_elements(mesh, 1) # id elements
+# for j in 1:length(connected_elements)
+#   mesh.node_sdf[mesh.IEN[j]] # hodnoty sdf pro uzly j-tého tetra elementu, který je součástí itého uzlu
 
 function project_nodes_to_isocontour!(mesh::BlockMesh)
   non = length(mesh.X)
   X_new = fill([0.0, 0.0, 0.0], non)
 
   # Počítadla pro sledování zpracovaných případů
-  processed = Dict{String, Int}()
+  processed = Dict{String,Int}()
   processed["three_negative"] = 0
   processed["two_negative"] = 0
   processed["one_negative"] = 0
@@ -420,9 +561,9 @@ function project_nodes_to_isocontour!(mesh::BlockMesh)
 
       # Přidáno logování pro debugging
       if !isempty(tet_three_negative)
+        #INFO: 3 uzly:
         processed["three_negative"] += 1
-        # Stávající kód pro zpracování tří záporných uzlů
-        tet_id = first(tet_three_negative) # ID tetrahedra se 3 zápornými uzly
+        tet_id = first(tet_three_negative)
 
         # Získání uzlů tetrahedra
         tet_nodes = mesh.IEN[tet_id]
@@ -435,10 +576,9 @@ function project_nodes_to_isocontour!(mesh::BlockMesh)
           continue
         end
 
-        # Nalezení pravidelného elementu obsahujícího tento tetrahedr
+        # Nalezení pravidelného elementu
         regular_element = nothing
         for element in elements
-          # Kontrola, zda aktuální element obsahuje všechny uzly tetrahedra
           contains_all_nodes = true
           for node in mesh.X[tet_nodes]
             if !any(e_node -> all(isapprox.(node, e_node)), element.coords)
@@ -457,55 +597,103 @@ function project_nodes_to_isocontour!(mesh::BlockMesh)
           continue
         end
 
-        # Získání souřadnic a SDF hodnot pro pravidelný element
+        # Bod s kladnou SDF hodnotou
+        positive_point = mesh.X[tet_nodes[positive_node_idx]]
+
+        # Iterativní hledání bodu na nulové hladině
+        max_iterations = 30
+        tolerance = 1e-4
+        current_point = x
         Xₑ = reduce(hcat, regular_element.coords)
         sdf_e = regular_element.sdf_values
 
-        # Bod s kladnou SDF hodnotou
-        positive_point = mesh.X[tet_nodes[positive_node_idx]]
-        positive_sdf = tet_sdf_values[positive_node_idx]
+        for iter in 1:max_iterations
+          # Výpočet směrového vektoru
+          direction = positive_point - current_point
+          # direction = - positive_point + current_point
 
-        # Výpočet průsečíku s nulovou hladinou pomocí lineární interpolace
-        negative_sdf = mesh.node_sdf[i]  # SDF hodnota aktuálního bodu
-        t = negative_sdf / (negative_sdf - positive_sdf)
+          # Výpočet nového bodu v polovině vzdálenosti
+          new_point = current_point + 0.5 * direction
 
-        # Interpolace souřadnic
-        X_new[i] = x + t * (positive_point - x)
+          # Nalezení lokálních souřadnic pro nový bod
+          try
+            (_, local_coords) = find_local_coordinates(Xₑ, new_point)
+            ξ₁, ξ₂, ξ₃ = local_coords
 
+            # Výpočet tvarových funkcí
+            N = [
+              -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
+              1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
+              -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
+              1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
+              1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
+              -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
+              1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
+              -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
+            ]
 
+            # Výpočet SDF hodnoty v novém bodě
+            sdf_new = dot(sdf_e, N)
+
+            # Kontrola konvergence
+            if abs(sdf_new) < tolerance
+              X_new[i] = new_point
+              break
+            end
+
+            # Aktualizace bodů pro další iteraci
+            if sdf_new < 0
+              current_point = new_point
+            else
+              positive_point = new_point
+            end
+
+            # Pokud jsme v poslední iteraci a stále jsme nenašli bod
+            if iter == max_iterations
+              X_new[i] = new_point  # Použijeme poslední vypočtený bod
+              @warn "Nedosažena požadovaná přesnost pro uzel $i po $max_iterations iteracích"
+            end
+
+          catch e
+            @warn "Chyba při výpočtu lokálních souřadnic pro uzel $i: $e"
+            X_new[i] = current_point  # Použijeme poslední platný bod
+            break
+          end
+        end
       elseif !isempty(tet_two_negative)
+        #INFO: 2 uzly:
         processed["two_negative"] += 1
         println("Zpracovávám konfiguraci se dvěma zápornými uzly pro uzel $i")
         tet_id = first(tet_two_negative)
-        
+
         # Získání uzlů tetrahedru
         tet_nodes = mesh.IEN[tet_id]
         tet_sdf_values = mesh.node_sdf[tet_nodes]
-        
+
         # Najít uzly s kladnou a zápornou SDF
         positive_indices = findall(x -> x >= 0.0, tet_sdf_values)
         negative_indices = findall(x -> x < 0.0, tet_sdf_values)
-        
+
         # Použít průměr interpolovaných bodů
         x_new = zeros(3)
         count = 0
-        
+
         for neg_idx in negative_indices
           for pos_idx in positive_indices
             neg_point = mesh.X[tet_nodes[neg_idx]]
             pos_point = mesh.X[tet_nodes[pos_idx]]
             neg_sdf = tet_sdf_values[neg_idx]
             pos_sdf = tet_sdf_values[pos_idx]
-            
+
             # Lineární interpolace
             t = neg_sdf / (neg_sdf - pos_sdf)
             interpolated_point = neg_point + t * (pos_point - neg_point)
-            
+
             x_new += interpolated_point
             count += 1
           end
         end
-        
+
         X_new[i] = x_new / count
       else
         processed["one_negative"] += 1
@@ -559,12 +747,12 @@ function project_nodes_to_isocontour!(mesh::BlockMesh)
     end
   end
 
-   # Výpis statistik
-   println("\nStatistiky zpracování:")
-   println("Zpracováno případů s třemi zápornými uzly: $(processed["three_negative"])")
-   println("Zpracováno případů s dvěma zápornými uzly: $(processed["two_negative"])")
-   println("Zpracováno případů s jedním záporným uzlem: $(processed["one_negative"])")
- 
+  # Výpis statistik
+  println("\nStatistiky zpracování:")
+  println("Zpracováno případů s třemi zápornými uzly: $(processed["three_negative"])")
+  println("Zpracováno případů s dvěma zápornými uzly: $(processed["two_negative"])")
+  println("Zpracováno případů s jedním záporným uzlem: $(processed["one_negative"])")
+
 
   # Update mesh coordinates
   copy_nonzero_vectors!(X_new, mesh.X)
@@ -598,3 +786,94 @@ end
 
 
 export_vtk(mesh, "test_geom")
+
+hledaný_bod = [0, -0.55, -0.45]
+tolerance = 1e-3
+index = findfirst(x -> all(abs.(x .- hledaný_bod) .< tolerance), mesh.X)
+if index !== nothing
+  nalezený_bod = mesh.X[index]
+end
+index
+
+
+# # Debugovací funkce pro analýzu konfigurace tetraedrů
+# function analyze_mesh_configuration(mesh::BlockMesh)
+#   # Počítadla pro různé konfigurace
+#   total_nodes = length(mesh.X)
+#   total_elements = length(mesh.IEN)
+#   nodes_with_negative_sdf = sum(x -> x < 0.0, mesh.node_sdf)
+
+#   # Statistiky tetraedrů
+#   tet_configurations = Dict{Int, Int}()  # počet_záporných_uzlů => počet_výskytů
+
+#   # Analýza uzlů
+#   for i in 1:total_nodes
+#       if mesh.node_sdf[i] < 0.0
+#           # Analýza připojených elementů
+#           connected_elements = get_connected_elements(mesh, i)
+
+#           # Pro každý připojený element
+#           for elem_id in connected_elements
+#               # Získání SDF hodnot pro všechny uzly elementu
+#               tet_sdf_values = mesh.node_sdf[mesh.IEN[elem_id]]
+#               negative_count = sum(x -> x < 0.0, tet_sdf_values)
+
+#               # Aktualizace statistik
+#               tet_configurations[negative_count] = get(tet_configurations, negative_count, 0) + 1
+#           end
+#       end
+#   end
+
+#   # Výpis statistik
+#   println("\n=== Analýza konfigurace sítě ===")
+#   println("Celkový počet uzlů: $total_nodes")
+#   println("Počet uzlů se záporným SDF: $nodes_with_negative_sdf")
+#   println("Celkový počet tetraedrů: $total_elements")
+
+#   println("\nKonfigurace tetraedrů:")
+#   for (neg_count, frequency) in sort(collect(tet_configurations))
+#       percentage = round(100 * frequency / total_elements, digits=2)
+#       println("Tetraedry s $neg_count zápornými uzly: $frequency ($percentage%)")
+#   end
+
+#   # Detailní analýza několika prvních tetraedrů se zápornými uzly
+#   println("\nDetail prvních 5 tetraedrů se zápornými uzly:")
+#   analyzed_count = 0
+#   for elem_id in 1:total_elements
+#       tet_sdf_values = mesh.node_sdf[mesh.IEN[elem_id]]
+#       negative_count = sum(x -> x < 0.0, tet_sdf_values)
+
+#       if negative_count > 0 && analyzed_count < 5
+#           println("\nTetrahedron $elem_id:")
+#           println("SDF hodnoty: [", join(["$(round(v, digits=4))" for v in tet_sdf_values], ", "), "]")
+#           println("Počet záporných uzlů: $negative_count")
+#           println("Souřadnice uzlů:")
+#           for (node_idx, node_id) in enumerate(mesh.IEN[elem_id])
+#               coords = mesh.X[node_id]
+#               coords_str = join(["$(round(c, digits=4))" for c in coords], ", ")
+#               sdf = round(mesh.node_sdf[node_id], digits=4)
+#               println("  Uzel $node_idx: ($coords_str) [SDF: $sdf]")
+#           end
+#           analyzed_count += 1
+#       end
+#   end
+
+#   # Dodatečná analýza problémových konfigurací
+#   println("\nHledání specifických konfigurací pro první záporný uzel:")
+#   for i in 1:total_nodes
+#       if mesh.node_sdf[i] < 0.0
+#           connected_elements = get_connected_elements(mesh, i)
+#           tet_three_negative, tet_two_negative = find_elements_by_negative_sdf(mesh, connected_elements)
+
+#           println("\nUzel $i (SDF: $(round(mesh.node_sdf[i], digits=4))):")
+#           println("  Počet připojených elementů: $(length(connected_elements))")
+#           println("  Elementy se třemi zápornými uzly: $(length(tet_three_negative))")
+#           println("  Elementy se dvěma zápornými uzly: $(length(tet_two_negative))")
+#           break  # Analyzujeme pouze první záporný uzel
+#       end
+#   end
+# end
+
+# # Spustit analýzu
+# analyze_mesh_configuration(mesh)
+
