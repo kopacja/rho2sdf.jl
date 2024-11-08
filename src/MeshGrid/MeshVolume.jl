@@ -36,16 +36,15 @@ function calculate_mesh_volume(X::Vector{Vector{Float64}}, IEN::Vector{Vector{In
 
     for k in 1:ngp, j in 1:ngp, i in 1:ngp
       ξ, η, ζ = gp[i], gp[j], gp[k]
-      # local_coords = [ξ, η, ζ]
+      local_coords = [ξ, η, ζ]
 
       # Shape functions derivatives
-      dN = shape_function_derivatives(ξ, η, ζ)
-      # _, dN, _, _ = C3D8_SFaD(local_coords)
+      _, dN, _, _ = C3D8_SFaD(local_coords)
+
       # Jacobian matrix
       J = zeros(3, 3)
       for n in 1:8
-        J += xe[:, n] * dN[:, n]'
-        # J += xe[:, n] * dN[:, n]
+        J += xe[:, n] * dN[n, :]'
       end
 
       # Add contribution to element volume
@@ -61,44 +60,3 @@ function calculate_mesh_volume(X::Vector{Vector{Float64}}, IEN::Vector{Vector{In
   println("Volume fraction: ", (TO_volume / domain_volume))
 end
 
-"""
-Calculate shape function derivatives for 8-node hexahedron at given point.
-Returns 3×8 matrix of shape function derivatives.
-"""
-function shape_function_derivatives(ξ::Float64, η::Float64, ζ::Float64)
-  dN = zeros(3, 8)
-
-  # dN/dξ
-  dN[1, 1] = -0.125 * (1 - η) * (1 - ζ)
-  dN[1, 2] = 0.125 * (1 - η) * (1 - ζ)
-  dN[1, 3] = 0.125 * (1 + η) * (1 - ζ)
-  dN[1, 4] = -0.125 * (1 + η) * (1 - ζ)
-  dN[1, 5] = -0.125 * (1 - η) * (1 + ζ)
-  dN[1, 6] = 0.125 * (1 - η) * (1 + ζ)
-  dN[1, 7] = 0.125 * (1 + η) * (1 + ζ)
-  dN[1, 8] = -0.125 * (1 + η) * (1 + ζ)
-
-  # dN/dη
-  dN[2, 1] = -0.125 * (1 - ξ) * (1 - ζ)
-  dN[2, 2] = -0.125 * (1 + ξ) * (1 - ζ)
-  dN[2, 3] = 0.125 * (1 + ξ) * (1 - ζ)
-  dN[2, 4] = 0.125 * (1 - ξ) * (1 - ζ)
-  dN[2, 5] = -0.125 * (1 - ξ) * (1 + ζ)
-  dN[2, 6] = -0.125 * (1 + ξ) * (1 + ζ)
-  dN[2, 7] = 0.125 * (1 + ξ) * (1 + ζ)
-  dN[2, 8] = 0.125 * (1 - ξ) * (1 + ζ)
-
-  # dN/dζ
-  dN[3, 1] = -0.125 * (1 - ξ) * (1 - η)
-  dN[3, 2] = -0.125 * (1 + ξ) * (1 - η)
-  dN[3, 3] = -0.125 * (1 + ξ) * (1 + η)
-  dN[3, 4] = -0.125 * (1 - ξ) * (1 + η)
-  dN[3, 5] = 0.125 * (1 - ξ) * (1 - η)
-  dN[3, 6] = 0.125 * (1 + ξ) * (1 - η)
-  dN[3, 7] = 0.125 * (1 + ξ) * (1 + η)
-  dN[3, 8] = 0.125 * (1 - ξ) * (1 + η)
-
-  return dN
-end
-
-# calculate_mesh_volume(mesh.X, mesh.IEN, rho)
