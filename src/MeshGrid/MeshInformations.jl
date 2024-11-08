@@ -7,6 +7,9 @@ function MeshInformations(data::Any)
     IEN = convert(Array{Int64}, mesh["IEN"] .+ 1) # Matrix
     IEN = [IEN[:, i] for i in axes(IEN, 2)] # Vector{Vector{Int64}}
 
+    calculate_mesh_volume(X, IEN, rho)
+
+
     return (X, IEN, rho)
 end
 

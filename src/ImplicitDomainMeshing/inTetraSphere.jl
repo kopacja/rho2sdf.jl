@@ -1,5 +1,6 @@
 using LinearAlgebra
 using WriteVTK
+using Statistics
 using StaticArrays
 using JLD2
 using NLopt
@@ -20,9 +21,11 @@ mutable struct BlockMesh
 
   function BlockMesh()
     # Načtení dat
-    @load "data/Z_block_FineGrid.jld2" fine_grid
+    # @load "data/Z_block_FineGrid.jld2" fine_grid
+    @load "data/Z_chapadlo_FineGrid.jld2" fine_grid
     # @load "src/ImplicitDomainMeshing/data/Z_block_FineGrid.jld2" fine_grid
-    @load "data/Z_block_FineSDF.jld2" fine_sdf
+    # @load "data/Z_block_FineSDF.jld2" fine_sdf
+    @load "data/Z_chapadlo_FineSDF.jld2" fine_sdf
     # @load "src/ImplicitDomainMeshing/data/Z_block_FineSDF.jld2" fine_sdf
 
     # Konverze Float32 na Float64 pro konzistenci
@@ -762,118 +765,249 @@ end
 
 project_nodes_to_isocontour!(mesh)
 
-# Export do VTK formátu
-function export_vtk(mesh::BlockMesh, filename::String)
-  if !endswith(filename, ".vtu")
-    filename = filename * ".vtu"
-  end
-
-  # Převod uzlů do formátu pro VTK (3×N matice)
-  points = reduce(hcat, mesh.X)
-
-  # Vytvoření VTK buněk
-  cells = [MeshCell(VTKCellTypes.VTK_TETRA, tet) for tet in mesh.IEN]
-
-  # Export
-  vtk = vtk_grid(filename, points, cells)
-  vtk["SDF"] = mesh.node_sdf
-  vtk["radius"] = fill(0.5, length(mesh.node_sdf))
-  vtk_save(vtk)
-
-  @info "VTK soubor uložen jako: $(abspath(filename))"
-  @info "Exportováno $(length(mesh.X)) uzlů a $(length(mesh.IEN)) tetraedrů"
+# Výpočet objemu tetrahedru
+function tetrahedron_volume(vertices::Vector{Vector{Float64}})
+    # Matrix pro výpočet objemu
+    a = vertices[2] - vertices[1]
+    b = vertices[3] - vertices[1]
+    c = vertices[4] - vertices[1]
+    
+    # Objem = 1/6 * |det(a b c)|
+    return abs(dot(a, cross(b, c))) / 6.0
 end
 
-
-export_vtk(mesh, "test_geom")
-
-hledaný_bod = [0, -0.55, -0.45]
-tolerance = 1e-3
-index = findfirst(x -> all(abs.(x .- hledaný_bod) .< tolerance), mesh.X)
-if index !== nothing
-  nalezený_bod = mesh.X[index]
+# Výpočet plochy trojúhelníku
+function triangle_area(v1::Vector{Float64}, v2::Vector{Float64}, v3::Vector{Float64})
+    # Výpočet plochy pomocí vektorového součinu
+    return norm(cross(v2 - v1, v3 - v1)) / 2.0
 end
-index
 
+# Výpočet délky hrany
+function edge_length(v1::Vector{Float64}, v2::Vector{Float64})
+    return norm(v2 - v1)
+end
 
-# # Debugovací funkce pro analýzu konfigurace tetraedrů
-# function analyze_mesh_configuration(mesh::BlockMesh)
-#   # Počítadla pro různé konfigurace
-#   total_nodes = length(mesh.X)
-#   total_elements = length(mesh.IEN)
-#   nodes_with_negative_sdf = sum(x -> x < 0.0, mesh.node_sdf)
+# Výpočet kvality elementu pomocí poměru objemu k součtu ploch stěn
+function volume_surface_quality(vertices::Vector{Vector{Float64}})
+    # Výpočet objemu
+    volume = tetrahedron_volume(vertices)
+    
+    # Výpočet ploch všech stěn
+    areas = [
+        triangle_area(vertices[1], vertices[2], vertices[3]),  # Face 123
+        triangle_area(vertices[1], vertices[2], vertices[4]),  # Face 124
+        triangle_area(vertices[1], vertices[3], vertices[4]),  # Face 134
+        triangle_area(vertices[2], vertices[3], vertices[4])   # Face 234
+    ]
+    
+    total_surface = sum(areas)
+    
+    # Normalizovaný poměr (0 = degenerovaný, 1 = pravidelný tetrahedr)
+    actual_ratio = (volume / total_surface) * 36.0  # 36 je normalizační faktor
+    
+    return max(0.0, min(1.0, actual_ratio))
+end
 
-#   # Statistiky tetraedrů
-#   tet_configurations = Dict{Int, Int}()  # počet_záporných_uzlů => počet_výskytů
+# Výpočet kvality elementu pomocí poměru nejkratší a nejdelší hrany
+function aspect_ratio_quality(vertices::Vector{Vector{Float64}})
+    # Výpočet délky všech hran
+    edges = [
+        edge_length(vertices[1], vertices[2]),  # Edge 12
+        edge_length(vertices[1], vertices[3]),  # Edge 13
+        edge_length(vertices[1], vertices[4]),  # Edge 14
+        edge_length(vertices[2], vertices[3]),  # Edge 23
+        edge_length(vertices[2], vertices[4]),  # Edge 24
+        edge_length(vertices[3], vertices[4])   # Edge 34
+    ]
+    
+    min_edge = minimum(edges)
+    max_edge = maximum(edges)
+    
+    # Poměr nejkratší a nejdelší hrany (0 = degenerovaný, 1 = všechny hrany stejně dlouhé)
+    return min_edge / max_edge
+end
 
-#   # Analýza uzlů
-#   for i in 1:total_nodes
-#       if mesh.node_sdf[i] < 0.0
-#           # Analýza připojených elementů
-#           connected_elements = get_connected_elements(mesh, i)
+# Výpočet celkové kvality elementu jako kombinace obou metrik
+function calculate_element_quality(vertices::Vector{Vector{Float64}})
+    vol_surf_q = volume_surface_quality(vertices)
+    aspect_q = aspect_ratio_quality(vertices)
+    
+    # Vážený průměr obou metrik (můžete upravit váhy podle potřeby)
+    return 0.5 * (vol_surf_q + aspect_q)
+end
 
-#           # Pro každý připojený element
-#           for elem_id in connected_elements
-#               # Získání SDF hodnot pro všechny uzly elementu
-#               tet_sdf_values = mesh.node_sdf[mesh.IEN[elem_id]]
-#               negative_count = sum(x -> x < 0.0, tet_sdf_values)
+# Výpočet kvality všech elementů v síti
+function calculate_mesh_quality(mesh::BlockMesh)
+    qualities = zeros(Float64, length(mesh.IEN))
+    
+    for (i, element) in enumerate(mesh.IEN)
+        # Získání souřadnic vrcholů elementu
+        vertices = [mesh.X[node_id] for node_id in element]
+        qualities[i] = calculate_element_quality(vertices)
+    end
+    
+    return qualities
+end
 
-#               # Aktualizace statistik
-#               tet_configurations[negative_count] = get(tet_configurations, negative_count, 0) + 1
-#           end
-#       end
-#   end
+# Upravená funkce pro export do VTK
+function export_vtk_with_quality(mesh::BlockMesh, filename::String)
+    if !endswith(filename, ".vtu")
+        filename = filename * ".vtu"
+    end
 
-#   # Výpis statistik
-#   println("\n=== Analýza konfigurace sítě ===")
-#   println("Celkový počet uzlů: $total_nodes")
-#   println("Počet uzlů se záporným SDF: $nodes_with_negative_sdf")
-#   println("Celkový počet tetraedrů: $total_elements")
+    # Výpočet kvality elementů
+    element_qualities = calculate_mesh_quality(mesh)
+    
+    # Převod uzlů do formátu pro VTK (3×N matice)
+    points = reduce(hcat, mesh.X)
 
-#   println("\nKonfigurace tetraedrů:")
-#   for (neg_count, frequency) in sort(collect(tet_configurations))
-#       percentage = round(100 * frequency / total_elements, digits=2)
-#       println("Tetraedry s $neg_count zápornými uzly: $frequency ($percentage%)")
-#   end
+    # Vytvoření VTK buněk
+    cells = [MeshCell(VTKCellTypes.VTK_TETRA, tet) for tet in mesh.IEN]
 
-#   # Detailní analýza několika prvních tetraedrů se zápornými uzly
-#   println("\nDetail prvních 5 tetraedrů se zápornými uzly:")
-#   analyzed_count = 0
-#   for elem_id in 1:total_elements
-#       tet_sdf_values = mesh.node_sdf[mesh.IEN[elem_id]]
-#       negative_count = sum(x -> x < 0.0, tet_sdf_values)
+    # Export
+    vtk = vtk_grid(filename, points, cells)
+    vtk["SDF"] = mesh.node_sdf
+    vtk["element_quality"] = element_qualities  # Přidání kvality elementů
+    
+    # Statistiky kvality
+    min_quality = minimum(element_qualities)
+    max_quality = maximum(element_qualities)
+    avg_quality = mean(element_qualities)
+    
+    @info "Statistiky kvality sítě:"
+    @info "  Minimální kvalita: $(round(min_quality, digits=3))"
+    @info "  Průměrná kvalita: $(round(avg_quality, digits=3))"
+    @info "  Maximální kvalita: $(round(max_quality, digits=3))"
+    
+    vtk_save(vtk)
+    @info "VTK soubor uložen jako: $(abspath(filename))"
+end
 
-#       if negative_count > 0 && analyzed_count < 5
-#           println("\nTetrahedron $elem_id:")
-#           println("SDF hodnoty: [", join(["$(round(v, digits=4))" for v in tet_sdf_values], ", "), "]")
-#           println("Počet záporných uzlů: $negative_count")
-#           println("Souřadnice uzlů:")
-#           for (node_idx, node_id) in enumerate(mesh.IEN[elem_id])
-#               coords = mesh.X[node_id]
-#               coords_str = join(["$(round(c, digits=4))" for c in coords], ", ")
-#               sdf = round(mesh.node_sdf[node_id], digits=4)
-#               println("  Uzel $node_idx: ($coords_str) [SDF: $sdf]")
-#           end
-#           analyzed_count += 1
-#       end
-#   end
+export_vtk_with_quality(mesh, "test_geom_quality")
 
-#   # Dodatečná analýza problémových konfigurací
-#   println("\nHledání specifických konfigurací pro první záporný uzel:")
-#   for i in 1:total_nodes
-#       if mesh.node_sdf[i] < 0.0
-#           connected_elements = get_connected_elements(mesh, i)
-#           tet_three_negative, tet_two_negative = find_elements_by_negative_sdf(mesh, connected_elements)
+# Funkce pro výpočet Laplaceových souřadnic uzlu
+function compute_laplacian_coordinates(mesh::BlockMesh, node_id::Int)
+    # Získat všechny elementy obsahující tento uzel
+    connected_elements = mesh.INE[node_id]
+    
+    # Získat všechny sousední uzly
+    neighbor_nodes = Set{Int}()
+    for elem_id in connected_elements
+        for vertex in mesh.IEN[elem_id]
+            if vertex != node_id
+                push!(neighbor_nodes, vertex)
+            end
+        end
+    end
+    
+    # Výpočet průměrné pozice
+    if isempty(neighbor_nodes)
+        return copy(mesh.X[node_id])
+    end
+    
+    avg_position = zeros(Float64, 3)
+    for neighbor_id in neighbor_nodes
+        avg_position .+= mesh.X[neighbor_id]
+    end
+    
+    return avg_position ./ length(neighbor_nodes)
+end
 
-#           println("\nUzel $i (SDF: $(round(mesh.node_sdf[i], digits=4))):")
-#           println("  Počet připojených elementů: $(length(connected_elements))")
-#           println("  Elementy se třemi zápornými uzly: $(length(tet_three_negative))")
-#           println("  Elementy se dvěma zápornými uzly: $(length(tet_two_negative))")
-#           break  # Analyzujeme pouze první záporný uzel
-#       end
-#   end
-# end
+# Funkce pro kontrolu kvality elementů spojených s uzlem
+function check_node_element_quality(mesh::BlockMesh, node_id::Int, new_position::Vector{Float64})
+    connected_elements = mesh.INE[node_id]
+    
+    # Uložení původní pozice
+    original_position = copy(mesh.X[node_id])
+    
+    # Dočasná změna pozice pro výpočet nové kvality
+    mesh.X[node_id] = new_position
+    
+    # Výpočet minimální kvality pro všechny připojené elementy
+    min_quality = Inf
+    for elem_id in connected_elements
+        vertices = [mesh.X[v] for v in mesh.IEN[elem_id]]
+        quality = calculate_element_quality(vertices)
+        min_quality = min(min_quality, quality)
+    end
+    
+    # Vrácení původní pozice
+    mesh.X[node_id] = original_position
+    
+    return min_quality
+end
 
-# # Spustit analýzu
-# analyze_mesh_configuration(mesh)
+# Smart Laplacian smoothing s projekcí na povrch
+function optimize_surface_mesh!(mesh::BlockMesh, max_iterations::Int=50, quality_threshold::Float64=0.1)
+    improved_nodes = 0
+    total_surface_nodes = 0
+    
+    # Identifikace uzlů na povrchu (blízko nulové hladiny SDF)
+    surface_nodes = findall(x -> abs(x) < 0.1, mesh.node_sdf)
+    total_surface_nodes = length(surface_nodes)
+    
+    for iteration in 1:max_iterations
+        moved_nodes = 0
+        
+        for node_id in surface_nodes
+            # Původní pozice a kvalita
+            original_position = copy(mesh.X[node_id])
+            original_quality = minimum([calculate_element_quality([mesh.X[v] for v in mesh.IEN[elem_id]]) 
+                                     for elem_id in mesh.INE[node_id]])
+            
+            # Výpočet nové pozice pomocí Laplaceova vyhlazování
+            new_position = compute_laplacian_coordinates(mesh, node_id)
+            
+            # Projekce zpět na povrch
+            elements = find_regular_elements(mesh, new_position)
+            if !isempty(elements)
+                for element in elements
+                    if any(>=(0), element.sdf_values) && any(<(0), element.sdf_values)
+                        Xₑ = reduce(hcat, element.coords)
+                        try
+                            ξ₁, ξ₂, ξ₃ = compute_coords(new_position, Xₑ, element.sdf_values)
+                            
+                            # Výpočet nové pozice na povrchu
+                            N = [
+                                -1/8 * (ξ₁-1) * (ξ₂-1) * (ξ₃-1),
+                                1/8 * (ξ₁+1) * (ξ₂-1) * (ξ₃-1),
+                                -1/8 * (ξ₁+1) * (ξ₂+1) * (ξ₃-1),
+                                1/8 * (ξ₁-1) * (ξ₂+1) * (ξ₃-1),
+                                1/8 * (ξ₁-1) * (ξ₂-1) * (ξ₃+1),
+                                -1/8 * (ξ₁+1) * (ξ₂-1) * (ξ₃+1),
+                                1/8 * (ξ₁+1) * (ξ₂+1) * (ξ₃+1),
+                                -1/8 * (ξ₁-1) * (ξ₂+1) * (ξ₃+1)
+                            ]
+                            
+                            projected_position = Xₑ * N
+                            
+                            # Kontrola zlepšení kvality
+                            new_quality = check_node_element_quality(mesh, node_id, projected_position)
+                            
+                            if new_quality > original_quality && new_quality > quality_threshold
+                                mesh.X[node_id] = projected_position
+                                moved_nodes += 1
+                                improved_nodes += 1
+                                break
+                            end
+                        catch e
+                            continue
+                        end
+                    end
+                end
+            end
+        end
+        
+        # Ukončení pokud nedošlo k žádnému pohybu uzlů
+        if moved_nodes == 0
+            @info "Optimalizace konvergovala po $iteration iteracích"
+            break
+        end
+    end
+    
+    @info "Vylepšeno $improved_nodes uzlů z celkových $total_surface_nodes povrchových uzlů"
+    return mesh
+end
+optimize_surface_mesh!(mesh)
 
+export_vtk_with_quality(mesh, "test_geom_quality_smooth")

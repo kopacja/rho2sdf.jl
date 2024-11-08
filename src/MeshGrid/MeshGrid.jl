@@ -5,7 +5,9 @@ export MeshInformations, elementToNodalValues, Mesh, PartOfModel, Grid, LinkedLi
 
 using Statistics
 using LinearAlgebra
+using Rho2sdf.ShapeFunctions
 
+include("MeshVolume.jl")
 include("MeshInformations.jl")
 include("PartOfModel.jl")
 include("NodalDensities.jl")
