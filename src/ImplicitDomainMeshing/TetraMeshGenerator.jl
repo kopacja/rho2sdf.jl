@@ -174,6 +174,21 @@ function cleanup_unused_nodes!(mesh::BlockMesh)
   @info "Počet uzlů po vyčištění: $(length(mesh.X))"
 end
 
+# Funkce pro vytvoření INE
+function create_INE!(mesh::BlockMesh)
+  # Inicializace INE pro každý uzel prázdným vektorem
+  mesh.INE = [Vector{Int64}() for _ in 1:length(mesh.X)]
+
+  # Procházení všech elementů a přiřazení k uzlům
+  for (elem_id, element) in enumerate(mesh.IEN)
+    for node_id in element
+      push!(mesh.INE[node_id], elem_id)
+    end
+  end
+
+  return mesh
+end
+
 # Generování sítě
 function generate_mesh!(mesh::BlockMesh)
   empty!(mesh.X)
@@ -197,6 +212,12 @@ function generate_mesh!(mesh::BlockMesh)
   @info "Vytvořeno $(length(mesh.X)) uzlů a $(length(mesh.IEN)) tetraedrů"
 end
 
+mesh = BlockMesh()
+@info "Generování sítě..."
+generate_mesh!(mesh)
+exit()
+
+#INFO: Project nodes to isocontour:________________________
 
 function find_regular_elements(mesh::BlockMesh, node_coords::Vector{Float64})
   # Najít všechny elementy (krychle) obsahující daný uzel
@@ -286,21 +307,6 @@ function copy_nonzero_vectors!(source, destination)
   return destination
 end
 
-# Funkce pro vytvoření INE
-function create_INE!(mesh::BlockMesh)
-  # Inicializace INE pro každý uzel prázdným vektorem
-  mesh.INE = [Vector{Int64}() for _ in 1:length(mesh.X)]
-
-  # Procházení všech elementů a přiřazení k uzlům
-  for (elem_id, element) in enumerate(mesh.IEN)
-    for node_id in element
-      push!(mesh.INE[node_id], elem_id)
-    end
-  end
-
-  return mesh
-end
-
 # Pomocná funkce pro získání elementů připojených k uzlu
 function get_connected_elements(mesh::BlockMesh, node_id::Int)
   return mesh.INE[node_id]
@@ -329,12 +335,6 @@ function find_elements_by_negative_sdf(mesh::BlockMesh, connected_elements::Vect
 
   return tet_three_negative, tet_two_negative
 end
-
-
-mesh = BlockMesh()
-@info "Generování sítě..."
-generate_mesh!(mesh)
-
 
 function project_nodes_to_isocontour!(mesh::BlockMesh)
   non = length(mesh.X)
