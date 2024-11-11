@@ -152,6 +152,49 @@ function cleanup_unused_nodes!(mesh::BlockMesh)
   mesh.node_map = new_node_map
 end
 
+# Efektivní deduplikace uzlů po vygenerování sítě
+function deduplicate_nodes!(mesh::BlockMesh)
+    # Vytvoření slovníku pro mapování pozic na indexy
+    pos_to_idx = Dict{NTuple{3,Float64},Int}()
+    new_indices = Int[]
+    new_X = Vector{Vector{Float64}}()
+    new_node_sdf = Vector{Float64}()
+    
+    # První průchod - identifikace unikátních uzlů
+    for (i, pos) in enumerate(mesh.X)
+        pos_tuple = (pos[1], pos[2], pos[3])
+        if haskey(pos_to_idx, pos_tuple)
+            # Pro duplicitní uzel použij existující index
+            push!(new_indices, pos_to_idx[pos_tuple])
+        else
+            # Pro nový uzel vytvoř nový index
+            new_idx = length(new_X) + 1
+            pos_to_idx[pos_tuple] = new_idx
+            push!(new_indices, new_idx)
+            push!(new_X, pos)
+            push!(new_node_sdf, mesh.node_sdf[i])
+        end
+    end
+    
+    # Aktualizace IEN s novými indexy
+    for i in 1:length(mesh.IEN)
+        mesh.IEN[i] = [new_indices[idx] for idx in mesh.IEN[i]]
+    end
+    
+    # Aktualizace meshe
+    mesh.X = new_X
+    mesh.node_sdf = new_node_sdf
+    
+    # Přepočítání node_map
+    old_node_map = mesh.node_map
+    mesh.node_map = Dict{Int64,Int64}()
+    for (orig_id, old_idx) in old_node_map
+        mesh.node_map[orig_id] = new_indices[old_idx]
+    end
+    
+    return length(mesh.X)
+end
+
 # Optimized mesh generation function
 function generate_mesh!(mesh::BlockMesh)
   empty!(mesh.X)
@@ -225,6 +268,7 @@ function generate_mesh!(mesh::BlockMesh)
 
   # Vyčištění nepoužitých uzlů
   cleanup_unused_nodes!(mesh)
+  deduplicate_nodes!(mesh)
 
   # Create INE mapping
   create_INE!(mesh)
