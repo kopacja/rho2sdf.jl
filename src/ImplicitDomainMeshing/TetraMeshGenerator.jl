@@ -7,6 +7,9 @@ using NLopt
 using JuMP
 import Ipopt
 
+using Rho2sdf
+using Rho2sdf.SignedDistances
+
 mutable struct BlockMesh
   nx::Int
   ny::Int
@@ -22,11 +25,11 @@ mutable struct BlockMesh
   function BlockMesh()
     # Načtení dat
     # @load "data/Z_block_FineGrid.jld2" fine_grid
-    @load "data/Z_chapadlo_FineGrid.jld2" fine_grid
-    # @load "src/ImplicitDomainMeshing/data/Z_block_FineGrid.jld2" fine_grid
+    # @load "data/Z_chapadlo_FineGrid.jld2" fine_grid
+    @load "src/ImplicitDomainMeshing/data/Z_block_FineGrid.jld2" fine_grid
     # @load "data/Z_block_FineSDF.jld2" fine_sdf
-    @load "data/Z_chapadlo_FineSDF.jld2" fine_sdf
-    # @load "src/ImplicitDomainMeshing/data/Z_block_FineSDF.jld2" fine_sdf
+    # @load "data/Z_chapadlo_FineSDF.jld2" fine_sdf
+    @load "src/ImplicitDomainMeshing/data/Z_block_FineSDF.jld2" fine_sdf
 
     # Konverze Float32 na Float64 pro konzistenci
     grid = Array{Vector{Float64},3}(undef, size(fine_grid))
@@ -267,66 +270,6 @@ function find_regular_elements(mesh::BlockMesh, node_coords::Vector{Float64})
 end
 
 
-function compute_coords(
-  x::Vector,
-  Xₑ::Matrix,
-  ρₑ::Vector,
-  # starting_points::Vector{Tuple{Float64, Float64, Float64}}
-)
-  starting_points = [
-    (0.0, 0.0, 0.0),
-    # (-0.5, -0.5, -0.5),
-    # (0.5, -0.5, -0.5),
-    # (0.5, 0.5, -0.5),
-    # (-0.5, 0.5, -0.5),
-    # (-0.5, -0.5, 0.5),
-    # (0.5, -0.5, 0.5),
-    # (0.5, 0.5, 0.5),
-    # (-0.5, 0.5, 0.5),
-  ]
-
-  best_solution = nothing
-  best_objective = Inf
-
-  for (ξ₁_start, ξ₂_start, ξ₃_start) in starting_points
-    model = Model(Ipopt.Optimizer)
-    set_silent(model)
-
-    set_optimizer_attribute(model, "tol", 1e-6)
-    set_optimizer_attribute(model, "max_iter", 50)
-    set_optimizer_attribute(model, "acceptable_tol", 1e-6)
-
-    @variable(model, ξ₁, lower_bound = -1.0, upper_bound = 1.0, start = ξ₁_start)
-    @variable(model, ξ₂, lower_bound = -1.0, upper_bound = 1.0, start = ξ₂_start)
-    @variable(model, ξ₃, lower_bound = -1.0, upper_bound = 1.0, start = ξ₃_start)
-
-    N8 = [
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
-    ]
-    @NLobjective(model, Min, sum((x[i] - sum(Xₑ[i, k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x)))
-    @NLconstraint(model, sum(ρₑ[k] * N8[k] for k in 1:length(N8)) == 0.0)
-    JuMP.optimize!(model)
-
-    current_objective = objective_value(model)
-    current_solution = value.([ξ₁, ξ₂, ξ₃])
-
-    if current_objective < best_objective
-      best_solution = current_solution
-      best_objective = current_objective
-    end
-  end
-
-  return best_solution
-end
-
-
 function euclidean_distance(p1, p2)
   return sqrt(sum((p1 .- p2) .^ 2))
 end
@@ -388,149 +331,10 @@ function find_elements_by_negative_sdf(mesh::BlockMesh, connected_elements::Vect
 end
 
 
-function find_local_coordinates(
-  Xₑ,
-  xₙ
-)
-  starting_points::Vector{Tuple{Float64,Float64,Float64}} = [
-    (0.0, 0.0, 0.0),
-    (-0.5, -0.5, -0.5),
-    (0.5, -0.5, -0.5),
-    (0.5, 0.5, -0.5),
-    (-0.5, 0.5, -0.5),
-    (-0.5, -0.5, 0.5),
-    (0.5, -0.5, 0.5),
-    (0.5, 0.5, 0.5),
-    (-0.5, 0.5, 0.5)
-  ]
-
-  function objective(ξ::Vector, grad::Vector)
-    ξ₁, ξ₂, ξ₃ = ξ
-
-    # Compute N(ξ)
-    N = [
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
-    ]
-
-    d¹N_dξ¹ = zeros(Float64, 8, 3)
-    d¹N_dξ¹[1, :] = [
-      -0.125 * (ξ₂ - 1) * (ξ₃ - 1)
-      -0.125 * (ξ₁ - 1) * (ξ₃ - 1)
-      -0.125 * (ξ₁ - 1) * (ξ₂ - 1)
-    ]
-
-    d¹N_dξ¹[2, :] = [
-      0.125 * (ξ₂ - 1) * (ξ₃ - 1)
-      0.125 * (ξ₁ + 1) * (ξ₃ - 1)
-      0.125 * (ξ₁ + 1) * (ξ₂ - 1)
-    ]
-
-    d¹N_dξ¹[3, :] = [
-      -0.125 * (ξ₂ + 1) * (ξ₃ - 1)
-      -0.125 * (ξ₁ + 1) * (ξ₃ - 1)
-      -0.125 * (ξ₁ + 1) * (ξ₂ + 1)
-    ]
-
-    d¹N_dξ¹[4, :] = [
-      0.125 * (ξ₂ + 1) * (ξ₃ - 1)
-      0.125 * (ξ₁ - 1) * (ξ₃ - 1)
-      0.125 * (ξ₁ - 1) * (ξ₂ + 1)
-    ]
-
-    d¹N_dξ¹[5, :] = [
-      0.125 * (ξ₂ - 1) * (ξ₃ + 1)
-      0.125 * (ξ₁ - 1) * (ξ₃ + 1)
-      0.125 * (ξ₁ - 1) * (ξ₂ - 1)
-    ]
-
-    d¹N_dξ¹[6, :] = [
-      -0.125 * (ξ₂ - 1) * (ξ₃ + 1)
-      -0.125 * (ξ₁ + 1) * (ξ₃ + 1)
-      -0.125 * (ξ₁ + 1) * (ξ₂ - 1)
-    ]
-
-    d¹N_dξ¹[7, :] = [
-      0.125 * (ξ₂ + 1) * (ξ₃ + 1)
-      0.125 * (ξ₁ + 1) * (ξ₃ + 1)
-      0.125 * (ξ₁ + 1) * (ξ₂ + 1)
-    ]
-
-    d¹N_dξ¹[8, :] = [
-      -0.125 * (ξ₂ + 1) * (ξ₃ + 1)
-      -0.125 * (ξ₁ - 1) * (ξ₃ + 1)
-      -0.125 * (ξ₁ - 1) * (ξ₂ + 1)
-    ]
-
-    # Compute x(ξ)
-    x = Xₑ * N  # x is a 3-element vector
-
-    # Compute residual R = x - xₙ
-    R = x - xₙ  # R is a 3-element vector
-
-    # Compute objective function value f
-    f = dot(R, R)  # Equivalent to sum(R[i]^2 for i in 1:3)
-
-    if length(grad) > 0
-      # Compute the derivatives of N with respect to ξ
-      dN_dξ = zeros(Float64, 8, 3)  # 8 shape functions x 3 variables
-
-      # Assign your computed derivatives to dN_dξ
-      dN_dξ .= d¹N_dξ¹  # Ensure dN_dξ is correctly populated
-
-      # Compute Jacobian J = Xₑ * dN_dξ
-      J = Xₑ * dN_dξ  # J is 3x3
-
-      # Compute gradient grad = 2 * Jᵗ * R
-      grad .= 2 * (J' * R)
-    end
-
-    return f
-  end
-
-  best_solution = nothing
-  best_objective = Inf
-
-  for start_point in starting_points
-    #   opt = Opt(:LN_COBYLA, 3)
-    opt = Opt(:LD_LBFGS, 3)
-    opt.lower_bounds = [-5.0, -5.0, -5.0]
-    opt.upper_bounds = [5.0, 5.0, 5.0]
-    opt.xtol_rel = 1e-6
-    opt.maxeval = 500
-    opt.min_objective = objective
-    opt.maxtime = 1.0
-
-    (minf, minx, ret) = NLopt.optimize(opt, collect(start_point))
-
-    if minf < best_objective
-      best_objective = minf
-      best_solution = minx
-    end
-  end
-
-  if best_solution === nothing
-    return (false, [10.0, 10.0, 10.0])
-  else
-    return (true, best_solution)
-  end
-end
-
-
 mesh = BlockMesh()
 @info "Generování sítě..."
 generate_mesh!(mesh)
-# mesh.INE[5]
 
-# connected_elements = get_connected_elements(mesh, 1) # id elements
-# for j in 1:length(connected_elements)
-#   mesh.node_sdf[mesh.IEN[j]] # hodnoty sdf pro uzly j-tého tetra elementu, který je součástí itého uzlu
 
 function project_nodes_to_isocontour!(mesh::BlockMesh)
   non = length(mesh.X)
@@ -663,99 +467,12 @@ function project_nodes_to_isocontour!(mesh::BlockMesh)
             break
           end
         end
-      elseif !isempty(tet_two_negative)
-        #INFO: 2 uzly:
-        processed["two_negative"] += 1
-        println("Zpracovávám konfiguraci se dvěma zápornými uzly pro uzel $i")
-        tet_id = first(tet_two_negative)
-
-        # Získání uzlů tetrahedru
-        tet_nodes = mesh.IEN[tet_id]
-        tet_sdf_values = mesh.node_sdf[tet_nodes]
-
-        # Najít uzly s kladnou a zápornou SDF
-        positive_indices = findall(x -> x >= 0.0, tet_sdf_values)
-        negative_indices = findall(x -> x < 0.0, tet_sdf_values)
-
-        # Použít průměr interpolovaných bodů
-        x_new = zeros(3)
-        count = 0
-
-        for neg_idx in negative_indices
-          for pos_idx in positive_indices
-            neg_point = mesh.X[tet_nodes[neg_idx]]
-            pos_point = mesh.X[tet_nodes[pos_idx]]
-            neg_sdf = tet_sdf_values[neg_idx]
-            pos_sdf = tet_sdf_values[pos_idx]
-
-            # Lineární interpolace
-            t = neg_sdf / (neg_sdf - pos_sdf)
-            interpolated_point = neg_point + t * (pos_point - neg_point)
-
-            x_new += interpolated_point
-            count += 1
-          end
-        end
-
-        X_new[i] = x_new / count
       else
-        processed["one_negative"] += 1
-        #INFO: 1 uzel:
-        println("Zpracovávám konfiguraci s jedním záporným uzlem pro uzel $i")
-        nce = length(crossing_indices)
-        x_possibilities = fill([0.0, 0.0, 0.0], nce)
-
-        # Process each crossing element
-        for j in 1:nce
-          element = elements[crossing_indices[j]]
-          sdf_e = element.sdf_values
-          Xₑ = reduce(hcat, element.coords)
-
-          # Compute projected coordinates
-          try
-            ξ₁, ξ₂, ξ₃ = compute_coords(x, Xₑ, sdf_e)
-
-            # Compute shape functions
-            N = [
-              -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
-              1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
-              -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
-              1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
-              1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
-              -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
-              1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
-              -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
-            ]
-
-            x_new = Xₑ * N
-            x_possibilities[j] = x_new
-          catch e
-            @warn "Failed to compute coordinates for node $i in element $j: $e"
-            continue
-          end
-        end
-
-        # Filter out zero vectors from failed computations
-        valid_points = filter(p -> !all(iszero, p), x_possibilities)
-
-        if !isempty(valid_points)
-          distances = [euclidean_distance(point, x) for point in valid_points]
-          closest_idx = argmin(distances)
-          X_new[i] = valid_points[closest_idx]
-        else
-          @warn "No valid projections found for node $i at position $(x)"
-        end
+        @warn println("Neznámá konfigurace, pro výpočet posunu uzlu.")
+        println("Node ID: ", i)
       end
-
     end
   end
-
-  # Výpis statistik
-  println("\nStatistiky zpracování:")
-  println("Zpracováno případů s třemi zápornými uzly: $(processed["three_negative"])")
-  println("Zpracováno případů s dvěma zápornými uzly: $(processed["two_negative"])")
-  println("Zpracováno případů s jedním záporným uzlem: $(processed["one_negative"])")
-
 
   # Update mesh coordinates
   copy_nonzero_vectors!(X_new, mesh.X)
@@ -765,123 +482,124 @@ end
 
 project_nodes_to_isocontour!(mesh)
 
+#INFO: Výpočet kvality:
+
 # Výpočet objemu tetrahedru
 function tetrahedron_volume(vertices::Vector{Vector{Float64}})
-    # Matrix pro výpočet objemu
-    a = vertices[2] - vertices[1]
-    b = vertices[3] - vertices[1]
-    c = vertices[4] - vertices[1]
-    
-    # Objem = 1/6 * |det(a b c)|
-    return abs(dot(a, cross(b, c))) / 6.0
+  # Matrix pro výpočet objemu
+  a = vertices[2] - vertices[1]
+  b = vertices[3] - vertices[1]
+  c = vertices[4] - vertices[1]
+
+  # Objem = 1/6 * |det(a b c)|
+  return abs(dot(a, cross(b, c))) / 6.0
 end
 
 # Výpočet plochy trojúhelníku
 function triangle_area(v1::Vector{Float64}, v2::Vector{Float64}, v3::Vector{Float64})
-    # Výpočet plochy pomocí vektorového součinu
-    return norm(cross(v2 - v1, v3 - v1)) / 2.0
+  # Výpočet plochy pomocí vektorového součinu
+  return norm(cross(v2 - v1, v3 - v1)) / 2.0
 end
 
 # Výpočet délky hrany
 function edge_length(v1::Vector{Float64}, v2::Vector{Float64})
-    return norm(v2 - v1)
+  return norm(v2 - v1)
 end
 
 # Výpočet kvality elementu pomocí poměru objemu k součtu ploch stěn
 function volume_surface_quality(vertices::Vector{Vector{Float64}})
-    # Výpočet objemu
-    volume = tetrahedron_volume(vertices)
-    
-    # Výpočet ploch všech stěn
-    areas = [
-        triangle_area(vertices[1], vertices[2], vertices[3]),  # Face 123
-        triangle_area(vertices[1], vertices[2], vertices[4]),  # Face 124
-        triangle_area(vertices[1], vertices[3], vertices[4]),  # Face 134
-        triangle_area(vertices[2], vertices[3], vertices[4])   # Face 234
-    ]
-    
-    total_surface = sum(areas)
-    
-    # Normalizovaný poměr (0 = degenerovaný, 1 = pravidelný tetrahedr)
-    actual_ratio = (volume / total_surface) * 36.0  # 36 je normalizační faktor
-    
-    return max(0.0, min(1.0, actual_ratio))
+  # Výpočet objemu
+  volume = tetrahedron_volume(vertices)
+
+  # Výpočet ploch všech stěn
+  areas = [
+    triangle_area(vertices[1], vertices[2], vertices[3]),  # Face 123
+    triangle_area(vertices[1], vertices[2], vertices[4]),  # Face 124
+    triangle_area(vertices[1], vertices[3], vertices[4]),  # Face 134
+    triangle_area(vertices[2], vertices[3], vertices[4])   # Face 234
+  ]
+
+  total_surface = sum(areas)
+
+  # Normalizovaný poměr (0 = degenerovaný, 1 = pravidelný tetrahedr)
+  actual_ratio = (volume / total_surface) * 36.0  # 36 je normalizační faktor
+
+  return max(0.0, min(1.0, actual_ratio))
 end
 
 # Výpočet kvality elementu pomocí poměru nejkratší a nejdelší hrany
 function aspect_ratio_quality(vertices::Vector{Vector{Float64}})
-    # Výpočet délky všech hran
-    edges = [
-        edge_length(vertices[1], vertices[2]),  # Edge 12
-        edge_length(vertices[1], vertices[3]),  # Edge 13
-        edge_length(vertices[1], vertices[4]),  # Edge 14
-        edge_length(vertices[2], vertices[3]),  # Edge 23
-        edge_length(vertices[2], vertices[4]),  # Edge 24
-        edge_length(vertices[3], vertices[4])   # Edge 34
-    ]
-    
-    min_edge = minimum(edges)
-    max_edge = maximum(edges)
-    
-    # Poměr nejkratší a nejdelší hrany (0 = degenerovaný, 1 = všechny hrany stejně dlouhé)
-    return min_edge / max_edge
+  # Výpočet délky všech hran
+  edges = [
+    edge_length(vertices[1], vertices[2]),  # Edge 12
+    edge_length(vertices[1], vertices[3]),  # Edge 13
+    edge_length(vertices[1], vertices[4]),  # Edge 14
+    edge_length(vertices[2], vertices[3]),  # Edge 23
+    edge_length(vertices[2], vertices[4]),  # Edge 24
+    edge_length(vertices[3], vertices[4])   # Edge 34
+  ]
+
+  min_edge = minimum(edges)
+  max_edge = maximum(edges)
+
+  # Poměr nejkratší a nejdelší hrany (0 = degenerovaný, 1 = všechny hrany stejně dlouhé)
+  return min_edge / max_edge
 end
 
 # Výpočet celkové kvality elementu jako kombinace obou metrik
 function calculate_element_quality(vertices::Vector{Vector{Float64}})
-    vol_surf_q = volume_surface_quality(vertices)
-    aspect_q = aspect_ratio_quality(vertices)
-    
-    # Vážený průměr obou metrik (můžete upravit váhy podle potřeby)
-    return 0.5 * (vol_surf_q + aspect_q)
+  vol_surf_q = volume_surface_quality(vertices)
+  aspect_q = aspect_ratio_quality(vertices)
+
+  # Vážený průměr obou metrik (můžete upravit váhy podle potřeby)
+  return 0.5 * (vol_surf_q + aspect_q)
 end
 
 # Výpočet kvality všech elementů v síti
 function calculate_mesh_quality(mesh::BlockMesh)
-    qualities = zeros(Float64, length(mesh.IEN))
-    
-    for (i, element) in enumerate(mesh.IEN)
-        # Získání souřadnic vrcholů elementu
-        vertices = [mesh.X[node_id] for node_id in element]
-        qualities[i] = calculate_element_quality(vertices)
-    end
-    
-    return qualities
+  qualities = zeros(Float64, length(mesh.IEN))
+
+  for (i, element) in enumerate(mesh.IEN)
+    # Získání souřadnic vrcholů elementu
+    vertices = [mesh.X[node_id] for node_id in element]
+    qualities[i] = calculate_element_quality(vertices)
+  end
+
+  return qualities
 end
 
 # Upravená funkce pro export do VTK
 function export_vtk_with_quality(mesh::BlockMesh, filename::String)
-    if !endswith(filename, ".vtu")
-        filename = filename * ".vtu"
-    end
+  if !endswith(filename, ".vtu")
+    filename = filename * ".vtu"
+  end
 
-    # Výpočet kvality elementů
-    element_qualities = calculate_mesh_quality(mesh)
-    
-    # Převod uzlů do formátu pro VTK (3×N matice)
-    points = reduce(hcat, mesh.X)
+  # Výpočet kvality elementů
+  element_qualities = calculate_mesh_quality(mesh)
 
-    # Vytvoření VTK buněk
-    cells = [MeshCell(VTKCellTypes.VTK_TETRA, tet) for tet in mesh.IEN]
+  # Převod uzlů do formátu pro VTK (3×N matice)
+  points = reduce(hcat, mesh.X)
 
-    # Export
-    vtk = vtk_grid(filename, points, cells)
-    vtk["SDF"] = mesh.node_sdf
-    vtk["element_quality"] = element_qualities  # Přidání kvality elementů
-    
-    # Statistiky kvality
-    min_quality = minimum(element_qualities)
-    max_quality = maximum(element_qualities)
-    avg_quality = mean(element_qualities)
-    
-    @info "Statistiky kvality sítě:"
-    @info "  Minimální kvalita: $(round(min_quality, digits=3))"
-    @info "  Průměrná kvalita: $(round(avg_quality, digits=3))"
-    @info "  Maximální kvalita: $(round(max_quality, digits=3))"
-    
-    vtk_save(vtk)
-    @info "VTK soubor uložen jako: $(abspath(filename))"
+  # Vytvoření VTK buněk
+  cells = [MeshCell(VTKCellTypes.VTK_TETRA, tet) for tet in mesh.IEN]
+
+  # Export
+  vtk = vtk_grid(filename, points, cells)
+  vtk["SDF"] = mesh.node_sdf
+  vtk["element_quality"] = element_qualities  # Přidání kvality elementů
+
+  # Statistiky kvality
+  min_quality = minimum(element_qualities)
+  max_quality = maximum(element_qualities)
+  avg_quality = mean(element_qualities)
+
+  @info "Statistiky kvality sítě:"
+  @info "  Minimální kvalita: $(round(min_quality, digits=3))"
+  @info "  Průměrná kvalita: $(round(avg_quality, digits=3))"
+  @info "  Maximální kvalita: $(round(max_quality, digits=3))"
+
+  vtk_save(vtk)
+  @info "VTK soubor uložen jako: $(abspath(filename))"
 end
 
 export_vtk_with_quality(mesh, "test_geom_quality")
-
