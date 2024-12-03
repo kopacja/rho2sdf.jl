@@ -11,33 +11,51 @@ end
 
 # Definice acute tetrahedral lattice pro jeden element (27)
 const LATTICE_NODES = [
-  [2, 1, 5],
-  [4, 1, 5],
-  [6, 1, 5],
-  [1, 1, 3],
-  [3, 2, 3],
-  [5, 1, 3],
-  [2, 1, 1],
-  [4, 1, 1],
-  [6, 1, 1],
-  [1, 3, 6],
-  [3, 3, 5],
-  [5, 3, 6],
-  [1, 3, 4],
-  [3, 4, 3],
-  [5, 3, 4],
-  [1, 3, 2],
+  [1, 1, 1],
+  [3, 1, 1],
   [3, 3, 1],
-  [5, 3, 2],
-  [2, 5, 5],
-  [4, 5, 5],
-  [6, 5, 5],
-  [1, 5, 3],
-  [3, 6, 3],
-  [5, 5, 3],
-  [2, 5, 1],
-  [4, 5, 1],
-  [6, 5, 1]
+  [1, 3, 1],
+  [2, 2, 1], # bottom face centre
+
+  [2, 2, 2], # cube centre
+
+  [1, 2, 2], # left  face centre
+  [2, 1, 2], # back  face centre
+  [3, 2, 2], # right face centre
+  [2, 3, 2], # front face centre
+
+  [1, 1, 3],
+  [3, 1, 3],
+  [3, 3, 3],
+  [1, 3, 3],
+  [2, 2, 3], # top face centre
+  # [2, 1, 5],
+  # [4, 1, 5],
+  # [6, 1, 5],
+  # [1, 1, 3],
+  # [3, 2, 3],
+  # [5, 1, 3],
+  # [2, 1, 1],
+  # [4, 1, 1],
+  # [6, 1, 1],
+  # [1, 3, 6],
+  # [3, 3, 5],
+  # [5, 3, 6],
+  # [1, 3, 4],
+  # [3, 4, 3],
+  # [5, 3, 4],
+  # [1, 3, 2],
+  # [3, 3, 1],
+  # [5, 3, 2],
+  # [2, 5, 5],
+  # [4, 5, 5],
+  # [6, 5, 5],
+  # [1, 5, 3],
+  # [3, 6, 3],
+  # [5, 5, 3],
+  # [2, 5, 1],
+  # [4, 5, 1],
+  # [6, 5, 1]
   # [3, 3, 2],
   # [4, 4, 2],
   # [5, 5, 2],
@@ -47,11 +65,79 @@ const LATTICE_NODES = [
 ]
 
 const LATTICE_TETS = [
-  [13, 5, 1, 4],
-  [1, 13, 10, 11],
-  [5, 13, 1, 11],
-  [2, 5, 1, 11],
-  [14, 13, 5, 11],
+  # spotní -
+  # [5, 1, 4, 6],
+  # [5, 2, 1, 6],
+  # [5, 3, 2, 6],
+  # [5, 4, 3, 6],
+  # spotní +
+  [5, 4, 1, 6],
+  [5, 1, 2, 6],
+  [5, 2, 3, 6],
+  [5, 3, 4, 6],
+
+  # levý -
+  # [4, 1, 7, 6],
+  # [14, 4, 7, 6],
+  # [11, 14, 7, 6],
+  # [1, 11, 7, 6],
+  # levý +
+  [1, 4, 7, 6],
+  [4, 14, 7, 6],
+  [14, 11, 7, 6],
+  [11, 1, 7, 6],
+
+  # zadní -
+  # [1, 2, 8, 6],
+  # [2, 12, 8, 6],
+  # [12, 11, 8, 6],
+  # [11, 1, 8, 6],
+  # zadní +
+  [2, 1, 8, 6],
+  [12, 2, 8, 6],
+  [11, 12, 8, 6],
+  [1, 11, 8, 6],
+  
+  # pravý -
+  # [2, 3, 9, 6],
+  # [3, 13, 9, 6],
+  # [13, 12, 9, 6],
+  # [12, 2, 9, 6],
+  # pravý +
+  [3, 2, 9, 6],
+  [13, 3, 9, 6],
+  [12, 13, 9, 6],
+  [2, 12, 9, 6],
+  
+  # přední -
+  # [3, 4, 10, 6],
+  # [4, 14, 10, 6],
+  # [14, 13, 10, 6],
+  # [13, 3, 10, 6],
+  # přední +
+  [4, 3, 10, 6],
+  [14, 4, 10, 6],
+  [13, 14, 10, 6],
+  [3, 13, 10, 6],
+  
+  # horní -
+  # [11, 12, 15, 6],
+  # [12, 13, 15, 6],
+  # [13, 14, 15, 6],
+  # [14, 11, 15, 6],
+
+  # horní +
+  [12, 11, 15, 6],
+  [13, 12, 15, 6],
+  [14, 13, 15, 6],
+  [11, 14, 15, 6],
+
+  #_____old_____
+  # [13, 5, 1, 4],
+  # [1, 13, 10, 11],
+  # [5, 13, 1, 11],
+  # [2, 5, 1, 11],
+  # [14, 13, 5, 11],
 
   # [15, 2, 3, 12],
   # [2, 15, 5, 11],
@@ -135,9 +221,9 @@ function create_single_hex_element(origin::Vector{Float64}, size::Float64)
 
   # Vytvoření všech uzlů podle lattice
   for (idx, node) in enumerate(LATTICE_NODES)
-    x = origin[1] + (node[1] - 1) * size / 5
-    y = origin[2] + (node[2] - 1) * size / 5
-    z = origin[3] + (node[3] - 1) * size / 5
+    x = origin[1] + (node[1] - 1) * size / 2
+    y = origin[2] + (node[2] - 1) * size / 2
+    z = origin[3] + (node[3] - 1) * size / 2
     local_vertices[idx] = [x, y, z]
   end
 
@@ -184,19 +270,47 @@ function export_to_vtk(mesh::TetMesh, filename::String)
     vtk_save(vtk_tet_vertices)
 end
 
-# Příklad použití
+function compute_tet_volume(vertices::Vector{Vector{Float64}}, tet::Vector{Int})
+    # Získání vrcholů tetrahedru
+    v1 = vertices[tet[1]]
+    v2 = vertices[tet[2]]
+    v3 = vertices[tet[3]]
+    v4 = vertices[tet[4]]
+    
+    # Výpočet vektorů hran
+    a = v2 - v1
+    b = v3 - v1
+    c = v4 - v1
+    
+    # Objem = 1/6 * |det(a, b, c)| = 1/6 * |a·(b×c)|
+    volume = dot(a, cross(b, c)) / 6.0
+    
+    return volume
+end
+
 function main()
-  # Vytvoření jednoho elementu se středem v počátku a velikostí 1.0
-  origin = [0.0, 0.0, 0.0]
-  size = 1.0
-  mesh = create_single_hex_element(origin, size)
+    origin = [0.0, 0.0, 0.0]
+    size = 1.0
+    mesh = create_single_hex_element(origin, size)
 
-  # Export do VTK pro vizualizaci
-  export_to_vtk(mesh, "hex_discretization")
+    # Export do VTK pro vizualizaci
+    export_to_vtk(mesh, "hex_discretization")
 
-  println("Počet uzlů tetraedrů: ", length(mesh.vertices))
-  println("Počet tetraedrů: ", length(mesh.tets))
-  println("Počet vrcholů hexahedru: ", length(mesh.hex_vertices))
+    println("\nStatistiky sítě:")
+    println("----------------")
+    println("Počet uzlů tetraedrů: ", length(mesh.vertices))
+    println("Počet tetraedrů: ", length(mesh.tets))
+    println("Počet vrcholů hexahedru: ", length(mesh.hex_vertices))
+    
+    println("\nObjemy tetraedrů:")
+    println("----------------")
+    total_volume = 0.0
+    for (i, tet) in enumerate(mesh.tets)
+        volume = compute_tet_volume(mesh.vertices, tet)
+        println("Tetrahedron $i: $volume")
+        total_volume += volume
+    end
+    println("\nCelkový objem: $total_volume")
 end
 
 main()
