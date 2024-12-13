@@ -216,12 +216,9 @@ function RBFs_smoothing(
 
   fine_LSF_offset_array = vector_to_array(fine_LSF_offset, dim)
 
-  # Save SDF data to HDF5 file
-  h5open(taskName * "_" * name * "_SDF_B-" * string(B) * ".h5", "w") do file
-    write(file, "/SDF", fine_LSF_offset_array)
-    write(file, "/dx", step)
-    write(file, "/dy", step)
-    write(file, "/dz", step)
-    write(file, "/origin", Float32.(my_grid.AABB_min))
-  end
+  fine_sdf = fine_LSF_offset_array
+
+  @save "Z_$(taskName)_FineSDF_B-$(B)_smooth-$(smooth).jld2" fine_sdf
+  @save "Z_$(taskName)_FineGrid_B-$(B)_smooth-$(smooth).jld2" fine_grid
+
 end
