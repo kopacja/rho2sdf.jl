@@ -5,6 +5,8 @@ Inputs:
 - IEN: 8×m connectivity matrix
 Returns:
 - total volume of the mesh
+using FastGaussQuadrature
+gp, w = gausslegendre(2)
 """
 function calculate_mesh_volume(X::Vector{Vector{Float64}}, IEN::Vector{Vector{Int64}}, rho::Vector{Float64})
 
@@ -58,5 +60,7 @@ function calculate_mesh_volume(X::Vector{Vector{Float64}}, IEN::Vector{Vector{In
   println("Topology optimization domain volume: ", domain_volume)
   println("Optimized shape volume: ", TO_volume)
   println("Volume fraction: ", (TO_volume / domain_volume))
+
+  return [domain_volume, (TO_volume / domain_volume)]
 end
 

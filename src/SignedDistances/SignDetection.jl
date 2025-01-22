@@ -27,7 +27,7 @@ function Sign_Detection(mesh::Mesh, grid::Grid, points::Matrix, ρₙ::Vector, �
     for j in 1:none
       el = candidate_elements[j]
       Xₑ = @view X[:, IEN[:, el]] # Coordinates of the element nodes
-      (_, local_coords) = find_local_coordinates(sfce, Xₑ, x)
+      (_, local_coords) = find_local_coordinates(Xₑ, x)
       max_local_new = maximum(abs.(local_coords))
 
       if max_local_new < 1.01 && max_local > max_local_new

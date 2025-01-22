@@ -126,7 +126,6 @@ end
 
 
 function find_local_coordinates(
-  sfce::Function,
   Xₑ,
   xₙ
 )
@@ -294,7 +293,7 @@ function IsProjectedOnFullSegment(
   tid::Int,
   x::Vector,
 )
-  (_, local_coords) = find_local_coordinates(sfce, Xₑ, xₚ)
+  (_, local_coords) = find_local_coordinates(Xₑ, xₚ)
   max_local = maximum(local_coords)
   min_local = minimum(local_coords)
 
@@ -617,21 +616,23 @@ function evalDistances(
   end
 
   #NOTE: This part is used for checking distance function:
-  
+
   # Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
   # # println("mean of projected distance: ", mean_PD)
   # # println("maximum projected distance: ", max_PD)
+  #
+  # taskName = "block"
   #
   # nnp = size(Xg, 1)
   #
   # IEN = [[i; i + nnp] for i = 1:nnp]
   # X = vec([Xg Xp])
   #
-  # Rho2sdf.exportToVTU("lines.vtu", X, IEN, 3)
+  # Rho2sdf.exportToVTU("lines_$(taskName).vtu", X, IEN, 3)
   #
   # IEN = [[i] for i = 1:nnp]
-  # Rho2sdf.exportToVTU("Xg.vtu", Xg, IEN, 1)
-  # Rho2sdf.exportToVTU("Xp.vtu", Xp, IEN, 1)
+  # Rho2sdf.exportToVTU("Xg_$(taskName).vtu", Xg, IEN, 1)
+  # Rho2sdf.exportToVTU("Xp_$(taskName).vtu", Xp, IEN, 1)
 
   dist = abs.(dist)
 

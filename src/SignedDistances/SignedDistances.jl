@@ -1,6 +1,6 @@
 module SignedDistances
 
-export evalSignedDistancesOnTriangularMesh, evalDistances, computePseudoNormals, barycentricCoordinates, calculate_triangle_edges, update_distance!, SelectProjectedNodes, find_local_coordinates, Sign_Detection
+export evalSignedDistancesOnTriangularMesh, evalDistances, computePseudoNormals, barycentricCoordinates, calculate_triangle_edges, update_distance!, SelectProjectedNodes, find_local_coordinates, Sign_Detection, compute_coords
 
 using Base.Threads
 using Einsum

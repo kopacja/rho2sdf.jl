@@ -64,7 +64,7 @@ using LinearAlgebra
       # ρₙ = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0] # 1, 7
 
       ## Generate FEM mesh structure:
-      mesh = MeshGrid.Mesh(X, IEN, C3D8_SFaD)
+      mesh = MeshGrid.Mesh(X, IEN, rho, C3D8_SFaD)
 
       VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
       Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
@@ -102,7 +102,7 @@ using LinearAlgebra
       (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("block", [2, 1, 1])
       # ρₙ = [0.0, 0.0, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5]
 
-      mesh = MeshGrid.Mesh(X, IEN, C3D8_SFaD)
+      mesh = MeshGrid.Mesh(X, IEN, rho, C3D8_SFaD)
       # ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
 
       # Modif ρₙ:
@@ -151,7 +151,7 @@ using LinearAlgebra
       (X, IEN, rho) = MeshGrid.MeshInformations(data)
 
       ## Generate FEM mesh structure:
-      mesh = MeshGrid.Mesh(X, IEN, C3D8_SFaD)
+      mesh = MeshGrid.Mesh(X, IEN, rho, C3D8_SFaD)
 
       ## Map elemental densities to the nodes:
       ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
@@ -191,6 +191,7 @@ using LinearAlgebra
       ## Inputs:
       taskName = "chapadlo"
       N = 60  # Number of cells along the longest side
+      #WARNING: Nemůžu se dám přímo prahovou hustot -> vypočítat z objemového poměru TO
       ρₜ = 0.5 # Threshold density (isosurface level)
 
       ## Read FEM mesh:
@@ -199,7 +200,7 @@ using LinearAlgebra
       #Z,idx_Z = findall(x->X[3,i] > 50 for i in [1:size(X,2)])
 
       ## Generate FEM mesh structure:
-      mesh = MeshGrid.Mesh(X, IEN, C3D8_SFaD)
+      mesh = MeshGrid.Mesh(X, IEN, rho, C3D8_SFaD)
 
       ## Map elemental densities to the nodes:
       ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
@@ -240,6 +241,7 @@ using LinearAlgebra
     @testset "Chapadlo" begin
       ## Inputs:
       taskName = "chapadlo"
+      #WARNING: Nemůžu se dám přímo prahovou hustot -> vypočítat z objemového poměru TO
       ρₜ = 0.5 # Threshold density (isosurface level)
 
       ## Read FEM mesh:
@@ -247,7 +249,7 @@ using LinearAlgebra
       (X, IEN, rho) = MeshGrid.MeshInformations(data)
 
       ## Generate FEM mesh structure:
-      mesh = MeshGrid.Mesh(X, IEN, C3D8_SFaD)
+      mesh = MeshGrid.Mesh(X, IEN, rho, C3D8_SFaD)
 
       ## Grid:
       # sdf_grid = MeshGrid.interactive_sdf_grid_setup(mesh)

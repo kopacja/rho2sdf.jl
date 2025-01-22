@@ -5,11 +5,9 @@ function extractSurfaceTriangularMesh(mesh::Mesh)
     IEN = mesh.IEN # ID element -> nodes
     INE = mesh.INE # ID node -> ID elements
     ISN = mesh.ISN # connectivity face - edges
-    # nsd = mesh.nsd # number of special dimension
     nel = mesh.nel # number of elements
     nes = mesh.nes # number of element segments (faces) 6
     nsn = mesh.nsn # number of segment nodes (kolik má stěna uzlů) 4
-    sfce = mesh.sfce
 
     X_new = Vector{Vector{Float64}}()
     push!(X_new, vec(X[:, 1]))
@@ -57,7 +55,7 @@ function extractSurfaceTriangularMesh(mesh::Mesh)
         end # sg
     end # el
 
-    return Mesh(X_new, IEN_new, sfce)
+    return TriangularMesh(X_new, IEN_new)
 end
 
 function find_triangle_position(EN::NodalCoordinatesInElement, vertices::Matrix)
