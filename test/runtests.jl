@@ -2,6 +2,7 @@ using Base: print_without_params
 # using REPLVim; @async REPLVim.serve()
 using Test
 using Rho2sdf
+using Rho2sdf.TerminalUtils
 using Rho2sdf.PrimitiveGeometries
 using Rho2sdf.ShapeFunctions
 using Rho2sdf.MeshGrid

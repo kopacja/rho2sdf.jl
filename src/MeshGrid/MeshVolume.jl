@@ -10,7 +10,7 @@ gp, w = gausslegendre(2)
 """
 function calculate_mesh_volume(X::Vector{Vector{Float64}}, IEN::Vector{Vector{Int64}}, rho::Vector{Float64})
 
-  @info "Compute volume"
+  print_info("Computing volume...")
   # Gauss quadrature points and weights for hexahedron
   # Using 3×3×3 integration points
   gp = [-√(3 / 5), 0.0, √(3 / 5)]
@@ -54,10 +54,9 @@ function calculate_mesh_volume(X::Vector{Vector{Float64}}, IEN::Vector{Vector{In
     TO_volume += elem_volume * rho[elem]
   end
 
-  println("Topology optimization domain volume: ", domain_volume)
-  println("Optimized shape volume: ", TO_volume)
-  @info "Optimized shape volume: $TO_volume" 
-  println("Volume fraction: ", (TO_volume / domain_volume))
+  println("Topology optimization domain volume: ", round(domain_volume, sigdigits=6))
+  print_data("Optimized shape volume: $(round(domain_volume, sigdigits=6))")
+  println("Volume fraction: ", round(TO_volume / domain_volume, sigdigits=6))
 
   return [domain_volume, (TO_volume / domain_volume)]
 end

@@ -339,7 +339,9 @@ function evalDistances(
   points::Matrix,
   ρₙ::Vector{Float64},
   ρₜ::Float64,
-)
+) 
+
+  print_info("\nComputing distace function...")
 
   linkedList = MeshGrid.LinkedList(grid, points) # pro rychlé vyhledávání
 

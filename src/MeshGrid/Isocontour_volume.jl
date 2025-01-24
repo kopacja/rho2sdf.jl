@@ -114,58 +114,58 @@ function find_threshold_for_volume(mesh::Mesh,
   nodal_values::Vector{Float64},
   tolerance::Float64=1e-4,
   max_iterations::Int=60)
+  target_volume = mesh.V_domain * mesh.V_frac
 
-  target_volume = mesh.V_domain*mesh.V_frac
-  # Inicializace hraničních hodnot pro binary search
-  # Víme, že hodnoty jsou mezi 0 a 1, takže to jsou naše počáteční meze
+  # Initialize boundary values for binary search
+  # We know values are between 0 and 1, so these are our initial bounds
   lower_bound = 0.0
   upper_bound = 1.0
 
-  # Vypočítáme počáteční objemy pro kontrolu řešitelnosti
+  # Calculate initial volumes to check solution feasibility
   min_volume = calculate_isocontour_volume(mesh, nodal_values, upper_bound)
   max_volume = calculate_isocontour_volume(mesh, nodal_values, lower_bound)
 
-  # Kontrola, zda je požadovaný objem v možném rozsahu
+  # Check if the requested volume is within the possible range
   if target_volume > max_volume || target_volume < min_volume
-    error("Požadovaný objem $(target_volume) je mimo možný rozsah [$(min_volume), $(max_volume)]")
+    error("Requested volume $(target_volume) is outside the possible range [$(min_volume), $(max_volume)]")
   end
 
-  # Proměnné pro sledování průběhu
+  # Variables for tracking progress
   current_iteration = 0
   best_threshold = 0.0
   best_volume_error = Inf
 
-  println("Hledání prahové hodnoty pro cílový objem: $(target_volume)")
-  println("Iterace | Práh | Objem | Odchylka")
+  print_info("\nComputing volume fraction...")
+  println("Iteration | Threshold | Volume | Error")
   println("-"^50)
 
   while current_iteration < max_iterations
-    # Výpočet středové hodnoty intervalu
+    # Calculate midpoint of the interval
     threshold = (lower_bound + upper_bound) / 2
 
-    # Výpočet objemu pro aktuální práh
+    # Calculate volume for current threshold
     current_volume = calculate_isocontour_volume(mesh, nodal_values, threshold)
 
-    # Výpočet relativní chyby
+    # Calculate relative error
     volume_error = abs(current_volume - target_volume) / target_volume
 
-    # Výpis průběhu
-    println(@sprintf("%3d | %.4f | %.4f | %.4e",
+    # Print progress
+    println(@sprintf("  %3d     | %.4f    | %.4f | %.4e",
       current_iteration, threshold, current_volume, volume_error))
 
-    # Aktualizace nejlepšího nalezeného řešení
+    # Update best solution found
     if volume_error < best_volume_error
       best_threshold = threshold
       best_volume_error = volume_error
     end
 
-    # Kontrola konvergence
+    # Check convergence
     if volume_error < tolerance
-      println("\nŘešení nalezeno!")
+      println("\nSolution found!")
       break
     end
 
-    # Úprava mezí intervalu podle výsledku
+    # Adjust interval bounds based on result
     if current_volume > target_volume
       lower_bound = threshold
     else
@@ -175,18 +175,19 @@ function find_threshold_for_volume(mesh::Mesh,
     current_iteration += 1
   end
 
-  # Kontrola, zda jsme dosáhli maximálního počtu iterací
+  # Check if we reached maximum iterations
   if current_iteration == max_iterations
-    println("\nDosažen maximální počet iterací!")
-    println("Vracím nejlepší nalezené řešení.")
+    println("\nMaximum number of iterations reached!")
+    println("Returning best solution found.")
   end
 
-  # Výpis finálního výsledku
+  # Print final result
   final_volume = calculate_isocontour_volume(mesh, nodal_values, best_threshold)
-  println("\nVýsledek:")
-  println("Nalezená prahová hodnota: $(best_threshold)")
-  println("Dosažený objem: $(final_volume)")
-  println("Relativní chyba: $(best_volume_error)")
+  println("\nResult:")
+  print_success("Volume fraction: $(round(best_threshold, sigdigits=6))")
+  println("Achieved volume: $(round(final_volume, sigdigits=6))")
+  print_data("Relative error: $(round(best_volume_error, sigdigits=6))")
 
   return best_threshold
 end
+

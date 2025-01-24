@@ -6,6 +6,10 @@ using DelimitedFiles
 using Einsum
 using BenchmarkTools
 
+# Tools for monitoring the computation process:
+include("TerminalUtils/TerminalUtils.jl")
+using .TerminalUtils
+
 # Predefined shape functions and its derivatives:
 include("ShapeFunctions/ShapeFunctions.jl")
 using .ShapeFunctions
