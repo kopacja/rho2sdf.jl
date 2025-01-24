@@ -12,12 +12,9 @@ function calculate_mesh_volume(X::Vector{Vector{Float64}}, IEN::Vector{Vector{In
 
   @info "Compute volume"
   # Gauss quadrature points and weights for hexahedron
-  # Using 2×2×2 integration points
-  gp = [-1 / √3, 1 / √3]
-  w = [1.0, 1.0]
   # Using 3×3×3 integration points
-  # gp = [-√(3 / 5), 0.0, √(3 / 5)]
-  # w = [5 / 9, 8 / 9, 5 / 9]
+  gp = [-√(3 / 5), 0.0, √(3 / 5)]
+  w = [5 / 9, 8 / 9, 5 / 9]
 
   ngp = length(gp)
 
@@ -59,6 +56,7 @@ function calculate_mesh_volume(X::Vector{Vector{Float64}}, IEN::Vector{Vector{In
 
   println("Topology optimization domain volume: ", domain_volume)
   println("Optimized shape volume: ", TO_volume)
+  @info "Optimized shape volume: $TO_volume" 
   println("Volume fraction: ", (TO_volume / domain_volume))
 
   return [domain_volume, (TO_volume / domain_volume)]

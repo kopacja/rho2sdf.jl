@@ -29,10 +29,11 @@ mutable struct Mesh <: AbstractMesh
   rho::Vector{Float64}
   V_domain::Float64
   V_frac::Float64
+  ρₜ::Float64
   # INN::Vector{Vector{Int64}}
 
-  function Mesh(X::Vector{Vector{Float64}}, IEN::Vector{Vector{Int64}}, rho::Vector{Float64}, sfce::Function)
-    (V_domain, V_frac) = calculate_mesh_volume(X, IEN, rho)
+  function Mesh(X::Vector{Vector{Float64}}, IEN::Vector{Vector{Int64}}, ρₙ::Vector{Float64}, sfce::Function)
+    (V_domain, V_frac) = calculate_mesh_volume(X, IEN, ρₙ)
 
     X = reduce(hcat, X)
     IEN = reduce(hcat, IEN)
@@ -72,7 +73,10 @@ mutable struct Mesh <: AbstractMesh
       (4, 12, 8, 9),
       (5, 6, 7, 8))
 
-    return new(X, IEN, INE, ISN, sfce, nsd, nnp, nen, nel, nes, nsn, edges, ISE, rho, V_domain, V_frac) #INN)
+    # initial_rho_t = @isdefined(ρₜ) ? ρₜ : 0.0
+    ρₜ = 0.
+
+    return new(X, IEN, INE, ISN, sfce, nsd, nnp, nen, nel, nes, nsn, edges, ISE, ρₙ, V_domain, V_frac, ρₜ) #INN)
   end
 end
 
