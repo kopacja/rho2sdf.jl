@@ -221,4 +221,5 @@ function RBFs_smoothing(
   @save "Z_$(taskName)_FineSDF_B-$(B)_smooth-$(smooth).jld2" fine_sdf
   @save "Z_$(taskName)_FineGrid_B-$(B)_smooth-$(smooth).jld2" fine_grid
 
+  return fine_sdf
 end

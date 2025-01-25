@@ -10,6 +10,7 @@ using FastGaussQuadrature
 using Printf
 using Base.Threads
 using Rho2sdf.ShapeFunctions
+using Rho2sdf.TerminalUtils
 
 include("MeshVolume.jl")
 include("MeshInformations.jl")

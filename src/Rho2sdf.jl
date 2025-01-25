@@ -29,4 +29,7 @@ using .DataExport
 include("SdfSmoothing/SdfSmoothing.jl")
 using .SdfSmoothing
 
+include("Visualizations/Visualizations.jl")
+using .Visualizations
+
 end # module Rho2sdf

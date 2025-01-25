@@ -15,6 +15,7 @@ using JuMP
 import Ipopt
 
 using Rho2sdf.ShapeFunctions
+using Rho2sdf.TerminalUtils
 using Rho2sdf.MeshGrid
 using Rho2sdf
 
