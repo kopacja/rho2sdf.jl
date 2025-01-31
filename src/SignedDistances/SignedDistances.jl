@@ -5,26 +5,27 @@ export evalSignedDistancesOnTriangularMesh, evalDistances, computePseudoNormals,
 using Base.Threads
 using Einsum
 using Statistics
+using StaticArrays
 using LinearAlgebra
 using DelimitedFiles
 using ProgressMeter
-using LazySets
-using JLD2
 using NLopt
-using JuMP
-import Ipopt
+using BenchmarkTools
 
 using Rho2sdf.ShapeFunctions
 using Rho2sdf.TerminalUtils
 using Rho2sdf.MeshGrid
 using Rho2sdf
 
+# Compute local coords:
+include("FindLocalCoordinates.jl")
+include("ComputeCoordsOnIso.jl")
+
 include("Derivatives.jl")
 include("PseudoNormals.jl")
 include("sdfOnTriangularMesh.jl")
 include("sdfOnDensityField.jl")
 include("SignDetection.jl")
-
 
 
 end
