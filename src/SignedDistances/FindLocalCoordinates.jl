@@ -1,86 +1,72 @@
-function compute_shape_functions!(
+@inline function compute_shape_functions!(
   N::MVector{8,Float64},
   d¹N_dξ¹::MMatrix{8,3,Float64},
   ξ₁::Float64,
   ξ₂::Float64,
   ξ₃::Float64
 )
-  # Předpočítání výrazů pomocí statických vektorů
-  ξ_terms = @SVector [
-    ξ₁ - 1,  # ξ₁m1
-    ξ₁ + 1,  # ξ₁p1
-    ξ₂ - 1,  # ξ₂m1
-    ξ₂ + 1,  # ξ₂p1
-    ξ₃ - 1,  # ξ₃m1
-    ξ₃ + 1   # ξ₃p1
-  ]
+  # Předpočítání základních výrazů - compiler může optimalizovat do registrů
+  ξ₁m1 = ξ₁ - 1
+  ξ₁p1 = ξ₁ + 1
+  ξ₂m1 = ξ₂ - 1
+  ξ₂p1 = ξ₂ + 1
+  ξ₃m1 = ξ₃ - 1
+  ξ₃p1 = ξ₃ + 1
 
-  # Pojmenování indexů pro lepší čitelnost (bez const)
-  ξ₁m1, ξ₁p1, ξ₂m1, ξ₂p1, ξ₃m1, ξ₃p1 = ξ_terms
+  # Předpočítání společných součinů
+  t1 = ξ₁m1 * ξ₂m1  # Pro uzly 1 a 5
+  t2 = ξ₁p1 * ξ₂m1  # Pro uzly 2 a 6
+  t3 = ξ₁p1 * ξ₂p1  # Pro uzly 3 a 7
+  t4 = ξ₁m1 * ξ₂p1  # Pro uzly 4 a 8
 
-  # Předpočítání společných součinů pomocí statického vektoru
-  temp = @SVector [
-    ξ₁m1 * ξ₂m1,  # temp1: Pro uzly 1 a 5
-    ξ₁p1 * ξ₂m1,  # temp2: Pro uzly 2 a 6
-    ξ₁p1 * ξ₂p1,  # temp3: Pro uzly 3 a 7
-    ξ₁m1 * ξ₂p1   # temp4: Pro uzly 4 a 8
-  ]
-
-  # Společný koeficient (bez const)
+  # Konstantní koeficient
   coef = 0.125
 
-  # Efektivní výpočet hodnot shape funkcí
-  # První čtyři uzly (ξ₃m1)
-  N[1] = -coef * temp[1] * ξ₃m1
-  N[2] = coef * temp[2] * ξ₃m1
-  N[3] = -coef * temp[3] * ξ₃m1
-  N[4] = coef * temp[4] * ξ₃m1
+  # Výpočet hodnot shape funkcí - přímo do výstupního vektoru
+  N[1] = -coef * t1 * ξ₃m1
+  N[2] = coef * t2 * ξ₃m1
+  N[3] = -coef * t3 * ξ₃m1
+  N[4] = coef * t4 * ξ₃m1
+  N[5] = coef * t1 * ξ₃p1
+  N[6] = -coef * t2 * ξ₃p1
+  N[7] = coef * t3 * ξ₃p1
+  N[8] = -coef * t4 * ξ₃p1
 
-  # Druhé čtyři uzly (ξ₃p1)
-  N[5] = coef * temp[1] * ξ₃p1
-  N[6] = -coef * temp[2] * ξ₃p1
-  N[7] = coef * temp[3] * ξ₃p1
-  N[8] = -coef * temp[4] * ξ₃p1
+  # Předpočítání společných výrazů pro derivace
+  d1_coef = coef * ξ₃m1
+  d1_coefp = coef * ξ₃p1
 
-  # Předpočítáme společné výrazy pro derivace
-  d1_terms = @SVector [
-    -coef * ξ₂m1 * ξ₃m1,
-    coef * ξ₂m1 * ξ₃m1,
-    -coef * ξ₂p1 * ξ₃m1,
-    coef * ξ₂p1 * ξ₃m1,
-    coef * ξ₂m1 * ξ₃p1,
-    -coef * ξ₂m1 * ξ₃p1,
-    coef * ξ₂p1 * ξ₃p1,
-    -coef * ξ₂p1 * ξ₃p1
-  ]
+  # Derivace podle ξ₁
+  d¹N_dξ¹[1, 1] = -d1_coef * ξ₂m1
+  d¹N_dξ¹[2, 1] = d1_coef * ξ₂m1
+  d¹N_dξ¹[3, 1] = -d1_coef * ξ₂p1
+  d¹N_dξ¹[4, 1] = d1_coef * ξ₂p1
+  d¹N_dξ¹[5, 1] = d1_coefp * ξ₂m1
+  d¹N_dξ¹[6, 1] = -d1_coefp * ξ₂m1
+  d¹N_dξ¹[7, 1] = d1_coefp * ξ₂p1
+  d¹N_dξ¹[8, 1] = -d1_coefp * ξ₂p1
 
-  d2_terms = @SVector [
-    -coef * ξ₁m1 * ξ₃m1,
-    coef * ξ₁p1 * ξ₃m1,
-    -coef * ξ₁p1 * ξ₃m1,
-    coef * ξ₁m1 * ξ₃m1,
-    coef * ξ₁m1 * ξ₃p1,
-    -coef * ξ₁p1 * ξ₃p1,
-    coef * ξ₁p1 * ξ₃p1,
-    -coef * ξ₁m1 * ξ₃p1
-  ]
+  # Derivace podle ξ₂
+  d¹N_dξ¹[1, 2] = -d1_coef * ξ₁m1
+  d¹N_dξ¹[2, 2] = d1_coef * ξ₁p1
+  d¹N_dξ¹[3, 2] = -d1_coef * ξ₁p1
+  d¹N_dξ¹[4, 2] = d1_coef * ξ₁m1
+  d¹N_dξ¹[5, 2] = d1_coefp * ξ₁m1
+  d¹N_dξ¹[6, 2] = -d1_coefp * ξ₁p1
+  d¹N_dξ¹[7, 2] = d1_coefp * ξ₁p1
+  d¹N_dξ¹[8, 2] = -d1_coefp * ξ₁m1
 
-  d3_terms = @SVector [
-    -coef * temp[1],
-    coef * temp[2],
-    -coef * temp[3],
-    coef * temp[4],
-    coef * temp[1],
-    -coef * temp[2],
-    coef * temp[3],
-    -coef * temp[4]
-  ]
-
-  # Přiřazení derivací
-  d¹N_dξ¹[1:8, 1] = d1_terms
-  d¹N_dξ¹[1:8, 2] = d2_terms
-  d¹N_dξ¹[1:8, 3] = d3_terms
+  # Derivace podle ξ₃
+  d¹N_dξ¹[1, 3] = -coef * t1
+  d¹N_dξ¹[2, 3] = coef * t2
+  d¹N_dξ¹[3, 3] = -coef * t3
+  d¹N_dξ¹[4, 3] = coef * t4
+  d¹N_dξ¹[5, 3] = coef * t1
+  d¹N_dξ¹[6, 3] = -coef * t2
+  d¹N_dξ¹[7, 3] = coef * t3
+  d¹N_dξ¹[8, 3] = -coef * t4
 end
+
 
 function find_local_coordinates(
   Xₑ::AbstractMatrix{Float64},
