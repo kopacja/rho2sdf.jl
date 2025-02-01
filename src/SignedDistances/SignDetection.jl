@@ -44,7 +44,7 @@ function Sign_Detection(mesh::Mesh, grid::Grid, points::Matrix, ρₙ::Vector, �
         # If local coordinates indicate point is well inside element (< 0.95)
         # we can process this element and exit early
         if max_local_new < 0.95
-          H, = sfce(local_coords)  # Only need shape functions here
+          H = sfce(local_coords)  # Only need shape functions here
           ρₑ = ρₙ[IEN[:, el]]
           ρ = H ⋅ ρₑ
           if ρ >= ρₜ
@@ -54,7 +54,7 @@ function Sign_Detection(mesh::Mesh, grid::Grid, points::Matrix, ρₙ::Vector, �
         end
 
         # Otherwise process element normally
-        H, = sfce(local_coords)
+        H = sfce(local_coords)
         ρₑ = ρₙ[IEN[:, el]]
         ρ = H ⋅ ρₑ
         if ρ >= ρₜ

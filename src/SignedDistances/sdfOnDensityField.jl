@@ -103,7 +103,7 @@ function IsProjectedOnFullSegment(
   min_local = minimum(local_coords)
 
   if max_local < 1.001 && min_local > -1.001
-    H, _, _, _ = sfce(local_coords) # shape functions and their derivatives
+    H = sfce(local_coords) # shape functions and their derivatives
     ρₑ = view(ρₙ, IEN[:, el]) # view for better performance
     ρ = H ⋅ ρₑ
 
@@ -394,7 +394,7 @@ function evalDistances(
             Ξ = zeros(Float64, 3)   # local coordinates
 
             Ξ = compute_coords_on_iso(x, ρₜ, Xₑ, ρₑ)
-            H, _, _, _ = sfce(Ξ)
+            H = sfce(Ξ)
             xₚ = Xₑ * H
             dist_tmp = norm(x - xₚ)
 

@@ -15,16 +15,17 @@ using LinearAlgebra
 taskName = "block"
 
 N = 10  # Number of cells along the longest side
-ρₜ = 0.5 # Threshold density (isosurface level)
+# ρₜ = 0.5 # Threshold density (isosurface level)
 
 (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("block", [2, 1, 1])
 # ρₙ = [0.0, 0.0, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5]
 
-mesh = MeshGrid.Mesh(X, IEN, rho, C3D8_SFaD)
+mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
 # ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
 
 # Modif ρₙ:
 ρₙ = [0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5]
+ρₜ = find_threshold_for_volume(mesh, ρₙ)
 
 VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
 Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
