@@ -23,7 +23,7 @@ function compute_coords_on_iso(
   # Closure pro sdílení přealokovaných vektorů
   let N = N, dN = dN, temp_sums = temp_sums
     function objective(ξ::Vector, grad::Vector)
-      compute_shape_functions!(N, dN, ξ[1], ξ[2], ξ[3])
+      compute_hex8_shape!(N, dN, ξ[1], ξ[2], ξ[3])
 
       # Předpočítání projekcí pro všechny dimenze najednou
       @inbounds for i in 1:3
@@ -49,7 +49,7 @@ function compute_coords_on_iso(
     end
 
     function constraint(ξ::Vector, grad::Vector)
-      compute_shape_functions!(N, dN, ξ[1], ξ[2], ξ[3])
+      compute_hex8_shape!(N, dN, ξ[1], ξ[2], ξ[3])
 
       if !isempty(grad)
         @inbounds for j in 1:3

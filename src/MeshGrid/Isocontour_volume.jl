@@ -53,7 +53,7 @@ function calculate_isocontour_volume(
       local_coords = SVector{3}(gp[i], gp[j], gp[k])
 
       # Compute shape functions and their derivatives
-      Rho2sdf.SignedDistances.compute_shape_functions!(N, dN, local_coords[1], local_coords[2], local_coords[3])
+      compute_hex8_shape!(N, dN, local_coords[1], local_coords[2], local_coords[3])
 
       if check_threshold
         interpolated_value = dot(N, elem_values)
