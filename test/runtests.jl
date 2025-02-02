@@ -12,6 +12,7 @@ using Rho2sdf.SdfSmoothing
 using MAT
 using JLD2
 using LinearAlgebra
+using BenchmarkTools
 
 @testset "Rho2sdf.jl" begin
 
@@ -33,9 +34,9 @@ using LinearAlgebra
   # # Data from Matlab:
   # taskName = "chapadlo"
 
-  RUN_PLANE = true
+  RUN_PLANE = false
   RUN_BLOCK = true
-  RUN_SPHERE = true
+  RUN_SPHERE = false
   RUN_CHAPADLO = false
   RUN_CHAPADLO_cele = false
 
@@ -66,7 +67,7 @@ using LinearAlgebra
       # ρₙ = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0] # 1, 7
 
       ## Generate FEM mesh structure:
-      mesh = MeshGrid.Mesh(X, IEN, rho, C3D8_SFaD)
+      mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
 
       VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
       Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
@@ -98,17 +99,19 @@ using LinearAlgebra
       ## Inputs:
       taskName = "block"
 
-      N = 20  # Number of cells along the longest side
+      N = 10  # Number of cells along the longest side
       ρₜ = 0.5 # Threshold density (isosurface level)
 
       (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("block", [2, 1, 1])
       # ρₙ = [0.0, 0.0, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5]
 
-      mesh = MeshGrid.Mesh(X, IEN, rho, C3D8_SFaD)
+      mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
       # ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
 
       # Modif ρₙ:
       ρₙ = [0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5]
+      
+      # ρₜ= find_threshold_for_volume(mesh, ρₙ)
 
       VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
       Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
@@ -129,12 +132,15 @@ using LinearAlgebra
       # RBF smoothing:
       RBFs_smoothing(sdf_dists, sdf_grid, false, 2, taskName) # interpolation == true, aproximation == false, smooth
 
-      @save "Z_$(taskName)_xp.jld2" xp
-      @save "Z_$(taskName)_Mesh.jld2" mesh
-      @save "Z_$(taskName)_Grid.jld2" sdf_grid
-      @save "Z_$(taskName)_Points.jld2" points
-      @save "Z_$(taskName)_SDF.jld2" sdf_dists
-      @save "Z_$(taskName)_rho.jld2" ρₙ
+      # fig = visualize_stable_isosurface(fine_LSF)
+      # display(fig)
+
+      # @save "Z_$(taskName)_xp.jld2" xp
+      # @save "Z_$(taskName)_Mesh.jld2" mesh
+      # @save "Z_$(taskName)_Grid.jld2" sdf_grid
+      # @save "Z_$(taskName)_Points.jld2" points
+      # @save "Z_$(taskName)_SDF.jld2" sdf_dists
+      # @save "Z_$(taskName)_rho.jld2" ρₙ
 
     end
   end
@@ -144,8 +150,6 @@ using LinearAlgebra
     @testset "Sphere" begin
       ## Inputs:
       taskName = "sphere"
-      N = 20  # Number of cells along the longest side
-      ρₜ = 0.5 # Threshold density (isosurface level)
 
       N = 10  # Number of cells along the longest side
       # ρₜ = 0.5 # Threshold density (isosurface level)
@@ -155,13 +159,13 @@ using LinearAlgebra
       (X, IEN, rho) = MeshGrid.MeshInformations(data)
 
       ## Generate FEM mesh structure:
-      mesh = MeshGrid.Mesh(X, IEN, rho, C3D8_SFaD)
+      mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
 
       ## Map elemental densities to the nodes:
       ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
       #ρₙ = MeshGrid.elementToNodalValues(mesh, rho) # average
 
-      ρₜ= find_threshold_for_volume(mesh, ρₙ)
+      ρₜ= @time find_threshold_for_volume(mesh, ρₙ)
 
       VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
       Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
@@ -173,7 +177,7 @@ using LinearAlgebra
 
       ## SDF from densities:
       (dists, xp) = SignedDistances.evalDistances(mesh, sdf_grid, points, ρₙ, ρₜ)
-      signs = SignedDistances.Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
+      signs = @time SignedDistances.Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
       sdf_dists = dists .* signs
 
       ## Export to VTK:
@@ -182,12 +186,12 @@ using LinearAlgebra
       # RBF smoothing:
       RBFs_smoothing(sdf_dists, sdf_grid, false, 2, taskName) # interpolation == true, aproximation == false, smooth
 
-      @save "Z_$(taskName)_xp.jld2" xp
-      @save "Z_$(taskName)_Mesh.jld2" mesh
+      # @save "Z_$(taskName)_xp.jld2" xp
+      # @save "Z_$(taskName)_Mesh.jld2" mesh
       @save "Z_$(taskName)_Grid.jld2" sdf_grid
-      @save "Z_$(taskName)_Points.jld2" points
+      # @save "Z_$(taskName)_Points.jld2" points
       @save "Z_$(taskName)_SDF.jld2" sdf_dists
-      @save "Z_$(taskName)_rho.jld2" ρₙ
+      # @save "Z_$(taskName)_rho.jld2" ρₙ
 
     end
   end
@@ -205,13 +209,13 @@ using LinearAlgebra
       #Z,idx_Z = findall(x->X[3,i] > 50 for i in [1:size(X,2)])
 
       ## Generate FEM mesh structure:
-      mesh = MeshGrid.Mesh(X, IEN, rho, C3D8_SFaD)
+      mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
 
       ## Map elemental densities to the nodes:
       ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
       #ρₙ = MeshGrid.elementToNodalValues(mesh, rho) # average
 
-      ρₜ= find_threshold_for_volume(mesh, ρₙ)
+      ρₜ= @time find_threshold_for_volume(mesh, ρₙ)
 
       VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
       Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
@@ -255,7 +259,7 @@ using LinearAlgebra
       (X, IEN, rho) = MeshGrid.MeshInformations(data)
 
       ## Generate FEM mesh structure:
-      mesh = MeshGrid.Mesh(X, IEN, rho, C3D8_SFaD)
+      mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
 
       ## Grid:
       # sdf_grid = MeshGrid.interactive_sdf_grid_setup(mesh)
