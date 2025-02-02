@@ -170,10 +170,10 @@ function LamReduction(λ::Vector)
             lam = λ[4:length(λ)]
         end
     else
-        println("Problem with eigenvalues")
-        println("The ratio between the first and last eigenvalue: ", ε₁, "  allowed ratio: ", εₘ₁)
-        println("The ratio between the second and last eigenvalue: ", ε₂, "  allowed ratio: ", εₘ₂)
-        println("-> compute mean instead :(")
+        # println("Problem with eigenvalues")
+        # println("The ratio between the first and last eigenvalue: ", ε₁, "  allowed ratio: ", εₘ₁)
+        # println("The ratio between the second and last eigenvalue: ", ε₂, "  allowed ratio: ", εₘ₂)
+        # println("-> compute mean instead :(")
     end
     return lam
 end
