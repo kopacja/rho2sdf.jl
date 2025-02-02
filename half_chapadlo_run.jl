@@ -19,7 +19,7 @@ data = matread("test/chapadlo.mat")
 (X, IEN, rho) = MeshGrid.MeshInformations(data)
 
 ## Generate FEM mesh structure:
-mesh = MeshGrid.Mesh(X, IEN, hex8_shape)
+mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
 
 ## Map elemental densities to the nodes:
 ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
