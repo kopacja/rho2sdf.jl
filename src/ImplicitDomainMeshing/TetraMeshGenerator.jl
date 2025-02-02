@@ -26,10 +26,17 @@ mutable struct BlockMesh
     # Načtení dat
     # @load "data/Z_block_FineGrid.jld2" fine_grid
     # @load "data/Z_chapadlo_FineGrid.jld2" fine_grid
-    @load "src/ImplicitDomainMeshing/data/Z_block_FineGrid.jld2" fine_grid
     # @load "data/Z_block_FineSDF.jld2" fine_sdf
     # @load "data/Z_chapadlo_FineSDF.jld2" fine_sdf
+
+    @load "src/ImplicitDomainMeshing/data/Z_block_FineGrid.jld2" fine_grid
     @load "src/ImplicitDomainMeshing/data/Z_block_FineSDF.jld2" fine_sdf
+    
+    # @load "src/ImplicitDomainMeshing/data/Z_chapadlo_FineGrid.jld2" fine_grid
+    # @load "src/ImplicitDomainMeshing/data/Z_chapadlo_FineSDF.jld2" fine_sdf
+
+    # @load "src/ImplicitDomainMeshing/data/Z_sphere_FineGrid_B-0.1_smooth-4.jld2" fine_grid
+    # @load "src/ImplicitDomainMeshing/data/Z_sphere_FineSDF_B-0.1_smooth-4.jld2" fine_sdf
 
     # Konverze Float32 na Float64 pro konzistenci
     grid = Array{Vector{Float64},3}(undef, size(fine_grid))
@@ -119,11 +126,11 @@ function process_cell!(mesh::BlockMesh, i::Int, j::Int, k::Int)
   # Tetrahedra definitions according to Schläfli orthoscheme
   tet_connectivity = [
     [1, 2, 3, 7],  # Path 1: x, y, z
-    [1, 2, 6, 7],  # Path 2: x, z, y
-    [1, 4, 3, 7],  # Path 3: y, x, z
+    [1, 6, 2, 7],  # Path 2: x, z, y
+    [1, 3, 4, 7],  # Path 3: y, x, z
     [1, 4, 8, 7],  # Path 4: y, z, x
     [1, 5, 6, 7],  # Path 5: z, x, y
-    [1, 5, 8, 7]   # Path 6: z, y, x
+    [1, 8, 5, 7]   # Path 6: z, y, x
   ]
 
   # Vytvoření elementů s novými ID uzlů
@@ -215,7 +222,7 @@ end
 mesh = BlockMesh()
 @info "Generování sítě..."
 generate_mesh!(mesh)
-exit()
+# exit()
 
 #INFO: Project nodes to isocontour:________________________
 
@@ -602,4 +609,9 @@ function export_vtk_with_quality(mesh::BlockMesh, filename::String)
   @info "VTK soubor uložen jako: $(abspath(filename))"
 end
 
-export_vtk_with_quality(mesh, "test_geom_quality")
+# taskName = "block_test_geom_quality"
+# taskName = "chapadlo"
+taskName = "sphere4"
+export_vtk_with_quality(mesh, taskName)
+
+@save "$(taskName)_TetraMesh.jld2" mesh
