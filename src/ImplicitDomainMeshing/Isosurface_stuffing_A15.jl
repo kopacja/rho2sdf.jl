@@ -348,8 +348,97 @@ mesh = BlockMesh()
 export_mesh_vtk(mesh, "block-mesh.vtu")
 
 
-mesh.INE
-mesh.IEN
-mesh.X
-# mesh.X 282703-element
-# mesh.IEN 475215-element
+# ----------------------------
+# Pomocná funkce: Vyhodnocení SDF pomocí trilineární interpolace
+# ----------------------------
+function eval_sdf(mesh::BlockMesh, p::SVector{3,Float64})
+  # Získáme minimální a maximální souřadnice mřížky
+  vmin = mesh.grid[1,1,1]
+  vmax = mesh.grid[end,end,end]
+  # Normalizace souřadnic bodu p do intervalu [0,1]
+  r = (p .- vmin) ./ (vmax .- vmin)
+  # Přepočet na indexy v mřížce
+  i_f = r[1] * (mesh.nx - 1) + 1
+  j_f = r[2] * (mesh.ny - 1) + 1
+  k_f = r[3] * (mesh.nz - 1) + 1
+  i0 = clamp(floor(Int, i_f), 1, mesh.nx-1)
+  j0 = clamp(floor(Int, j_f), 1, mesh.ny-1)
+  k0 = clamp(floor(Int, k_f), 1, mesh.nz-1)
+  i1 = i0 + 1
+  j1 = j0 + 1
+  k1 = k0 + 1
+  # Lokální váhy
+  xd = i_f - i0
+  yd = j_f - j0
+  zd = k_f - k0
+  # Získání SDF hodnot na osmi rozích buňky
+  c000 = mesh.SDF[i0, j0, k0]
+  c100 = mesh.SDF[i1, j0, k0]
+  c010 = mesh.SDF[i0, j1, k0]
+  c110 = mesh.SDF[i1, j1, k0]
+  c001 = mesh.SDF[i0, j0, k1]
+  c101 = mesh.SDF[i1, j0, k1]
+  c011 = mesh.SDF[i0, j1, k1]
+  c111 = mesh.SDF[i1, j1, k1]
+  # Trilineární interpolace
+  c00 = c000*(1 - xd) + c100*xd
+  c01 = c001*(1 - xd) + c101*xd
+  c10 = c010*(1 - xd) + c110*xd
+  c11 = c011*(1 - xd) + c111*xd
+  c0 = c00*(1 - yd) + c10*yd
+  c1 = c01*(1 - yd) + c11*yd
+  return c0*(1 - zd) + c1*zd
+end
+
+# ----------------------------
+# Pomocná funkce: Aproximace gradientu SDF v bodě p pomocí centrálních diferencí
+# ----------------------------
+function approximate_gradient(mesh::BlockMesh, p::SVector{3,Float64}; h::Float64=1e-3)
+  dx = SVector{3,Float64}(h, 0.0, 0.0)
+  dy = SVector{3,Float64}(0.0, h, 0.0)
+  dz = SVector{3,Float64}(0.0, 0.0, h)
+  df_dx = (eval_sdf(mesh, p + dx) - eval_sdf(mesh, p - dx)) / (2*h)
+  df_dy = (eval_sdf(mesh, p + dy) - eval_sdf(mesh, p - dy)) / (2*h)
+  df_dz = (eval_sdf(mesh, p + dz) - eval_sdf(mesh, p - dz)) / (2*h)
+  return SVector{3,Float64}(df_dx, df_dy, df_dz)
+end
+
+# ----------------------------
+# Hlavní funkce: Warping nodů v rámci meshe
+#
+# Tato funkce iterativně upravuje pozice uzlů v mesh.X pomocí Newtonovy metody,
+# aby se posunuly na nulovou hladinu SDF, tedy blíže k implicitní ploše.
+#
+# Parametry:
+#   - iterations: maximální počet iterací pro každou úpravu bodu
+#   - tol: tolerance, při které považujeme bod za dostatečně blízko nule
+# ----------------------------
+function warp!(mesh::BlockMesh; iterations::Int=5, tol::Float64=1e-6)
+  @info "Spouštím warping uzlů..."
+  for i in eachindex(mesh.X)
+      p = mesh.X[i]
+      f = eval_sdf(mesh, p)
+      # Pokud je bod již blízko nulové hladiny, nemusíme jej upravovat
+      if abs(f) < tol
+          continue
+      end
+      # Iterativní Newtonova metoda
+      for iter in 1:iterations
+          f = eval_sdf(mesh, p)
+          if abs(f) < tol
+              break
+          end
+          g = approximate_gradient(mesh, p)
+          denom = dot(g, g) + eps()  # chráníme se před dělením nulou
+          p = p - (f / denom) * g
+      end
+      mesh.X[i] = p
+  end
+  @info "Warping dokončen."
+end
+
+@time warp!(mesh)
+export_mesh_vtk(mesh, "block-mesh.vtu")
+
+mesh.X # 90325-element
+mesh.IEN # 483263-element Vector{Vector{Int64}}:
