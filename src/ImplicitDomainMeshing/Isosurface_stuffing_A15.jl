@@ -15,6 +15,7 @@ mutable struct BlockMesh
     ny::Int
     nz::Int
     grid::Array{SVector{3,Float64},3}          # 3D array of node coordinates (basic grid) using static vectors
+    grid_step::Float64
     SDF::Array{Float64,3}                      # SDF values
     X::Vector{SVector{3,Float64}}    # List of physical node coordinates (nodes used in mesh)
     IEN::Vector{Vector{Int64}}                 # Tetrahedral connectivity (elements)
@@ -34,11 +35,13 @@ mutable struct BlockMesh
             # Assume fine_grid[i] is an array of Float64; convert to SVector
             grid[i] = SVector{3,Float64}(fine_grid[i]...)
         end
+        step = maximum(abs.(grid[1,1,1] - grid[2,2,2]))
         sdf = Float64.(fine_sdf)
         nx, ny, nz = size(grid)
         
         mesh = new(nx, ny, nz)
         mesh.grid = grid
+        mesh.grid_step = step
         mesh.SDF = sdf
         mesh.node_map = Dict{Int64,Int64}()
         mesh.cell_center_map = Dict{Tuple{Int,Int,Int},Int64}()
@@ -403,6 +406,22 @@ function approximate_gradient(mesh::BlockMesh, p::SVector{3,Float64}; h::Float64
   return SVector{3,Float64}(df_dx, df_dy, df_dz)
 end
 
+# Pomocná funkce – odhad gradientu SDF v okolí uzlu
+function compute_gradient(mesh::BlockMesh, node_index::Int; δ::Float64=1e-3)
+    # Pro jednoduchost předpokládáme, že můžeme spočítat gradient pomocí centrálních diferencí.
+    # V praxi by bylo vhodné použít přesnější metodu, případně interpolaci SDF hodnot z okolních buněk.
+    p = mesh.X[node_index]
+    # Předpokládejme, že máme k dispozici funkci sdf_value(point::SVector{3,Float64})
+    # která interpoluje SDF z mřížky (není součástí aktuálního kódu).
+    grad = zeros(Float64, 3)
+    for d in 1:3
+        dp = p + δ * SVector{3,Float64}((d==1 ? 1.0 : 0.0), (d==2 ? 1.0 : 0.0), (d==3 ? 1.0 : 0.0))
+        dm = p - δ * SVector{3,Float64}((d==1 ? 1.0 : 0.0), (d==2 ? 1.0 : 0.0), (d==3 ? 1.0 : 0.0))
+        grad[d] = (eval_sdf(mesh, dp) - eval_sdf(mesh, dm)) / (2δ)
+    end
+    return SVector{3,Float64}(grad)
+end
+
 # ----------------------------
 # Hlavní funkce: Warping nodů v rámci meshe
 #
@@ -413,28 +432,25 @@ end
 #   - iterations: maximální počet iterací pro každou úpravu bodu
 #   - tol: tolerance, při které považujeme bod za dostatečně blízko nule
 # ----------------------------
-function warp!(mesh::BlockMesh; iterations::Int=5, tol::Float64=1e-6)
-  @info "Spouštím warping uzlů..."
-  for i in eachindex(mesh.X)
-      p = mesh.X[i]
-      f = eval_sdf(mesh, p)
-      # Pokud je bod již blízko nulové hladiny, nemusíme jej upravovat
-      if abs(f) < tol
-          continue
-      end
-      # Iterativní Newtonova metoda
-      for iter in 1:iterations
-          f = eval_sdf(mesh, p)
-          if abs(f) < tol
-              break
+# Hlavní funkce pro warping uzlů
+function warp!(mesh::BlockMesh; threshold::Float64=0.2, warp_factor::Float64=0.5)
+  threshold_sdf = mesh.grid_step*threshold
+  for i in 1:length(mesh.X)
+      sdf = mesh.node_sdf[i]
+      # Aplikovat warping pouze na uzly blízko izopovrchu
+      if abs(sdf) < threshold_sdf
+          grad = compute_gradient(mesh, i)
+          # Pokud gradient nemá nenulovou normu, přeskočíme
+          if norm(grad) < 1e-8
+              continue
           end
-          g = approximate_gradient(mesh, p)
-          denom = dot(g, g) + eps()  # chráníme se před dělením nulou
-          p = p - (f / denom) * g
+          # Vypočítat posun; volba znaménka: posun směrem ke geometrickému povrchu
+          displacement = warp_factor * (threshold_sdf - abs(sdf)) * normalize(grad)
+          # Aktualizovat pozici uzlu; v některých implementacích se používá odečítání či přičítání,
+          # dle konvence SDF (např. zda SDF definuje vnitřek kladně nebo záporně)
+          mesh.X[i] = mesh.X[i] - displacement
       end
-      mesh.X[i] = p
   end
-  @info "Warping dokončen."
 end
 
 @time warp!(mesh)
