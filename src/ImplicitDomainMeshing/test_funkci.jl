@@ -3,9 +3,10 @@
 # ----------------------------
 function interpolate_zero(p1::SVector{3,Float64}, p2::SVector{3,Float64},
                             f1::Float64, f2::Float64, mesh::BlockMesh)::Int64
+    tol = mesh.grid_tol
     t = (0 - f1) / (f2 - f1)
     p_interp = p1 + t * (p2 - p1)
-    p_key = quantize(p_interp)
+    p_key = quantize(p_interp, tol)
     if haskey(mesh.node_hash, p_key)
         return mesh.node_hash[p_key]
     else
@@ -18,7 +19,8 @@ function interpolate_zero(p1::SVector{3,Float64}, p2::SVector{3,Float64},
 end
 
 # Zjistí, zda se bod nachází na hranici mřížky
-function is_on_boundary(mesh::BlockMesh, p::SVector{3,Float64}; tol::Float64=TOL)
+function is_on_boundary(mesh::BlockMesh, p::SVector{3,Float64})
+    tol = mesh.grid_tol
     vmin = mesh.grid[1,1,1]
     vmax = mesh.grid[end,end,end]
     return any(abs(p[i]-vmin[i]) < tol || abs(p[i]-vmax[i]) < tol for i in 1:3)
@@ -26,14 +28,15 @@ function is_on_boundary(mesh::BlockMesh, p::SVector{3,Float64}; tol::Float64=TOL
   
   # Uspořádá dané průsečíky (indexy v mesh.X) do cyklického pořadí
   function order_intersection_points(mesh::BlockMesh, ips::Vector{Int64})::Vector{Int64}
+    tol = mesh.grid_tol
     pts = [mesh.X[i] for i in ips]
     centroid = sum(pts) / length(pts)
     v1 = pts[1] - centroid
-    if norm(v1) < TOL
+    if norm(v1) < tol
        v1 = SVector(1.0, 0.0, 0.0)
     end
     v2 = cross(normalize(v1), SVector(0.0, 0.0, 1.0))
-    if norm(v2) < TOL
+    if norm(v2) < tol
         v2 = cross(normalize(v1), SVector(0.0, 1.0, 0.0))
     end
     angles = [atan(dot(pt - centroid, normalize(v1)), dot(pt - centroid, normalize(v2))) for pt in pts]
@@ -70,25 +73,45 @@ function is_on_boundary(mesh::BlockMesh, p::SVector{3,Float64}; tol::Float64=TOL
   end
 
   
-  function stencil_1p3(mesh::BlockMesh, tet::Vector{Int64})::Vector{Vector{Int64}}
+  function stencil_1p3(mesh::BlockMesh, tet::Vector{Int64})
+    tol = mesh.grid_tol
     # Získáme SDF hodnoty pro všechny čtyři vrcholy
     f = [ mesh.node_sdf[i] for i in tet ]
     signs = map(x -> x >= 0, f)
+    # Definujeme lokální toleranci – například 20% kroku mřížky
+    # local_threshold = tol*2000000
+    local_threshold = 0.2
+  
     # Najdeme lokální index vrcholu s kladnou hodnotou
     pos_local = findfirst(identity, signs)
-    # Zbylé (tři) vrcholy mají zápornou hodnotu
+    # Pokud je SDF kladného vrcholu příliš malé (tj. blízko nule), tetraedr nevytváříme
+    if abs(f[pos_local]) < local_threshold
+        return Vector{Vector{Int64}}()
+    end
+  
+    # Zbylé (tři) vrcholy mají zápornou hodnotu; pokud některý záporný vrchol je také příliš blízko izokontuře,
+    # rovněž tetraedr nevytváříme.
     neg_locals = [ i for (i, s) in enumerate(signs) if !s ]
+    for n in neg_locals
+        if abs(f[n]) < local_threshold
+            return Vector{Vector{Int64}}()
+        end
+    end
+  
+    # Určíme pozici a hodnotu kladného vrcholu
     p_pos = mesh.X[tet[pos_local]]
     f_pos = f[pos_local]
+  
     # Vypočítáme průsečíky na hranách spojujících kladný vrchol s každým záporným
     ips = Vector{Int64}()
-      for n in neg_locals
-          p_neg = mesh.X[tet[n]]
-          f_neg = f[n]
-          ip = interpolate_zero(p_pos, p_neg, f_pos, f_neg, mesh)
-          push!(ips, ip)
-      end
-    # Nový tetraedr: [kladný vrchol, I1, I2, I3]
+    for n in neg_locals
+        p_neg = mesh.X[tet[n]]
+        f_neg = f[n]
+        ip = interpolate_zero(p_pos, p_neg, f_pos, f_neg, mesh)
+        push!(ips, ip)
+    end
+  
+    # Vytvoříme nový tetraedr: [kladný vrchol, I1, I2, I3]
     return [ [ tet[pos_local], ips[1], ips[2], ips[3] ] ]
   end
   
@@ -187,7 +210,7 @@ function is_on_boundary(mesh::BlockMesh, p::SVector{3,Float64}; tol::Float64=TOL
   end
 
   
-  function apply_stencil(mesh::BlockMesh, tet::Vector{Int64})::Vector{Vector{Int64}}
+  function apply_stencil(mesh::BlockMesh, tet::Vector{Int64})
     f = [ mesh.node_sdf[i] for i in tet ]
     np = count(x -> x >= 0, f)
     if np == 1
