@@ -26,8 +26,8 @@ mutable struct BlockMesh
     node_hash::Dict{NTuple{3,Float64},Int64}    # Global dictionary for merging nodes
 
     function BlockMesh()
-        @load "src/ImplicitDomainMeshing/data/Z_block_FineGrid.jld2" fine_grid
-        @load "src/ImplicitDomainMeshing/data/Z_block_FineSDF.jld2" fine_sdf
+        @load "src/ImplicitDomainMeshing/data/Z_block_FineGrid_coarse.jld2" fine_grid
+        @load "src/ImplicitDomainMeshing/data/Z_block_FineSDF_coarse.jld2" fine_sdf
 
         # Convert fine_grid into a 3D array of SVectors
         grid = Array{SVector{3,Float64},3}(undef, size(fine_grid))
@@ -343,15 +343,6 @@ function export_mesh_vtk(mesh::BlockMesh, filename::String)
 end
 
 # ----------------------------
-# Main execution – create mesh and export it to file
-# ----------------------------
-mesh = BlockMesh()
-# Choose scheme: "A15" or "Schlafli"
-@time generate_mesh!(mesh, "A15")
-export_mesh_vtk(mesh, "block-mesh.vtu")
-
-
-# ----------------------------
 # Pomocná funkce: Vyhodnocení SDF pomocí trilineární interpolace
 # ----------------------------
 function eval_sdf(mesh::BlockMesh, p::SVector{3,Float64})
@@ -406,43 +397,113 @@ function approximate_gradient(mesh::BlockMesh, p::SVector{3,Float64}; h::Float64
   return SVector{3,Float64}(df_dx, df_dy, df_dz)
 end
 
-# Pomocná funkce – odhad gradientu SDF v okolí uzlu
-function compute_gradient(mesh::BlockMesh, node_index::Int; δ::Float64=1e-3)
-    # Pro jednoduchost předpokládáme, že můžeme spočítat gradient pomocí centrálních diferencí.
-    # V praxi by bylo vhodné použít přesnější metodu, případně interpolaci SDF hodnot z okolních buněk.
-    p = mesh.X[node_index]
-    # Předpokládejme, že máme k dispozici funkci sdf_value(point::SVector{3,Float64})
-    # která interpoluje SDF z mřížky (není součástí aktuálního kódu).
-    grad = zeros(Float64, 3)
-    for d in 1:3
-        dp = p + δ * SVector{3,Float64}((d==1 ? 1.0 : 0.0), (d==2 ? 1.0 : 0.0), (d==3 ? 1.0 : 0.0))
-        dm = p - δ * SVector{3,Float64}((d==1 ? 1.0 : 0.0), (d==2 ? 1.0 : 0.0), (d==3 ? 1.0 : 0.0))
-        grad[d] = (eval_sdf(mesh, dp) - eval_sdf(mesh, dm)) / (2δ)
-    end
-    return SVector{3,Float64}(grad)
+# Funkce pro výpočet délky nejdelší hrany mezi uzly ve všech tetraedrech
+function longest_edge(mesh::BlockMesh)
+  # Pre-allocate maximum length with type stability
+  max_length = zero(eltype(mesh.X[1]))
+  
+  # Vectorize operations by using broadcast
+  for tet in mesh.IEN
+      # Use array views for better memory efficiency
+      nodes = @view mesh.X[tet]
+      # Calculate all edge lengths at once using comprehension
+      lengths = [norm(nodes[i] - nodes[j]) for i in 1:3 for j in i+1:4]
+      # Use built-in maximum function
+      max_length = max(max_length, maximum(lengths))
+  end
+  return max_length
 end
 
-# ----------------------------
-# Hlavní funkce: Warping nodů v rámci meshe
+
+# Pomocná funkce – odhad gradientu SDF v okolí uzlu
+# First, let's modify compute_gradient to work with both node indices and positions
+function compute_gradient(mesh::BlockMesh, p::SVector{3,Float64}; δ::Float64=1e-3)
+  # Pre-allocate unit vectors as static vectors for better performance
+  unit_vectors = (
+      SVector{3,Float64}(1.0, 0.0, 0.0),
+      SVector{3,Float64}(0.0, 1.0, 0.0),
+      SVector{3,Float64}(0.0, 0.0, 1.0)
+  )
+  
+  # Use tuple comprehension for better compile-time optimization
+  grad = ntuple(3) do d
+      unit_vec = unit_vectors[d]
+      # Compute central difference
+      (eval_sdf(mesh, p + δ * unit_vec) - eval_sdf(mesh, p - δ * unit_vec)) / (2δ)
+  end
+  
+  return SVector{3,Float64}(grad)
+end
+
+# Add method for node index input
+function compute_gradient(mesh::BlockMesh, node_index::Int; δ::Float64=1e-3)
+  return compute_gradient(mesh, mesh.X[node_index]; δ=δ)
+end
+
+# Update warp_node_to_isocontour! to handle positions directly
+function warp_node_to_isocontour!(mesh::BlockMesh, node_index::Int; max_iter::Int=20, tol::Float64=1e-6)
+  current_position = mesh.X[node_index]
+  
+  for iter in 1:max_iter
+      f = eval_sdf(mesh, current_position)
+      
+      # Early return if we're close enough to the isocontour
+      abs2(f) < tol * tol && break
+      
+      grad = compute_gradient(mesh, current_position)
+      norm_grad_squared = sum(abs2, grad)
+      
+      # Early return if gradient is too small
+      norm_grad_squared < 1e-12 && break
+      
+      # Newton step
+      dp = (f / norm_grad_squared) * grad
+      current_position -= dp
+  end
+  
+  mesh.X[node_index] = current_position
+end
+
+# Hlavní funkce pro warping uzlů – ordered warping
 #
-# Tato funkce iterativně upravuje pozice uzlů v mesh.X pomocí Newtonovy metody,
-# aby se posunuly na nulovou hladinu SDF, tedy blíže k implicitní ploše.
-#
-# Parametry:
-#   - iterations: maximální počet iterací pro každou úpravu bodu
-#   - tol: tolerance, při které považujeme bod za dostatečně blízko nule
-# ----------------------------
-# Hlavní funkce pro warping uzlů
-function warp!(mesh::BlockMesh; threshold::Float64=0.2, warp_factor::Float64=0.5)
-  threshold_sdf = mesh.grid_step*threshold
+# Nejprve se upraví uzly s negativní SDF hodnotou (uvnitř izopovrchu) a poté uzly s kladnou hodnotou.
+# Uzly se posunují směrem k nulové hladině SDF (izopovrchu) a práh posunu se počítá jako
+# threshold_sdf = 0.2 * (délka nejdelší hrany tetraedru).
+function warp!(mesh::BlockMesh; max_iter::Int=20, tol::Float64=1e-6)
+  # Vypočítat nejdelší hranu a následně threshold pro posun
+  max_edge = longest_edge(mesh)
+  threshold_sdf = 0.5 * max_edge
+
+  @info "Warping: max edge = $max_edge, threshold_sdf = $threshold_sdf"
+
+  # První průchod: uzly s negativní SDF hodnotou (uvnitř)
   for i in 1:length(mesh.X)
       sdf = mesh.node_sdf[i]
-      # Aplikovat warping pouze na uzly blízko izopovrchu
-      if abs(sdf) < threshold_sdf
-          grad = compute_gradient(mesh, i)
-          # Pokud gradient nemá nenulovou normu, přeskočíme
-          if norm(grad) < 1e-8
-              continue
+      if sdf < 0 && abs(sdf) < threshold_sdf
+          warp_node_to_isocontour!(mesh, i; max_iter=max_iter, tol=tol)
+      end
+  end
+
+  # Druhý průchod: uzly s kladnou SDF hodnotou (vně izopovrchu)
+  for i in 1:length(mesh.X)
+      sdf = mesh.node_sdf[i]
+      if sdf > 0 && abs(sdf) < threshold_sdf
+          warp_node_to_isocontour!(mesh, i; max_iter=max_iter, tol=tol)
+      end
+  end
+end
+
+# ---------------------------------------------------
+# Funkce: Aktualizace topologie meshe (mesh.X, mesh.IEN, mesh.INE)
+# ---------------------------------------------------
+function update_connectivity!(mesh::BlockMesh; tol::Float64=TOL)
+  @info "Aktualizuji topologii meshe: cleanup, slučování duplicit a tvorba inverzní konektivity..."
+  cleanup_unused_nodes!(mesh)        # Přepočítá mesh.X, mesh.node_sdf a reindexuje mesh.IEN a mesh.node_map
+  merge_duplicate_nodes!(mesh, tol)    # Sloučí duplicitní uzly a upraví konektivitu v mesh.IEN
+  create_INE!(mesh)                    # Vytvoří inverzní konektivitu (mesh.INE)
+  @info "Aktualizace topologie dokončena: $(length(mesh.X)) uzlů, $(length(mesh.IEN)) tetraedrů."
+end
+
           end
           # Vypočítat posun; volba znaménka: posun směrem ke geometrickému povrchu
           displacement = warp_factor * (threshold_sdf - abs(sdf)) * normalize(grad)
