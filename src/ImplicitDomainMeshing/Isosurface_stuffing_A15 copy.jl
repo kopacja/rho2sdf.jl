@@ -439,7 +439,6 @@ end
 function warp_node_to_isocontour!(mesh::BlockMesh, node_index::Int, max_iter::Int)
   tol = mesh.grid_tol
   current_position = mesh.X[node_index]
-  current_sdf = eval_sdf(mesh, current_position)
   
   for iter in 1:max_iter
       f = eval_sdf(mesh, current_position)
@@ -457,6 +456,7 @@ function warp_node_to_isocontour!(mesh::BlockMesh, node_index::Int, max_iter::In
       dp = (f / norm_grad_squared) * grad
       current_position -= dp
   end
+  current_sdf = eval_sdf(mesh, current_position)
   println("current_sdf: ",current_sdf)
   # mesh.node_sdf[node_index] = current_sdf
   mesh.X[node_index] = current_position
@@ -470,7 +470,7 @@ end
 function warp!(mesh::BlockMesh, max_iter::Int=160)
   # Vypočítat nejdelší hranu a následně threshold pro posun
   max_edge = longest_edge(mesh)
-  threshold_sdf = 0.2 * max_edge
+  threshold_sdf = 0.5 * max_edge
 
   @info "Warping: max edge = $max_edge, threshold_sdf = $threshold_sdf"
 
