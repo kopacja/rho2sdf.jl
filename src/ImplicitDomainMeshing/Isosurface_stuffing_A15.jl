@@ -24,8 +24,8 @@ mutable struct BlockMesh
     node_hash::Dict{NTuple{3,Float64},Int64}    # Global dictionary for merging nodes
 
     function BlockMesh()
-        @load "src/ImplicitDomainMeshing/data/Z_block_FineGrid_coarse.jld2" fine_grid
-        @load "src/ImplicitDomainMeshing/data/Z_block_FineSDF_coarse.jld2" fine_sdf
+      @load "src/ImplicitDomainMeshing/data/Z_block_FineGrid_B-0.2_smooth-1.jld2" fine_grid
+      @load "src/ImplicitDomainMeshing/data/Z_block_FineSDF_B-0.2_smooth-1.jld2" fine_sdf
 
         # Convert fine_grid into a 3D array of SVectors
         grid = Array{SVector{3,Float64},3}(undef, size(fine_grid))
@@ -462,7 +462,9 @@ function warp_node_to_isocontour!(mesh::BlockMesh, node_index::Int; max_iter::In
       dp = (f / norm_grad_squared) * grad
       current_position -= dp
   end
-  
+  current_sdf = eval_sdf(mesh, current_position)
+  println("current_sdf: ",current_sdf)
+  mesh.node_sdf[node_index] = current_sdf
   mesh.X[node_index] = current_position
 end
 
@@ -478,20 +480,20 @@ function warp!(mesh::BlockMesh, max_iter::Int=60)
 
   @info "Warping: max edge = $max_edge, threshold_sdf = $threshold_sdf"
 
-  # První průchod: uzly s negativní SDF hodnotou (uvnitř)
+  # První průchod: uzly s kladnou SDF hodnotou (uvnitř)
   for i in 1:length(mesh.X)
-      sdf = mesh.node_sdf[i]
-      if sdf < 0 && abs(sdf) < threshold_sdf
-          warp_node_to_isocontour!(mesh, i; max_iter=max_iter)
-      end
+    sdf = mesh.node_sdf[i]
+    if sdf > 0 && abs(sdf) < threshold_sdf
+        warp_node_to_isocontour!(mesh, i)
+    end
   end
 
-  # Druhý průchod: uzly s kladnou SDF hodnotou (vně izopovrchu)
+  # Druhý průchod: uzly s negativní SDF hodnotou (vně)
   for i in 1:length(mesh.X)
-      sdf = mesh.node_sdf[i]
-      if sdf > 0 && abs(sdf) < threshold_sdf
-          warp_node_to_isocontour!(mesh, i; max_iter=max_iter)
-      end
+    sdf = mesh.node_sdf[i]
+    if sdf < 0 && abs(sdf) < threshold_sdf
+        warp_node_to_isocontour!(mesh, i)
+    end
   end
 end
 
