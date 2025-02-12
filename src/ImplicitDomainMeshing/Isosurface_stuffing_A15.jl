@@ -442,7 +442,7 @@ function compute_gradient(mesh::BlockMesh, node_index::Int; δ::Float64=1e-3)
 end
 
 # Update warp_node_to_isocontour! to handle positions directly
-function warp_node_to_isocontour!(mesh::BlockMesh, node_index::Int; max_iter::Int=20)
+function warp_node_to_isocontour!(mesh::BlockMesh, node_index::Int, max_iter)
   tol = mesh.grid_tol
   current_position = mesh.X[node_index]
   
@@ -473,7 +473,7 @@ end
 # Nejprve se upraví uzly s negativní SDF hodnotou (uvnitř izopovrchu) a poté uzly s kladnou hodnotou.
 # Uzly se posunují směrem k nulové hladině SDF (izopovrchu) a práh posunu se počítá jako
 # threshold_sdf = 0.2 * (délka nejdelší hrany tetraedru).
-function warp!(mesh::BlockMesh, max_iter::Int=60)
+function warp!(mesh::BlockMesh, max_iter::Int=160)
   # Vypočítat nejdelší hranu a následně threshold pro posun
   max_edge = longest_edge(mesh)
   threshold_sdf = 0.5 * max_edge
@@ -484,7 +484,7 @@ function warp!(mesh::BlockMesh, max_iter::Int=60)
   for i in 1:length(mesh.X)
     sdf = mesh.node_sdf[i]
     if sdf > 0 && abs(sdf) < threshold_sdf
-        warp_node_to_isocontour!(mesh, i)
+        warp_node_to_isocontour!(mesh, i, max_iter)
     end
   end
 
@@ -492,7 +492,7 @@ function warp!(mesh::BlockMesh, max_iter::Int=60)
   for i in 1:length(mesh.X)
     sdf = mesh.node_sdf[i]
     if sdf < 0 && abs(sdf) < threshold_sdf
-        warp_node_to_isocontour!(mesh, i)
+        warp_node_to_isocontour!(mesh, i, max_iter)
     end
   end
 end
