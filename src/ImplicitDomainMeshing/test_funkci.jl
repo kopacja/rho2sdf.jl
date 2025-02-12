@@ -2,16 +2,47 @@
 # Pomocná funkce: Lineární interpolace průsečíku s nulovou hladinou SDF
 # ----------------------------
 function interpolate_zero(p1::SVector{3,Float64}, p2::SVector{3,Float64},
-                            f1::Float64, f2::Float64, mesh::BlockMesh)::Int64
-    tol = mesh.grid_tol
-    t = (0 - f1) / (f2 - f1)
-    p_interp = p1 + t * (p2 - p1)
-    p_key = quantize(p_interp, tol)
+                          f1::Float64, f2::Float64, mesh::BlockMesh; tol=mesh.grid_tol, max_iter=20)::Int64
+                          
+    pos1 = f1 >= -tol
+    pos2 = f2 >= -tol
+    sdf_p1 = eval_sdf(mesh, p1)
+    sdf_p2 = eval_sdf(mesh, p2)
+    println("kontrola p1 sdf: ", sdf_p1)
+    println("kontrola p2 sdf: ", sdf_p2)
+    # Pokud oba body mají stejnou polaritu podle tolerance, nelze správně interpolovat.
+    if pos1 == pos2
+        error("Oba body mají stejnou 'toleranční' polaritu; jeden bod musí být blízko nuly (kladný) a druhý výrazně záporný.")
+    end
+
+    # Inicializujeme interval: low a high – předpokládáme, že p1 a p2 jsou uspořádané podle f
+    low, high = p1, p2
+    f_low, f_high = f1, f2
+    mid = low
+    for iter in 1:max_iter
+        mid = (low + high) / 2.0
+        f_mid = eval_sdf(mesh, mid)
+        # Pokud je hodnota dostatečně blízko nule, ukončíme iteraci
+        if abs(f_mid) < tol
+            break
+        end
+        # Podle znaménka f_mid aktualizujeme jeden z koncových bodů intervalu
+        if sign(f_mid) == sign(f_low)
+            low, f_low = mid, f_mid
+        else
+            high, f_high = mid, f_mid
+        end
+    end
+
+    # Kvantizujeme nalezený bod, abychom se vyhnuli duplicitám v hashtable
+    p_key = quantize(mid, tol)
+    sdf_of_iterp_point = eval_sdf(mesh, SVector{3, Float64}(p_key))
+    println("kontrola interp sdf: ", sdf_of_iterp_point)
     if haskey(mesh.node_hash, p_key)
         return mesh.node_hash[p_key]
     else
-        push!(mesh.X, p_interp)
-        push!(mesh.node_sdf, 0.0)
+        push!(mesh.X, mid)
+        push!(mesh.node_sdf, 0.0)  # nebo nastavíme přesně na 0
         new_index = length(mesh.X)
         mesh.node_hash[p_key] = new_index
         return new_index
