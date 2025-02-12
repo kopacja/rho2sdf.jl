@@ -120,6 +120,48 @@ function shape_functions(ξηζ::SVector{3,Float64})::SVector{8,Float64}
 end
 
 # ----------------------------
+# Pomocná funkce: Vyhodnocení SDF pomocí trilineární interpolace
+# ----------------------------
+function eval_sdf(mesh::BlockMesh, p::SVector{3,Float64})
+  # Získáme minimální a maximální souřadnice mřížky
+  vmin = mesh.grid[1,1,1]
+  vmax = mesh.grid[end,end,end]
+  # Normalizace souřadnic bodu p do intervalu [0,1]
+  r = (p .- vmin) ./ (vmax .- vmin)
+  # Přepočet na indexy v mřížce
+  i_f = r[1] * (mesh.nx - 1) + 1
+  j_f = r[2] * (mesh.ny - 1) + 1
+  k_f = r[3] * (mesh.nz - 1) + 1
+  i0 = clamp(floor(Int, i_f), 1, mesh.nx-1)
+  j0 = clamp(floor(Int, j_f), 1, mesh.ny-1)
+  k0 = clamp(floor(Int, k_f), 1, mesh.nz-1)
+  i1 = i0 + 1
+  j1 = j0 + 1
+  k1 = k0 + 1
+  # Lokální váhy
+  xd = i_f - i0
+  yd = j_f - j0
+  zd = k_f - k0
+  # Získání SDF hodnot na osmi rozích buňky
+  c000 = mesh.SDF[i0, j0, k0]
+  c100 = mesh.SDF[i1, j0, k0]
+  c010 = mesh.SDF[i0, j1, k0]
+  c110 = mesh.SDF[i1, j1, k0]
+  c001 = mesh.SDF[i0, j0, k1]
+  c101 = mesh.SDF[i1, j0, k1]
+  c011 = mesh.SDF[i0, j1, k1]
+  c111 = mesh.SDF[i1, j1, k1]
+  # Trilineární interpolace
+  c00 = c000*(1 - xd) + c100*xd
+  c01 = c001*(1 - xd) + c101*xd
+  c10 = c010*(1 - xd) + c110*xd
+  c11 = c011*(1 - xd) + c111*xd
+  c0 = c00*(1 - yd) + c10*yd
+  c1 = c01*(1 - yd) + c11*yd
+  return c0*(1 - zd) + c1*zd
+end
+
+# ----------------------------
 # Function for discretizing a cell using A15 scheme (unchanged logic, but with refactored shape function and slight optimizations)
 # ----------------------------
 function process_cell_A15!(mesh::BlockMesh, i::Int, j::Int, k::Int)
@@ -137,12 +179,6 @@ function process_cell_A15!(mesh::BlockMesh, i::Int, j::Int, k::Int)
 
   # Precompute differences for coordinate interpolation
   Δ = vmaxs .- vmins
-
-  # Get SDF values at cell corners
-  cell_sdf = sdf_values
-  f000, f100, f110, f010 = cell_sdf[1], cell_sdf[2], cell_sdf[3], cell_sdf[4]
-  f001, f101, f111, f011 = cell_sdf[5], cell_sdf[6], cell_sdf[7], cell_sdf[8]
-  
   local_mapping = Dict{Int, Int}()
   
   @inbounds for li in 1:length(tile_ref)
@@ -156,12 +192,9 @@ function process_cell_A15!(mesh::BlockMesh, i::Int, j::Int, k::Int)
       local_mapping[li] = mesh.node_hash[p_key]
     else
       push!(mesh.X, p)
-      # Compute standard shape functions using helper function
-      N = shape_functions(local_coord)
-      # Interpolate SDF value using the 8 corner SDFs
-      sdf_interp = N[1]*f000 + N[2]*f100 + N[3]*f110 + N[4]*f010 +
-                   N[5]*f001 + N[6]*f101 + N[7]*f111 + N[8]*f011
-      push!(mesh.node_sdf, sdf_interp)
+
+      sdf_aprox = eval_sdf(mesh, p)
+      push!(mesh.node_sdf, sdf_aprox)
       local_index = length(mesh.X)
       local_mapping[li] = local_index
       mesh.node_hash[p_key] = local_index
@@ -344,48 +377,6 @@ function export_mesh_vtk(mesh::BlockMesh, filename::String)
 end
 
 # ----------------------------
-# Pomocná funkce: Vyhodnocení SDF pomocí trilineární interpolace
-# ----------------------------
-function eval_sdf(mesh::BlockMesh, p::SVector{3,Float64})
-  # Získáme minimální a maximální souřadnice mřížky
-  vmin = mesh.grid[1,1,1]
-  vmax = mesh.grid[end,end,end]
-  # Normalizace souřadnic bodu p do intervalu [0,1]
-  r = (p .- vmin) ./ (vmax .- vmin)
-  # Přepočet na indexy v mřížce
-  i_f = r[1] * (mesh.nx - 1) + 1
-  j_f = r[2] * (mesh.ny - 1) + 1
-  k_f = r[3] * (mesh.nz - 1) + 1
-  i0 = clamp(floor(Int, i_f), 1, mesh.nx-1)
-  j0 = clamp(floor(Int, j_f), 1, mesh.ny-1)
-  k0 = clamp(floor(Int, k_f), 1, mesh.nz-1)
-  i1 = i0 + 1
-  j1 = j0 + 1
-  k1 = k0 + 1
-  # Lokální váhy
-  xd = i_f - i0
-  yd = j_f - j0
-  zd = k_f - k0
-  # Získání SDF hodnot na osmi rozích buňky
-  c000 = mesh.SDF[i0, j0, k0]
-  c100 = mesh.SDF[i1, j0, k0]
-  c010 = mesh.SDF[i0, j1, k0]
-  c110 = mesh.SDF[i1, j1, k0]
-  c001 = mesh.SDF[i0, j0, k1]
-  c101 = mesh.SDF[i1, j0, k1]
-  c011 = mesh.SDF[i0, j1, k1]
-  c111 = mesh.SDF[i1, j1, k1]
-  # Trilineární interpolace
-  c00 = c000*(1 - xd) + c100*xd
-  c01 = c001*(1 - xd) + c101*xd
-  c10 = c010*(1 - xd) + c110*xd
-  c11 = c011*(1 - xd) + c111*xd
-  c0 = c00*(1 - yd) + c10*yd
-  c1 = c01*(1 - yd) + c11*yd
-  return c0*(1 - zd) + c1*zd
-end
-
-# ----------------------------
 # Pomocná funkce: Aproximace gradientu SDF v bodě p pomocí centrálních diferencí
 # ----------------------------
 function approximate_gradient(mesh::BlockMesh, p::SVector{3,Float64}; h::Float64=1e-3)
@@ -399,6 +390,7 @@ function approximate_gradient(mesh::BlockMesh, p::SVector{3,Float64}; h::Float64
 end
 
 # Funkce pro výpočet délky nejdelší hrany mezi uzly ve všech tetraedrech
+# TODO: Stačí vzít počáteční diskretizaci a vzít pouze jeden element (pro zrychlení)
 function longest_edge(mesh::BlockMesh)
   # Pre-allocate maximum length with type stability
   max_length = zero(eltype(mesh.X[1]))
