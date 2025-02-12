@@ -8,68 +8,68 @@ using LinearAlgebra
 # Block mesh structure (extended with node_hash)
 # ----------------------------
 mutable struct BlockMesh
-    nx::Int
-    ny::Int
-    nz::Int
-    grid::Array{SVector{3,Float64},3}          # 3D array of node coordinates (basic grid) using static vectors
-    grid_step::Float64
-    grid_tol::Float64
-    SDF::Array{Float64,3}                      # SDF values
-    X::Vector{SVector{3,Float64}}    # List of physical node coordinates (nodes used in mesh)
-    IEN::Vector{Vector{Int64}}                 # Tetrahedral connectivity (elements)
-    INE::Vector{Vector{Int64}}                 # Inverse connectivity: for each node, list of adjacent elements
-    node_sdf::Vector{Float64}                  # SDF values at nodes
-    node_map::Dict{Int64,Int64}                # Mapping from original grid node index -> new node index
-    cell_center_map::Dict{Tuple{Int,Int,Int},Int64}  # Mapping for cell centers (Steiner points)
-    node_hash::Dict{NTuple{3,Float64},Int64}    # Global dictionary for merging nodes
+  nx::Int
+  ny::Int
+  nz::Int
+  grid::Array{SVector{3,Float64},3}          # 3D array of node coordinates (basic grid) using static vectors
+  grid_step::Float64
+  grid_tol::Float64
+  SDF::Array{Float64,3}                      # SDF values
+  X::Vector{SVector{3,Float64}}    # List of physical node coordinates (nodes used in mesh)
+  IEN::Vector{Vector{Int64}}                 # Tetrahedral connectivity (elements)
+  INE::Vector{Vector{Int64}}                 # Inverse connectivity: for each node, list of adjacent elements
+  node_sdf::Vector{Float64}                  # SDF values at nodes
+  node_map::Dict{Int64,Int64}                # Mapping from original grid node index -> new node index
+  cell_center_map::Dict{Tuple{Int,Int,Int},Int64}  # Mapping for cell centers (Steiner points)
+  node_hash::Dict{NTuple{3,Float64},Int64}    # Global dictionary for merging nodes
 
-    function BlockMesh()
-      @load "src/ImplicitDomainMeshing/data/Z_block_FineGrid_B-0.2_smooth-1.jld2" fine_grid
-      @load "src/ImplicitDomainMeshing/data/Z_block_FineSDF_B-0.2_smooth-1.jld2" fine_sdf
+  function BlockMesh()
+    @load "src/ImplicitDomainMeshing/data/Z_block_FineGrid_B-0.2_smooth-1.jld2" fine_grid
+    @load "src/ImplicitDomainMeshing/data/Z_block_FineSDF_B-0.2_smooth-1.jld2" fine_sdf
 
-        # Convert fine_grid into a 3D array of SVectors
-        grid = Array{SVector{3,Float64},3}(undef, size(fine_grid))
-        for i in eachindex(fine_grid)
-            # Assume fine_grid[i] is an array of Float64; convert to SVector
-            grid[i] = SVector{3,Float64}(fine_grid[i]...)
-        end
-        step = maximum(abs.(grid[1,1,1] - grid[2,2,2]))
-        sdf = Float64.(fine_sdf)
-        nx, ny, nz = size(grid)
-        
-        mesh = new(nx, ny, nz)
-        mesh.grid = grid
-        mesh.grid_step = step
-        mesh.grid_tol = 1e-6 * step
-        mesh.SDF = sdf
-        mesh.node_map = Dict{Int64,Int64}()
-        mesh.cell_center_map = Dict{Tuple{Int,Int,Int},Int64}()
-        mesh.X = Vector{SVector{3,Float64}}()
-        mesh.IEN = Vector{Vector{Int64}}()
-        mesh.INE = Vector{Vector{Int64}}()
-        mesh.node_sdf = Vector{Float64}()
-        mesh.node_hash = Dict{NTuple{3,Float64},Int64}()
-        return mesh
+    # Convert fine_grid into a 3D array of SVectors
+    grid = Array{SVector{3,Float64},3}(undef, size(fine_grid))
+    for i in eachindex(fine_grid)
+      # Assume fine_grid[i] is an array of Float64; convert to SVector
+      grid[i] = SVector{3,Float64}(fine_grid[i]...)
     end
+    step = maximum(abs.(grid[1, 1, 1] - grid[2, 2, 2]))
+    sdf = Float64.(fine_sdf)
+    nx, ny, nz = size(grid)
+
+    mesh = new(nx, ny, nz)
+    mesh.grid = grid
+    mesh.grid_step = step
+    mesh.grid_tol = 1e-6 * step
+    mesh.SDF = sdf
+    mesh.node_map = Dict{Int64,Int64}()
+    mesh.cell_center_map = Dict{Tuple{Int,Int,Int},Int64}()
+    mesh.X = Vector{SVector{3,Float64}}()
+    mesh.IEN = Vector{Vector{Int64}}()
+    mesh.INE = Vector{Vector{Int64}}()
+    mesh.node_sdf = Vector{Float64}()
+    mesh.node_hash = Dict{NTuple{3,Float64},Int64}()
+    return mesh
+  end
 end
 
 # ----------------------------
 # Helper function: Get SDF values at the 8 corners of a cell (unchanged)
 # ----------------------------
 function get_cell_sdf_values(mesh::BlockMesh, i::Int, j::Int, k::Int)
-    1 <= i < mesh.nx || throw(BoundsError(mesh.SDF, i))
-    1 <= j < mesh.ny || throw(BoundsError(mesh.SDF, j))
-    1 <= k < mesh.nz || throw(BoundsError(mesh.SDF, k))
-    return SVector{8}(
-        mesh.SDF[i, j, k],       # front-bottom-left
-        mesh.SDF[i+1, j, k],     # front-bottom-right
-        mesh.SDF[i+1, j+1, k],   # front-top-right
-        mesh.SDF[i, j+1, k],     # front-top-left
-        mesh.SDF[i, j, k+1],     # back-bottom-left
-        mesh.SDF[i+1, j, k+1],   # back-bottom-right
-        mesh.SDF[i+1, j+1, k+1], # back-top-right
-        mesh.SDF[i, j+1, k+1]    # back-top-left
-    )
+  1 <= i < mesh.nx || throw(BoundsError(mesh.SDF, i))
+  1 <= j < mesh.ny || throw(BoundsError(mesh.SDF, j))
+  1 <= k < mesh.nz || throw(BoundsError(mesh.SDF, k))
+  return SVector{8}(
+    mesh.SDF[i, j, k],       # front-bottom-left
+    mesh.SDF[i+1, j, k],     # front-bottom-right
+    mesh.SDF[i+1, j+1, k],   # front-top-right
+    mesh.SDF[i, j+1, k],     # front-top-left
+    mesh.SDF[i, j, k+1],     # back-bottom-left
+    mesh.SDF[i+1, j, k+1],   # back-bottom-right
+    mesh.SDF[i+1, j+1, k+1], # back-top-right
+    mesh.SDF[i, j+1, k+1]    # back-top-left
+  )
 end
 
 # ----------------------------
@@ -93,7 +93,7 @@ include("A15_scheme.jl")  # This file provides tile_ref and tetra_connectivity f
 # Quantization function – unchanged
 # ----------------------------
 function quantize(p::SVector{3,Float64}, tol::Float64)
-  return (round(p[1] / tol)*tol, round(p[2] / tol)*tol, round(p[3] / tol)*tol)
+  return (round(p[1] / tol) * tol, round(p[2] / tol) * tol, round(p[3] / tol) * tol)
 end
 
 # ----------------------------
@@ -106,7 +106,7 @@ function shape_functions(ξηζ::SVector{3,Float64})::SVector{8,Float64}
   ξ = 2 * ξηζ[1] - 1.0
   η = 2 * ξηζ[2] - 1.0
   ζ = 2 * ξηζ[3] - 1.0
-  coef = 1/8.0
+  coef = 1 / 8.0
   return @SVector [
     coef * (1 - ξ) * (1 - η) * (1 - ζ),
     coef * (1 + ξ) * (1 - η) * (1 - ζ),
@@ -124,17 +124,17 @@ end
 # ----------------------------
 function eval_sdf(mesh::BlockMesh, p::SVector{3,Float64})
   # Získáme minimální a maximální souřadnice mřížky
-  vmin = mesh.grid[1,1,1]
-  vmax = mesh.grid[end,end,end]
+  vmin = mesh.grid[1, 1, 1]
+  vmax = mesh.grid[end, end, end]
   # Normalizace souřadnic bodu p do intervalu [0,1]
   r = (p .- vmin) ./ (vmax .- vmin)
   # Přepočet na indexy v mřížce
   i_f = r[1] * (mesh.nx - 1) + 1
   j_f = r[2] * (mesh.ny - 1) + 1
   k_f = r[3] * (mesh.nz - 1) + 1
-  i0 = clamp(floor(Int, i_f), 1, mesh.nx-1)
-  j0 = clamp(floor(Int, j_f), 1, mesh.ny-1)
-  k0 = clamp(floor(Int, k_f), 1, mesh.nz-1)
+  i0 = clamp(floor(Int, i_f), 1, mesh.nx - 1)
+  j0 = clamp(floor(Int, j_f), 1, mesh.ny - 1)
+  k0 = clamp(floor(Int, k_f), 1, mesh.nz - 1)
   i1 = i0 + 1
   j1 = j0 + 1
   k1 = k0 + 1
@@ -152,13 +152,13 @@ function eval_sdf(mesh::BlockMesh, p::SVector{3,Float64})
   c011 = mesh.SDF[i0, j1, k1]
   c111 = mesh.SDF[i1, j1, k1]
   # Trilineární interpolace
-  c00 = c000*(1 - xd) + c100*xd
-  c01 = c001*(1 - xd) + c101*xd
-  c10 = c010*(1 - xd) + c110*xd
-  c11 = c011*(1 - xd) + c111*xd
-  c0 = c00*(1 - yd) + c10*yd
-  c1 = c01*(1 - yd) + c11*yd
-  return c0*(1 - zd) + c1*zd
+  c00 = c000 * (1 - xd) + c100 * xd
+  c01 = c001 * (1 - xd) + c101 * xd
+  c10 = c010 * (1 - xd) + c110 * xd
+  c11 = c011 * (1 - xd) + c111 * xd
+  c0 = c00 * (1 - yd) + c10 * yd
+  c1 = c01 * (1 - yd) + c11 * yd
+  return c0 * (1 - zd) + c1 * zd
 end
 
 # ----------------------------
@@ -172,15 +172,15 @@ function process_cell_A15!(mesh::BlockMesh, i::Int, j::Int, k::Int)
   end
 
   # Retrieve min and max corners of the cell
-  v000 = mesh.grid[i,   j,   k]
+  v000 = mesh.grid[i, j, k]
   v111 = mesh.grid[i+1, j+1, k+1]
   vmins = v000
   vmaxs = v111
 
   # Precompute differences for coordinate interpolation
   Δ = vmaxs .- vmins
-  local_mapping = Dict{Int, Int}()
-  
+  local_mapping = Dict{Int,Int}()
+
   @inbounds for li in 1:length(tile_ref)
     # tile_ref is assumed to be defined in A15_scheme.jl and normalized (in [0,1]*4 originally)
     local_coord = SVector{3,Float64}(tile_ref[li] ./ 4.0)  # normalized coordinates in [0,1]
@@ -200,11 +200,11 @@ function process_cell_A15!(mesh::BlockMesh, i::Int, j::Int, k::Int)
       mesh.node_hash[p_key] = local_index
     end
   end
-  
+
   # Process tetrahedral connectivity from A15 scheme
   @inbounds for tet in tetra_connectivity
-    global_tet = [ local_mapping[li] for li in tet ]
-    tet_sdf = [ mesh.node_sdf[idx] for idx in global_tet ]
+    global_tet = [local_mapping[li] for li in tet]
+    tet_sdf = [mesh.node_sdf[idx] for idx in global_tet]
     if any(x -> x >= 0, tet_sdf)
       push!(mesh.IEN, global_tet)
     end
@@ -220,20 +220,20 @@ function process_cell_Schlafli!(mesh::BlockMesh, i::Int, j::Int, k::Int)
   if !any(x -> x >= 0, sdf_values)
     return
   end
-  
+
   local_mapping = Dict{Int,Int}()
   # Define cell nodes as SVectors from grid
   cell_nodes = [
-    mesh.grid[i,   j,   k],     # Node 1: front-bottom-left
-    mesh.grid[i+1, j,   k],       # Node 2: front-bottom-right
+    mesh.grid[i, j, k],     # Node 1: front-bottom-left
+    mesh.grid[i+1, j, k],       # Node 2: front-bottom-right
     mesh.grid[i+1, j+1, k],       # Node 3: front-top-right
-    mesh.grid[i,   j+1, k],       # Node 4: front-top-left
-    mesh.grid[i,   j,   k+1],     # Node 5: back-bottom-left
-    mesh.grid[i+1, j,   k+1],     # Node 6: back-bottom-right
+    mesh.grid[i, j+1, k],       # Node 4: front-top-left
+    mesh.grid[i, j, k+1],     # Node 5: back-bottom-left
+    mesh.grid[i+1, j, k+1],     # Node 6: back-bottom-right
     mesh.grid[i+1, j+1, k+1],     # Node 7: back-top-right
-    mesh.grid[i,   j+1, k+1]      # Node 8: back-top-left
+    mesh.grid[i, j+1, k+1]      # Node 8: back-top-left
   ]
-  
+
   @inbounds for li in 1:8
     p = cell_nodes[li]
     p_key = quantize(p, tol)
@@ -247,11 +247,11 @@ function process_cell_Schlafli!(mesh::BlockMesh, i::Int, j::Int, k::Int)
       mesh.node_hash[p_key] = local_index
     end
   end
-  
+
   # Construct tetrahedra according to Schlafli scheme
   @inbounds for tet in schlafli_tet_connectivity
-    global_tet = [ local_mapping[li] for li in tet ]
-    tet_sdf = [ mesh.node_sdf[idx] for idx in global_tet ]
+    global_tet = [local_mapping[li] for li in tet]
+    tet_sdf = [mesh.node_sdf[idx] for idx in global_tet]
     if any(x -> x >= 0, tet_sdf)
       push!(mesh.IEN, global_tet)
     end
@@ -265,8 +265,8 @@ function merge_duplicate_nodes!(mesh::BlockMesh)
   tol = mesh.grid_tol
   new_nodes = Vector{SVector{3,Float64}}()
   new_node_sdf = Vector{Float64}()
-  node_map = Dict{Int, Int}()
-  global_hash = Dict{NTuple{3,Float64}, Int}()
+  node_map = Dict{Int,Int}()
+  global_hash = Dict{NTuple{3,Float64},Int}()
   @inbounds for i in 1:length(mesh.X)
     p = mesh.X[i]
     p_key = quantize(p, tol)
@@ -281,7 +281,7 @@ function merge_duplicate_nodes!(mesh::BlockMesh)
     end
   end
   @inbounds for i in 1:length(mesh.IEN)
-    mesh.IEN[i] = [ node_map[old] for old in mesh.IEN[i] ]
+    mesh.IEN[i] = [node_map[old] for old in mesh.IEN[i]]
   end
   mesh.X = new_nodes
   mesh.node_sdf = new_node_sdf
@@ -308,7 +308,7 @@ function cleanup_unused_nodes!(mesh::BlockMesh)
     push!(new_node_sdf, mesh.node_sdf[old_id])
   end
   @inbounds for i in 1:length(mesh.IEN)
-    mesh.IEN[i] = [ new_node_map[old_id] for old_id in mesh.IEN[i] ]
+    mesh.IEN[i] = [new_node_map[old_id] for old_id in mesh.IEN[i]]
   end
   mesh.X = new_coords
   mesh.node_sdf = new_node_sdf
@@ -339,7 +339,7 @@ function generate_mesh!(mesh::BlockMesh, scheme::String)
   empty!(mesh.node_map)
   empty!(mesh.cell_center_map)
   empty!(mesh.node_hash)
-  
+
   @inbounds for i in 1:mesh.nx-1
     for j in 1:mesh.ny-1
       for k in 1:mesh.nz-1
@@ -353,10 +353,10 @@ function generate_mesh!(mesh::BlockMesh, scheme::String)
       end
     end
   end
-  
+
   cleanup_unused_nodes!(mesh)
   merge_duplicate_nodes!(mesh)
-  
+
   create_INE!(mesh)
   @info "Mesh created: $(length(mesh.X)) nodes and $(length(mesh.IEN)) tetrahedra"
 end
@@ -383,9 +383,9 @@ function approximate_gradient(mesh::BlockMesh, p::SVector{3,Float64}; h::Float64
   dx = SVector{3,Float64}(h, 0.0, 0.0)
   dy = SVector{3,Float64}(0.0, h, 0.0)
   dz = SVector{3,Float64}(0.0, 0.0, h)
-  df_dx = (eval_sdf(mesh, p + dx) - eval_sdf(mesh, p - dx)) / (2*h)
-  df_dy = (eval_sdf(mesh, p + dy) - eval_sdf(mesh, p - dy)) / (2*h)
-  df_dz = (eval_sdf(mesh, p + dz) - eval_sdf(mesh, p - dz)) / (2*h)
+  df_dx = (eval_sdf(mesh, p + dx) - eval_sdf(mesh, p - dx)) / (2 * h)
+  df_dy = (eval_sdf(mesh, p + dy) - eval_sdf(mesh, p - dy)) / (2 * h)
+  df_dz = (eval_sdf(mesh, p + dz) - eval_sdf(mesh, p - dz)) / (2 * h)
   return SVector{3,Float64}(df_dx, df_dy, df_dz)
 end
 
@@ -394,15 +394,15 @@ end
 function longest_edge(mesh::BlockMesh)
   # Pre-allocate maximum length with type stability
   max_length = zero(eltype(mesh.X[1]))
-  
+
   # Vectorize operations by using broadcast
   for tet in mesh.IEN
-      # Use array views for better memory efficiency
-      nodes = @view mesh.X[tet]
-      # Calculate all edge lengths at once using comprehension
-      lengths = [norm(nodes[i] - nodes[j]) for i in 1:3 for j in i+1:4]
-      # Use built-in maximum function
-      max_length = max(max_length, maximum(lengths))
+    # Use array views for better memory efficiency
+    nodes = @view mesh.X[tet]
+    # Calculate all edge lengths at once using comprehension
+    lengths = [norm(nodes[i] - nodes[j]) for i in 1:3 for j in i+1:4]
+    # Use built-in maximum function
+    max_length = max(max_length, maximum(lengths))
   end
   return max_length
 end
@@ -413,18 +413,18 @@ end
 function compute_gradient(mesh::BlockMesh, p::SVector{3,Float64}; δ::Float64=1e-3)
   # Pre-allocate unit vectors as static vectors for better performance
   unit_vectors = (
-      SVector{3,Float64}(1.0, 0.0, 0.0),
-      SVector{3,Float64}(0.0, 1.0, 0.0),
-      SVector{3,Float64}(0.0, 0.0, 1.0)
+    SVector{3,Float64}(1.0, 0.0, 0.0),
+    SVector{3,Float64}(0.0, 1.0, 0.0),
+    SVector{3,Float64}(0.0, 0.0, 1.0)
   )
-  
+
   # Use tuple comprehension for better compile-time optimization
   grad = ntuple(3) do d
-      unit_vec = unit_vectors[d]
-      # Compute central difference
-      (eval_sdf(mesh, p + δ * unit_vec) - eval_sdf(mesh, p - δ * unit_vec)) / (2δ)
+    unit_vec = unit_vectors[d]
+    # Compute central difference
+    (eval_sdf(mesh, p + δ * unit_vec) - eval_sdf(mesh, p - δ * unit_vec)) / (2δ)
   end
-  
+
   return SVector{3,Float64}(grad)
 end
 
@@ -437,25 +437,25 @@ end
 function warp_node_to_isocontour!(mesh::BlockMesh, node_index::Int, max_iter)
   tol = mesh.grid_tol
   current_position = mesh.X[node_index]
-  
+
   for iter in 1:max_iter
-      f = eval_sdf(mesh, current_position)
-      
-      # Early return if we're close enough to the isocontour
-      abs2(f) < tol * tol && break
-      
-      grad = compute_gradient(mesh, current_position)
-      norm_grad_squared = sum(abs2, grad)
-      
-      # Early return if gradient is too small
-      norm_grad_squared < 1e-16 && break
-      
-      # Newton step
-      dp = (f / norm_grad_squared) * grad
-      current_position -= dp
+    f = eval_sdf(mesh, current_position)
+
+    # Early return if we're close enough to the isocontour
+    abs2(f) < tol * tol && break
+
+    grad = compute_gradient(mesh, current_position)
+    norm_grad_squared = sum(abs2, grad)
+
+    # Early return if gradient is too small
+    norm_grad_squared < 1e-16 && break
+
+    # Newton step
+    dp = (f / norm_grad_squared) * grad
+    current_position -= dp
   end
   current_sdf = eval_sdf(mesh, current_position)
-  println("current_sdf: ",current_sdf)
+  println("current_sdf: ", current_sdf)
   mesh.node_sdf[node_index] = current_sdf
   mesh.X[node_index] = current_position
 end
@@ -476,7 +476,7 @@ function warp!(mesh::BlockMesh, max_iter::Int=160)
   for i in 1:length(mesh.X)
     sdf = mesh.node_sdf[i]
     if sdf > 0 && abs(sdf) < threshold_sdf
-        warp_node_to_isocontour!(mesh, i, max_iter)
+      warp_node_to_isocontour!(mesh, i, max_iter)
     end
   end
 
@@ -484,7 +484,7 @@ function warp!(mesh::BlockMesh, max_iter::Int=160)
   for i in 1:length(mesh.X)
     sdf = mesh.node_sdf[i]
     if sdf < 0 && abs(sdf) < threshold_sdf
-        warp_node_to_isocontour!(mesh, i, max_iter)
+      warp_node_to_isocontour!(mesh, i, max_iter)
     end
   end
 end
@@ -500,85 +500,7 @@ function update_connectivity!(mesh::BlockMesh)
   @info "Aktualizace topologie dokončena: $(length(mesh.X)) uzlů, $(length(mesh.IEN)) tetraedrů."
 end
 
-
-# ----------------------------
-# Pomocná funkce: Lineární interpolace průsečíku s nulovou hladinou SDF
-# ----------------------------
-function interpolate_zero(p1::SVector{3,Float64}, p2::SVector{3,Float64},
-                            f1::Float64, f2::Float64, mesh::BlockMesh)::Int64
-    tol = mesh.grid_tol
-    t = (0 - f1) / (f2 - f1)
-    p_interp = p1 + t * (p2 - p1)
-    p_key = quantize(p_interp, tol)
-    if haskey(mesh.node_hash, p_key)
-        return mesh.node_hash[p_key]
-    else
-        push!(mesh.X, p_interp)
-        push!(mesh.node_sdf, 0.0)
-        new_index = length(mesh.X)
-        mesh.node_hash[p_key] = new_index
-        return new_index
-    end
-end
-
-# === Pomocné funkce (již dříve definované) ===
-
-# Vrátí, zda se bod nachází na hranici mřížky
-function is_on_boundary(mesh::BlockMesh, p::SVector{3,Float64})
-  tol = mesh.grid_step
-  vmin = mesh.grid[1,1,1]
-  vmax = mesh.grid[end,end,end]
-  return any(abs(p[i]-vmin[i]) < tol || abs(p[i]-vmax[i]) < tol for i in 1:3)
-end
-
-# Uspořádá průsečíky (indexy v mesh.X) do cyklického pořadí
-function order_intersection_points(mesh::BlockMesh, ips::Vector{Int64})::Vector{Int64}
-  tol = mesh.grid_step
-  pts = [mesh.X[i] for i in ips]
-  centroid = sum(pts) / length(pts)
-  v1 = pts[1] - centroid
-  if norm(v1) < tol
-     v1 = SVector(1.0, 0.0, 0.0)
-  end
-  v2 = cross(normalize(v1), SVector(0.0, 0.0, 1.0))
-  if norm(v2) < tol
-      v2 = cross(normalize(v1), SVector(0.0, 1.0, 0.0))
-  end
-  angles = [atan(dot(pt - centroid, normalize(v1)), dot(pt - centroid, normalize(v2))) for pt in pts]
-  sorted = sortperm(angles)
-  return ips[sorted]
-end
-
-# Určí “barvu” hrany – zda oba uzly mají SDF kladné (positive), záporné (negative) nebo smíšené
-function edge_color(mesh::BlockMesh, i::Int, j::Int)
-  f1 = mesh.node_sdf[i]
-  f2 = mesh.node_sdf[j]
-  if f1 >= 0 && f2 >= 0
-      return :positive
-  elseif f1 < 0 && f2 < 0
-      return :negative
-  else
-      return :mixed
-  end
-end
-
-# Výpočet nákladové funkce pro volbu diagonály
-function diagonal_cost(mesh::BlockMesh, pos_indices::Vector{Int64}, diag_pair::Tuple{Int64,Int64})
-  p_diag1 = mesh.X[diag_pair[1]]
-  p_diag2 = mesh.X[diag_pair[2]]
-  cost = 0.0
-  col = edge_color(mesh, diag_pair[1], diag_pair[2])
-  penalty = (col == :positive ? 0.0 : 1000.0)
-  cost += penalty
-  for pi in pos_indices
-      p_pos = mesh.X[pi]
-      cost += norm(p_pos - p_diag1) + norm(p_pos - p_diag2)
-  end
-  return cost
-end
-
 # === Kompletní šablony podle literatury ===
-
 """
   apply_complete_stencil(mesh, tet)
 
@@ -628,135 +550,19 @@ a na základě signatury (počtu kladných vs. záporných) aplikuje příslušn
   
 V případě, že všechny hodnoty jsou záporné, tetraedr se vynechá.
 """
-function apply_complete_stencil(mesh::BlockMesh, tet::Vector{Int64})::Vector{Vector{Int64}}
-  f = [ mesh.node_sdf[i] for i in tet ]
-  signs = map(x -> x >= 0, f)
-  np = count(identity, signs)
-  
-  if np == 1
-      # Šablona pro 1+3
-      pos_local = findfirst(identity, signs)
-      neg_locals = [ i for (i, s) in enumerate(signs) if !s ]
-      p_pos = mesh.X[tet[pos_local]]
-      f_pos = f[pos_local]
-      ips = Vector{Int64}()
-      for n in neg_locals
-          p_neg = mesh.X[tet[n]]
-          f_neg = f[n]
-          ip = interpolate_zero(p_pos, p_neg, f_pos, f_neg, mesh)
-          push!(ips, ip)
-      end
-      return [ [ tet[pos_local], ips[1], ips[2], ips[3] ] ]
-      
-  elseif np == 3
-      # Šablona pro 3+1
-      neg_local = findfirst(x -> !x, signs)
-      pos_locals = [ i for (i, s) in enumerate(signs) if s ]
-      p_neg = mesh.X[tet[neg_local]]
-      f_neg = f[neg_local]
-      ips = Dict{Int,Int64}()
-      for p_local in pos_locals
-          p_pos = mesh.X[tet[p_local]]
-          f_pos = f[p_local]
-          ip = interpolate_zero(p_neg, p_pos, f_neg, f_pos, mesh)
-          ips[p_local] = ip
-      end
-      a, b, c = pos_locals
-      Ia, Ib, Ic = ips[a], ips[b], ips[c]
-      tet1 = [ tet[a], tet[b], Ib, Ia ]
-      tet2 = [ tet[b], tet[c], Ic, Ib ]
-      tet3 = [ tet[c], tet[a], Ia, Ic ]
-      # tet1 = [ tet[a], tet[b], ips[b], ips[a] ]
-      # tet2 = [ tet[b], tet[c], ips[c], ips[b] ]
-      # tet3 = [ tet[c], tet[a], ips[a], ips[c] ]
-      return [ tet1, tet2, tet3 ]
-      
-  elseif np == 2
-      # Ambiguózní případ: dva kladné a dva záporné.
-      pos_locals = [ i for (i, s) in enumerate(signs) if s ]
-      neg_locals = [ i for (i, s) in enumerate(signs) if !s ]
-      pos_global = [ tet[i] for i in pos_locals ]
-      
-      # Vypočet průsečíků na hranách spojujících kladné a záporné vrcholy
-      intersection_map = Dict{Tuple{Int,Int},Int64}()
-      for i in pos_locals, j in neg_locals
-          key_sorted = sort([tet[i], tet[j]])
-          key_tuple = (key_sorted[1], key_sorted[2])
-          if !haskey(intersection_map, key_tuple)
-              p_pos = mesh.X[tet[i]]
-              p_neg = mesh.X[tet[j]]
-              f_pos = f[i]
-              f_neg = f[j]
-              ip = interpolate_zero(p_pos, p_neg, f_pos, f_neg, mesh)
-              intersection_map[key_tuple] = ip
-          end
-      end
-      
-      ips = collect(values(intersection_map))
-      if length(ips) != 4
-          @warn "Ambiguózní tetraedr nemá 4 unikátní průsečíky, přeskočím tento prvek."
-          return Vector{Vector{Int64}}()
-      end
-      
-      ordered_ips = order_intersection_points(mesh, ips) #ok
-      
-      # Vyhodnocení obou možných diagonál
-      diag1 = (ordered_ips[1], ordered_ips[3])
-      diag2 = (ordered_ips[2], ordered_ips[4])
-      cost1 = diagonal_cost(mesh, pos_global, diag1)
-      cost2 = diagonal_cost(mesh, pos_global, diag2) #ok
-      
-      # Pokud je tetraedr dotčen hranice, použijeme variantu B (dvě tetraedra)
-      if any(is_on_boundary(mesh, mesh.X[i]) for i in tet)
-          chosen_diag = (cost1 <= cost2 ? diag1 : diag2)
-          tet1 = [ pos_global[1], ordered_ips[1], ordered_ips[2], ordered_ips[3] ]
-          tet2 = [ pos_global[2], ordered_ips[1], ordered_ips[3], ordered_ips[4] ]
-          return [ tet1, tet2 ]
-      else
-          # Varianta A: standardní rozdělení do tří tetraedrů
-          if cost1 <= cost2
-              # ponecháme pořadí ordered_ips
-          else
-              # přeuspořádáme ordered_ips tak, aby první prvek byl začátkem vybrané diagonály
-              idx = findfirst(x -> x == diag2[1], ordered_ips)
-              ordered_ips = vcat(ordered_ips[idx:end], ordered_ips[1:idx-1])
-          end
-          pos1 = pos_global[1]
-          pos2 = pos_global[2]
-          tet1 = [ pos1, ordered_ips[1], ordered_ips[2], ordered_ips[3] ]
-          tet2 = [ pos2, ordered_ips[1], ordered_ips[3], ordered_ips[4] ]
-          tet3 = [ pos1, pos2, ordered_ips[1], ordered_ips[3] ]
-          new_tets = Vector{Vector{Int64}}()
-          for t in (tet1, tet2, tet3)
-              t_sdf = [ mesh.node_sdf[i] for i in t ]
-              if any(x -> x >= 0, t_sdf)
-                  push!(new_tets, t)
-              end
-          end
-          return new_tets
-      end
-      
-  elseif np == 4
-      # Všechny vrcholy kladné – tetraedr se ponechá
-      return [ tet ]
-  else
-      # Všechno záporné – prvek vynecháme
-      return Vector{Vector{Int64}}()
-  end
-end
 
 # Funkce, která projde všechny tetraedry v konektivitě a aplikuje kompletní stencils
 function slice_ambiguous_tetrahedra!(mesh::BlockMesh)
   new_IEN = Vector{Vector{Int64}}()
   for tet in mesh.IEN
-      # new_tets = apply_complete_stencil(mesh, tet)
-      new_tets = apply_stencil(mesh, tet)
-      for nt in new_tets
-          t_sdf = [ mesh.node_sdf[i] for i in nt ]
-          if any(x -> x >= 0, t_sdf)
-              push!(new_IEN, nt)
-          end
+    # new_tets = apply_complete_stencil(mesh, tet)
+    new_tets = apply_stencil(mesh, tet)
+    for nt in new_tets
+      t_sdf = [mesh.node_sdf[i] for i in nt]
+      if any(x -> x >= 0, t_sdf)
+        push!(new_IEN, nt)
       end
+    end
   end
   mesh.IEN = new_IEN
   @info "Po kompletním řezu tetraedrů: $(length(mesh.IEN)) tetraedrů"
