@@ -455,8 +455,13 @@ function warp_node_to_isocontour!(mesh::BlockMesh, node_index::Int, max_iter)
     current_position -= dp
   end
   current_sdf = eval_sdf(mesh, current_position)
-  println("current_sdf: ", current_sdf)
-  mesh.node_sdf[node_index] = current_sdf
+  if abs(current_sdf) < tol
+    mesh.node_sdf[node_index] = 0.
+  else
+    println("current_sdf: ", current_sdf)
+    mesh.node_sdf[node_index] = current_sdf
+  end
+
   mesh.X[node_index] = current_position
 end
 
