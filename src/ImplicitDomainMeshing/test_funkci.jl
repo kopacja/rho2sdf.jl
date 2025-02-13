@@ -3,13 +3,14 @@
 # ----------------------------
 function interpolate_zero(p1::SVector{3,Float64}, p2::SVector{3,Float64},
                           f1::Float64, f2::Float64, mesh::BlockMesh; tol=mesh.grid_tol, max_iter=20)::Int64
+                          # coord kladného, coords zápor, sdf kladného, sdf záporného
                           
     pos1 = f1 >= -tol
     pos2 = f2 >= -tol
     sdf_p1 = eval_sdf(mesh, p1)
     sdf_p2 = eval_sdf(mesh, p2)
-    println("kontrola p1 sdf: ", sdf_p1)
-    println("kontrola p2 sdf: ", sdf_p2)
+    # println("kontrola p1 sdf: ", sdf_p1)
+    # println("kontrola p2 sdf: ", sdf_p2)
     # Pokud oba body mají stejnou polaritu podle tolerance, nelze správně interpolovat.
     if pos1 == pos2
         error("Oba body mají stejnou 'toleranční' polaritu; jeden bod musí být blízko nuly (kladný) a druhý výrazně záporný.")
@@ -37,7 +38,7 @@ function interpolate_zero(p1::SVector{3,Float64}, p2::SVector{3,Float64},
     # Kvantizujeme nalezený bod, abychom se vyhnuli duplicitám v hashtable
     p_key = quantize(mid, tol)
     sdf_of_iterp_point = eval_sdf(mesh, SVector{3, Float64}(p_key))
-    println("kontrola interp sdf: ", sdf_of_iterp_point)
+    # println("kontrola interp sdf: ", sdf_of_iterp_point)
     if haskey(mesh.node_hash, p_key)
         return mesh.node_hash[p_key]
     else
@@ -48,6 +49,7 @@ function interpolate_zero(p1::SVector{3,Float64}, p2::SVector{3,Float64},
         return new_index
     end
 end
+
 
 # Zjistí, zda se bod nachází na hranici mřížky
 function is_on_boundary(mesh::BlockMesh, p::SVector{3,Float64})
@@ -103,69 +105,109 @@ function is_on_boundary(mesh::BlockMesh, p::SVector{3,Float64})
     return cost
   end
 
-  
-  function stencil_1p3(mesh::BlockMesh, tet::Vector{Int64})
+
+function stencil_1p3(mesh::BlockMesh, tet::Vector{Int64})::Vector{Vector{Int64}}
     tol = mesh.grid_tol
-    # Získáme SDF hodnoty pro všechny čtyři vrcholy
-    f = [ mesh.node_sdf[i] for i in tet ]
-    signs = map(x -> x >= 0, f)
-    # Definujeme lokální toleranci – například 20% kroku mřížky
-    # local_threshold = tol*2000000
-    local_threshold = 0.2
-  
-    # Najdeme lokální index vrcholu s kladnou hodnotou
-    pos_local = findfirst(identity, signs)
+    # Get SDF values for all vertices of the tetrahedron
+    f = [mesh.node_sdf[i] for i in tet]
+    
+    # Identify vertices by their position relative to the isosurface
+    plus = map(x -> x >= tol, f)           # vertices inside the body
+    minus = map(x -> x <= -tol, f)         # vertices outside the body
+    # tol_band = map(x -> abs(x) < tol, f)   # vertices on the isosurface
+    
+    # Find the index of the positive and negative vertex
+    pos_idx = findfirst(identity, plus)
+    neg_indices = findall(identity, minus)
+
     # Pokud je SDF kladného vrcholu příliš malé (tj. blízko nule), tetraedr nevytváříme
-    if abs(f[pos_local]) < local_threshold
+    if isnothing(pos_idx)
         return Vector{Vector{Int64}}()
     end
-  
-    # Zbylé (tři) vrcholy mají zápornou hodnotu; pokud některý záporný vrchol je také příliš blízko izokontuře,
-    # rovněž tetraedr nevytváříme.
-    neg_locals = [ i for (i, s) in enumerate(signs) if !s ]
-    for n in neg_locals
-        if abs(f[n]) < local_threshold
-            return Vector{Vector{Int64}}()
-        end
+    
+    # Create a copy of the original tetrahedron that we'll modify
+    new_tet = copy(tet)
+    
+    # For each negative vertex, calculate its new position on the isosurface
+    for neg_idx in neg_indices
+        # Interpolate between the positive vertex and the current negative vertex
+        ip = interpolate_zero(
+            mesh.X[tet[pos_idx]],  # coordinates of positive vertex
+            mesh.X[tet[neg_idx]],  # coordinates of negative vertex
+            f[pos_idx],            # SDF value of positive vertex
+            f[neg_idx],            # SDF value of negative vertex
+            mesh
+        )
+        # Replace the negative vertex with its new position on the isosurface
+        new_tet[neg_idx] = ip
     end
-  
-    # Určíme pozici a hodnotu kladného vrcholu
-    p_pos = mesh.X[tet[pos_local]]
-    f_pos = f[pos_local]
-  
-    # Vypočítáme průsečíky na hranách spojujících kladný vrchol s každým záporným
-    ips = Vector{Int64}()
-    for n in neg_locals
-        p_neg = mesh.X[tet[n]]
-        f_neg = f[n]
-        ip = interpolate_zero(p_pos, p_neg, f_pos, f_neg, mesh)
-        push!(ips, ip)
-    end
-  
-    # Vytvoříme nový tetraedr: [kladný vrchol, I1, I2, I3]
-    return [ [ tet[pos_local], ips[1], ips[2], ips[3] ] ]
-  end
-  
+    
+    # Return the modified tetrahedron as a single-element vector
+    # (keeping the return type consistent with other stencil functions)
+    return [new_tet]
+end
 
-  function stencil_3p1(mesh::BlockMesh, tet::Vector{Int64})::Vector{Vector{Int64}}
-    f = [ mesh.node_sdf[i] for i in tet ]
-    # Najdeme lokální index záporného vrcholu
-    neg_local = findfirst(x -> x < 0, f)
-    pos_locals = [ i for (i, s) in enumerate(f) if s >= 0 ]
-    # Vypočítáme průsečíky na hranách spojujících záporný vrchol s každým kladným
-    ips = Dict{Int,Int64}()
-    for p in pos_locals
-        ip = interpolate_zero(mesh.X[tet[neg_local]], mesh.X[tet[p]], f[neg_local], f[p], mesh)
-        ips[p] = ip
+function stencil_3p1(mesh::BlockMesh, tet::Vector{Int64})::Vector{Vector{Int64}}
+    # Načteme hodnoty SDF pro všechny vrcholy tetraedru
+    f = [mesh.node_sdf[i] for i in tet]
+    tol = mesh.grid_tol
+
+    # Najdeme záporný vrchol – definujeme ho jako ten, kde f < -tol.
+    # (Pokud žádný takový neexistuje, tetraedr zřejmě nemá zápornou stranu a zůstane nezměněn.)
+    neg_local = findfirst(x -> x < -tol, f)
+    if neg_local === nothing
+        return [tet]
     end
-    # Předpokládáme, že existují právě tři kladné vrcholy – označíme je jako a, b, c
-    a, b, c = pos_locals
-    # Vytvoříme tři tetraedry podle šablony:
-    tet1 = [ tet[a], tet[b], ips[b], ips[a] ]
-    tet2 = [ tet[b], tet[c], ips[c], ips[b] ]
-    tet3 = [ tet[c], tet[a], ips[a], ips[c] ]
-    return [ tet1, tet2, tet3 ]
-  end
+
+    # Určíme počet „strict pozitivních“ vrcholů, tj. těch, kde f >= tol.
+    pos_locals = [i for (i, s) in enumerate(f) if s >= tol]
+    n_strict_pos = length(pos_locals)
+
+    # Podle počtu strict pozitivních vrcholů rozhodneme, kterou stencil variantu použít:
+    if n_strict_pos == 3
+        # println(tet)
+        # return Vector{Vector{Int64}}()
+        # Klasický případ: máme tři vrcholy s f >= tol a jeden záporný vrchol.
+        # Pro každou hranu spojující záporný vrchol a jeden z těchto kladných určíme
+        # průsečík (interpolovaný nebo přímo, pokud je uzel již blízko 0).
+        ips = Dict{Int,Int64}()
+        for i in pos_locals
+            f_neg = f[neg_local]
+            f_pos = f[i]
+            # Provedeme iterovanou bisekci mezi vrcholy
+            ip = interpolate_zero(mesh.X[tet[neg_local]], mesh.X[tet[i]], f_neg, f_pos, mesh)
+            ips[i] = ip
+
+        end
+        # V tuto chvíli očekáváme, že pos_locals obsahuje právě 3 indexy.
+        # Pokud by tomu tak nebylo (např. kvůli numerickým odchylkám) – nepřerušíme běh, ale přesměrujeme na jinou variantu.
+        if n_strict_pos != 3
+            println("wtf")
+        end
+        # Pokud máme přesně 3 strict pozitivní vrcholy, označíme je jako a, b, c.
+        a, b, c = pos_locals  # Rozbalení tří indexů
+
+    tet1 = [ tet[a], tet[b], tet[c], ips[a] ]
+    tet2 = [ ips[a], ips[b], ips[c], tet[c] ]
+    tet3 = [ tet[c], ips[a], tet[b], ips[b] ]
+        return [tet1, tet2, tet3]
+
+
+    elseif n_strict_pos == 2
+        # Pokud máme jen 2 strict pozitivní vrcholy, voláme variantu pro 2-positivní.
+        # return stencil_2p2_variantA(mesh, tet)
+        return Vector{Vector{Int64}}()
+
+    elseif n_strict_pos == 1
+        # Pokud máme pouze 1 strict pozitivní vrchol, jedná se o konfiguraci 1p3.
+        return stencil_1p3(mesh, tet)
+        # return Vector{Vector{Int64}}() # smazat
+
+    else
+        # Pokud žádný vrchol nesplňuje f >= tol, tetraedr vynecháme.
+        return Vector{Vector{Int64}}()
+    end
+end
   
 
   function stencil_2p2_variantA(mesh::BlockMesh, tet::Vector{Int64})::Vector{Vector{Int64}}
@@ -243,25 +285,91 @@ function is_on_boundary(mesh::BlockMesh, p::SVector{3,Float64})
   
   function apply_stencil(mesh::BlockMesh, tet::Vector{Int64})
     f = [ mesh.node_sdf[i] for i in tet ]
-    np = count(x -> x >= 0, f)
+    tol = mesh.grid_tol
+    np = count(x -> x >= (-1.1*tol), f)
+    # np = count(x -> x >= (0), f)
     if np == 1
-        return stencil_1p3(mesh, tet)
+        # println(tet)
+        # return stencil_1p3(mesh, tet)
+        return Vector{Vector{Int64}}()
     elseif np == 3
+        # println(tet)
         # return stencil_3p1(mesh, tet)
         return Vector{Vector{Int64}}()
     elseif np == 2
         # Rozlišujeme variantu podle toho, zda se prvek dotýká hranice
-        # on_boundary = any(is_on_boundary(mesh, mesh.X[i]) for i in tet)
-        # if on_boundary
-        #     return stencil_2p2_variantB(mesh, tet)
-        # else
-        #     return stencil_2p2_variantA(mesh, tet)
-        # end
+        on_boundary = any(is_on_boundary(mesh, mesh.X[i]) for i in tet)
+        if on_boundary
+            # return stencil_2p2_variantB(mesh, tet)
+        else
+            # return stencil_2p2_variantA(mesh, tet)
+        end
         return Vector{Vector{Int64}}()
     elseif np == 4
-        return [ tet ]  # Všechny vrcholy kladné – tetraedr se ponechá
+        # return [ tet ]  # Všechny vrcholy kladné – tetraedr se ponechá
+        # return Vector{Vector{Int64}}() # smazat
     else
         return Vector{Vector{Int64}}()  # Všechny záporné – tetraedr vynecháme
     end
   end
   
+
+  #________________________
+#   current_position = mesh.X[1]
+#   f = eval_sdf(mesh, current_position)
+
+#   mesh.X
+#   length(mesh.SDF)
+tet = [58, 52, 56, 55]
+tet_id = findall(x -> x == tet, mesh.IEN)
+mesh.node_sdf[58]
+mesh.node_sdf[52]
+mesh.node_sdf[56]
+mesh.node_sdf[55]
+
+[2497, 2466, 2468, 2471]
+
+f = [ mesh.node_sdf[i] for i in tet ]
+f[4] = 0.5
+f[3] = 0.4
+f[1] = 0.1
+
+tol = mesh.grid_tol
+np = count(x -> x >= (-1.1*tol), f)
+
+tet = [63, 76, 69, 80]
+[63, 77, 76, 80]
+
+f = [mesh.node_sdf[i] for i in tet]
+    tol = mesh.grid_tol
+
+    # Najdeme záporný vrchol – definujeme ho jako ten, kde f < -tol.
+    # (Pokud žádný takový neexistuje, tetraedr zřejmě nemá zápornou stranu a zůstane nezměněn.)
+    neg_local = findfirst(x -> x < -tol, f)
+    if neg_local === nothing
+        return [tet]
+    end
+
+    # Určíme počet „strict pozitivních“ vrcholů, tj. těch, kde f >= tol.
+    pos_locals = [i for (i, s) in enumerate(f) if s >= tol]
+    n_strict_pos = length(pos_locals)
+
+    n_strict_pos == 3
+
+    ips = Dict{Int,Int64}()
+        for i in pos_locals
+            f_neg = f[neg_local]
+            f_pos = f[i]
+            # Provedeme iterovanou bisekci mezi vrcholy
+            ip = interpolate_zero(mesh.X[tet[neg_local]], mesh.X[tet[i]], f_neg, f_pos, mesh)
+            ips[i] = ip
+
+        end
+        # V tuto chvíli očekáváme, že pos_locals obsahuje právě 3 indexy.
+        # Pokud by tomu tak nebylo (např. kvůli numerickým odchylkám) – nepřerušíme běh, ale přesměrujeme na jinou variantu.
+        if n_strict_pos != 3
+            println("wtf")
+        end
+        # Pokud máme přesně 3 strict pozitivní vrcholy, označíme je jako a, b, c.
+        a, b, c = pos_locals
+
