@@ -7,8 +7,8 @@ function interpolate_zero(p1::SVector{3,Float64}, p2::SVector{3,Float64},
                           
     pos1 = f1 >= -tol
     pos2 = f2 >= -tol
-    sdf_p1 = eval_sdf(mesh, p1)
-    sdf_p2 = eval_sdf(mesh, p2)
+    # sdf_p1 = eval_sdf(mesh, p1)
+    # sdf_p2 = eval_sdf(mesh, p2)
     # println("kontrola p1 sdf: ", sdf_p1)
     # println("kontrola p2 sdf: ", sdf_p2)
     # Pokud oba body mají stejnou polaritu podle tolerance, nelze správně interpolovat.
@@ -49,16 +49,6 @@ function interpolate_zero(p1::SVector{3,Float64}, p2::SVector{3,Float64},
         return new_index
     end
 end
-
-
-# Zjistí, zda se bod nachází na hranici mřížky
-# TODO: Tohle otestovat když bude "řezat" doménu SDF
-function is_on_boundary(mesh::BlockMesh, p::SVector{3,Float64})
-    tol = mesh.grid_tol
-    vmin = mesh.grid[1,1,1]
-    vmax = mesh.grid[end,end,end]
-    return any(abs(p[i]-vmin[i]) < tol || abs(p[i]-vmax[i]) < tol for i in 1:3)
-  end
   
   # Uspořádá dané průsečíky (indexy v mesh.X) do cyklického pořadí
   function order_intersection_points(mesh::BlockMesh, ips::Vector{Int64})::Vector{Int64}
@@ -155,10 +145,6 @@ function stencil_3p1(mesh::BlockMesh, tet::Vector{Int64})::Vector{Vector{Int64}}
     f = [mesh.node_sdf[i] for i in tet]
 
     neg_local = findfirst(x -> x < 0., f)
-    if neg_local === nothing # Element má 3 uzly uvnitř a jeden na hranici
-        return [tet]
-        # return Vector{Vector{Int64}}()
-    end
 
     # Určíme počet „strict pozitivních“ vrcholů, tj. těch, kde f >= tol.
     # pos_locals = [i for (i, s) in enumerate(f) if s >= tol]
@@ -201,12 +187,62 @@ function stencil_2p2_variantA(mesh::BlockMesh, tet::Vector{Int64})::Vector{Vecto
     pos_locals = [ i for (i, s) in enumerate(f) if s >= 0 ]
     neg_locals = [ i for (i, s) in enumerate(f) if s < 0 ]
     pos_global = [ tet[i] for i in pos_locals ]
-
-    if neg_locals == Int64[] # Element má 3 uzly uvnitř a jeden na hranici
-        return [tet]
-        # return Vector{Vector{Int64}}()
-    end
     
+    # --- Speciální větev pro konfiguraci 3+1: 3 uzly s f ≥ 0 (z toho jeden má f == 0) a 1 uzel s f < 0 ---
+    if length(pos_locals) == 3 && length(neg_locals) == 1
+        # Najdeme lokální index uzlu, který má f == 0 (s tolerancí)
+        zero_local = findfirst(i -> isapprox(f[i], 0.0; atol=1e-8), pos_locals)
+        if zero_local === nothing
+            @warn "Konfigurace 3+1: Nenalezen uzel s f==0, pokračujeme standardně."
+            return [tet]
+        end
+        # Označíme uzel s f==0 jako 'bound'
+        bound = tet[pos_locals[zero_local]]
+        
+        # Pro účely výpočtu pos kladných uzlů (kde chceme pouze ty, které jsou opravdu uvnitř)
+        pos_positive = [ tet[i] for i in pos_locals if !isapprox(f[i], 0.0; atol=1e-8) ]
+        if length(pos_positive) != 2
+            @warn "Konfigurace 3+1: Očekávali jsme právě 2 uzly s f > 0."
+            return Vector{Vector{Int64}}()
+        end
+        pos1 = pos_positive[1]
+        pos2 = pos_positive[2]
+        
+        # Vypočteme průsečíky pouze na hranách spojujících záporný uzel s každým z pos_locals.
+        # Tím získáme 3 interpolovaných průsečíků.
+        intersection_map = Dict{Tuple{Int,Int},Int64}()
+        for i in pos_locals, j in neg_locals
+            key_sorted = sort([tet[i], tet[j]])
+            key_tuple = (key_sorted[1], key_sorted[2])
+            if !haskey(intersection_map, key_tuple)
+                ip = interpolate_zero(mesh.X[tet[i]], mesh.X[tet[j]], f[i], f[j], mesh)
+                intersection_map[key_tuple] = ip
+            end
+        end
+        ips = collect(values(intersection_map))
+        if length(ips) != 3
+            @warn "Konfigurace 3+1: Očekávali jsme 3 unikátní interpolované průsečíky."
+            return Vector{Vector{Int64}}()
+        end
+
+        # Přidáme původní uzel s f == 0 (bound) do seznamu, aby byl součástí cyklického uspořádání.
+        new_ips = vcat([bound], ips)  # nyní new_ips má délku 4; předpokládáme, že boundary uzel má být na určité pozici
+        # Seřadíme body cyklicky.
+        ordered_ips = order_intersection_points(mesh, new_ips)
+        
+        # Zajistíme, aby boundary uzel byl na prvním místě. Pokud tomu tak není, najdeme jeho index a provedeme rotaci.
+        idx_bound = findfirst(x -> x == bound, ordered_ips)
+        if idx_bound !== nothing && idx_bound != 1
+            ordered_ips = vcat(ordered_ips[idx_bound:end], ordered_ips[1:idx_bound-1])
+        end
+
+        # Sestavíme dva tetraedry podle zadaného stencilu:
+        tet1 = [ pos1, ordered_ips[4], ordered_ips[2], ordered_ips[1] ]
+        tet2 = [ pos2, ordered_ips[1], ordered_ips[3], ordered_ips[4] ]
+        return [ tet1, tet2 ]
+    end
+    # --- Konec speciální větve pro 3+1 konfiguraci ---
+
     # Vypočteme průsečíky na hranách spojujících každý kladný a záporný vrchol.
     # Pokud existují duplicity (vzhledem k numerické toleranci), zajistíme jejich odstranění.
     intersection_map = Dict{Tuple{Int,Int},Int64}()
@@ -294,34 +330,34 @@ end
   
   function apply_stencil(mesh::BlockMesh, tet::Vector{Int64})
     f = [ mesh.node_sdf[i] for i in tet ]
-    tol = mesh.grid_tol
-    # np = count(x -> x >= (-1.1*tol), f)
     np = count(x -> x > (0), f)
+
+    # Všechny uzly jsou na hranici nebo uvnitř tělesa:
+    np_zero = count(x -> x >= (0), f) # SDF >= 0
+    if np_zero == 4
+        return [ tet ]  # Tetraedr se ponechá
+        # return Vector{Vector{Int64}}() # --> smazat
+    end
+
     if np == 1
         # println(tet)
         return stencil_1p3(mesh, tet)
-        # return Vector{Vector{Int64}}()
+        # return Vector{Vector{Int64}}() # --> smazat
     elseif np == 3
         # println(tet)
         return stencil_3p1(mesh, tet)
-        # return Vector{Vector{Int64}}()
+        # return Vector{Vector{Int64}}() # --> smazat
     elseif np == 2
-        # Rozlišujeme variantu podle toho, zda se prvek dotýká hranice
-        on_boundary = any(is_on_boundary(mesh, mesh.X[i]) for i in tet)
-        # println(tet)
-        if on_boundary
-            # TODO: Tohle otestovat když bude "řezat" doménu SDF
-            # return stencil_2p2_variantB(mesh, tet)
+        # Rozlišujeme variantu podle toho, zda se jeden uzel dotýká hranice
+        if any(iszero, f)
+            return stencil_2p2_variantB(mesh, tet)
             println("on boundary")
             return Vector{Vector{Int64}}()
         else
             return stencil_2p2_variantA(mesh, tet)
-            # return Vector{Vector{Int64}}()
+            # return Vector{Vector{Int64}}() # --> smazat
         end
-        # return Vector{Vector{Int64}}()
-    elseif np == 4
-        return [ tet ]  # Všechny vrcholy kladné – tetraedr se ponechá
-        # return Vector{Vector{Int64}}() # smazat
+        # return Vector{Vector{Int64}}() # --> smazat
     else
         return Vector{Vector{Int64}}()  # Všechny záporné – tetraedr vynecháme
     end
