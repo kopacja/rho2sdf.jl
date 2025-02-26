@@ -595,3 +595,25 @@ slice_ambiguous_tetrahedra!(mesh)
 update_connectivity!(mesh)
 
 export_mesh_vtk(mesh, "block-mesh.vtu")
+
+#________________________
+function run_all()
+  mesh = BlockMesh()
+# Choose scheme: "A15" or "Schlafli"
+@time generate_mesh!(mesh, "A15")
+
+@time warp!(mesh)
+# @time warp!(mesh, 0.8)
+
+# Nejprve aktualizujeme topologii meshe
+update_connectivity!(mesh)
+
+export_mesh_vtk(mesh, "block-mesh_warped.vtu")
+
+slice_ambiguous_tetrahedra!(mesh)
+
+update_connectivity!(mesh)
+
+export_mesh_vtk(mesh, "block-mesh.vtu")
+end
+run_all()
