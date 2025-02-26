@@ -79,3 +79,107 @@ const tetra_connectivity = [
     [26,24,16,25],
     [14,16,17,7]
 ]
+
+@inline function compute_hex8_shape!(
+    # @inline function compute_shape_functions!(
+    N::MVector{8,Float64},
+    d¹N_dξ¹::MMatrix{8,3,Float64},
+    ξ₁::Float64,
+    ξ₂::Float64,
+    ξ₃::Float64
+  )
+    # Předpočítání základních výrazů - compiler může optimalizovat do registrů
+    ξ₁m1 = ξ₁ - 1
+    ξ₁p1 = ξ₁ + 1
+    ξ₂m1 = ξ₂ - 1
+    ξ₂p1 = ξ₂ + 1
+    ξ₃m1 = ξ₃ - 1
+    ξ₃p1 = ξ₃ + 1
+  
+    # Předpočítání společných součinů
+    t1 = ξ₁m1 * ξ₂m1  # Pro uzly 1 a 5
+    t2 = ξ₁p1 * ξ₂m1  # Pro uzly 2 a 6
+    t3 = ξ₁p1 * ξ₂p1  # Pro uzly 3 a 7
+    t4 = ξ₁m1 * ξ₂p1  # Pro uzly 4 a 8
+  
+    # Konstantní koeficient
+    coef = 0.125
+  
+    # Výpočet hodnot shape funkcí - přímo do výstupního vektoru
+    N[1] = -coef * t1 * ξ₃m1
+    N[2] = coef * t2 * ξ₃m1
+    N[3] = -coef * t3 * ξ₃m1
+    N[4] = coef * t4 * ξ₃m1
+    N[5] = coef * t1 * ξ₃p1
+    N[6] = -coef * t2 * ξ₃p1
+    N[7] = coef * t3 * ξ₃p1
+    N[8] = -coef * t4 * ξ₃p1
+  
+    # Předpočítání společných výrazů pro derivace
+    d1_coef = coef * ξ₃m1
+    d1_coefp = coef * ξ₃p1
+  
+    # Derivace podle ξ₁
+    d¹N_dξ¹[1, 1] = -d1_coef * ξ₂m1
+    d¹N_dξ¹[2, 1] = d1_coef * ξ₂m1
+    d¹N_dξ¹[3, 1] = -d1_coef * ξ₂p1
+    d¹N_dξ¹[4, 1] = d1_coef * ξ₂p1
+    d¹N_dξ¹[5, 1] = d1_coefp * ξ₂m1
+    d¹N_dξ¹[6, 1] = -d1_coefp * ξ₂m1
+    d¹N_dξ¹[7, 1] = d1_coefp * ξ₂p1
+    d¹N_dξ¹[8, 1] = -d1_coefp * ξ₂p1
+  
+    # Derivace podle ξ₂
+    d¹N_dξ¹[1, 2] = -d1_coef * ξ₁m1
+    d¹N_dξ¹[2, 2] = d1_coef * ξ₁p1
+    d¹N_dξ¹[3, 2] = -d1_coef * ξ₁p1
+    d¹N_dξ¹[4, 2] = d1_coef * ξ₁m1
+    d¹N_dξ¹[5, 2] = d1_coefp * ξ₁m1
+    d¹N_dξ¹[6, 2] = -d1_coefp * ξ₁p1
+    d¹N_dξ¹[7, 2] = d1_coefp * ξ₁p1
+    d¹N_dξ¹[8, 2] = -d1_coefp * ξ₁m1
+  
+    # Derivace podle ξ₃
+    d¹N_dξ¹[1, 3] = -coef * t1
+    d¹N_dξ¹[2, 3] = coef * t2
+    d¹N_dξ¹[3, 3] = -coef * t3
+    d¹N_dξ¹[4, 3] = coef * t4
+    d¹N_dξ¹[5, 3] = coef * t1
+    d¹N_dξ¹[6, 3] = -coef * t2
+    d¹N_dξ¹[7, 3] = coef * t3
+    d¹N_dξ¹[8, 3] = -coef * t4
+  end
+  
+  
+
+function hex8_shape(Ξ::Vector{Float64})
+    ξ₁ = Ξ[1]
+    ξ₂ = Ξ[2]
+    ξ₃ = Ξ[3]
+    # Předpočítání základních výrazů - compiler může optimalizovat do registrů
+    ξ₁m1 = ξ₁ - 1
+    ξ₁p1 = ξ₁ + 1
+    ξ₂m1 = ξ₂ - 1
+    ξ₂p1 = ξ₂ + 1
+    ξ₃m1 = ξ₃ - 1
+    ξ₃p1 = ξ₃ + 1
+    # Předpočítání společných součinů
+    t1 = ξ₁m1 * ξ₂m1  # Pro uzly 1 a 5
+    t2 = ξ₁p1 * ξ₂m1  # Pro uzly 2 a 6
+    t3 = ξ₁p1 * ξ₂p1  # Pro uzly 3 a 7
+    t4 = ξ₁m1 * ξ₂p1  # Pro uzly 4 a 8
+    # Konstantní koeficient
+    coef = 0.125
+    N = zeros(Float64, 8)
+    # Výpočet hodnot shape funkcí - přímo do výstupního vektoru
+    N[1] = -coef * t1 * ξ₃m1
+    N[2] = coef * t2 * ξ₃m1
+    N[3] = -coef * t3 * ξ₃m1
+    N[4] = coef * t4 * ξ₃m1
+    N[5] = coef * t1 * ξ₃p1
+    N[6] = -coef * t2 * ξ₃p1
+    N[7] = coef * t3 * ξ₃p1
+    N[8] = -coef * t4 * ξ₃p1
+    return N
+  end
+  
