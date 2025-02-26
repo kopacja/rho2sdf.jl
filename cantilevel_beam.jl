@@ -10,8 +10,8 @@ using JLD2
 using LinearAlgebra
 
 ## Inputs:
-taskName = "chapadlo"
-taskName = "cantilever_beam"
+# taskName = "chapadlo"
+taskName = "cantilever_beam_vfrac_04"
 
 ## Read FEM mesh:
 data = matread("test/" * taskName * ".mat")
