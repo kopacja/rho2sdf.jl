@@ -166,14 +166,23 @@ test_nodes = [
 ]
 
 # Definujeme SDF hodnoty pro každý vrchol
+# test_sdf = [
+#     -0.5,  # SDF pro vrchol 1
+#      0.3,  # SDF pro vrchol 2
+#      0.2,  # SDF pro vrchol 3
+#     -0.   # SDF pro vrchol 4
+# ]
 test_sdf = [
-    -0.5,  # SDF pro vrchol 1
-     0.3,  # SDF pro vrchol 2
-     0.2,  # SDF pro vrchol 3
-    -0.   # SDF pro vrchol 4
+    1.,  # SDF pro vrchol 1
+     1.,  # SDF pro vrchol 2
+     -1.,  # SDF pro vrchol 3
+    -1.   # SDF pro vrchol 4
 ]
 
 # Otestujeme tetrahedron
 test_single_tetrahedron(test_nodes, test_sdf)
-
-#TODO: Otestovat příklady co mají fungovat jestli opravdu fungují (= otestovat tento test :)))
+#nnn
+#TODO: Otestovat příklady co mají fungovat jestli opravdu fungují
+# (= otestovat tento test :)))exit()
+# vypadá to že nefunguje (zamrzá?)
+# konfigurace neodpovídají SDF
