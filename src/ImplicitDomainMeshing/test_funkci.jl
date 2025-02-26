@@ -292,13 +292,19 @@ end
 
   
 function stencil_2p2_variantB(mesh::BlockMesh, tet::Vector{Int64})::Vector{Vector{Int64}}
-    # Varianta B: Jednodušší dělení ambiguózního tetraedru na dvě tetraedry.
-    # Postup pro výpočet průsečíků je stejný jako u varianty A.
-    f = [ mesh.node_sdf[i] for i in tet ]
-    pos_locals = [ i for (i, s) in enumerate(f) if s >= 0 ]
-    neg_locals = [ i for (i, s) in enumerate(f) if s < 0 ]
-    pos_global = [ tet[i] for i in pos_locals ]
+    # Get SDF values for each vertex of the tetrahedron
+    f = [mesh.node_sdf[i] for i in tet]
     
+    # Find indices of positive, zero, and negative nodes
+    pos_locals = [i for (i, s) in enumerate(f) if s > 0]  # strictly positive
+    zero_locals = [i for (i, s) in enumerate(f) if s == 0]  # zero value
+    neg_locals = [i for (i, s) in enumerate(f) if s < 0]  # negative
+    
+    # Get global indices for positive nodes and zero node
+    pos_global = [tet[i] for i in pos_locals]
+    zero_global = tet[zero_locals[1]]  # We know there's exactly one zero node
+    
+    # Calculate intersections between positive and negative nodes
     intersection_map = Dict{Tuple{Int,Int},Int64}()
     for i in pos_locals, j in neg_locals
         key_sorted = sort([tet[i], tet[j]])
@@ -308,26 +314,31 @@ function stencil_2p2_variantB(mesh::BlockMesh, tet::Vector{Int64})::Vector{Vecto
             intersection_map[key_tuple] = ip
         end
     end
+    
+    # Collect intersection points and add the zero node
     ips = collect(values(intersection_map))
-    if length(ips) != 4
-        @warn "Ambiguózní tetraedr nedal 4 unikátní průsečíky."
+    push!(ips, zero_global)
+    
+    # We should have exactly 3 points on the isosurface
+    if length(ips) != 3
+        @warn "Expected 3 points on isosurface (2 intersections + 1 zero node), got $(length(ips))"
         return Vector{Vector{Int64}}()
     end
     
+    # Order the intersection points (may need to modify order_intersection_points for 3 points)
     ordered_ips = order_intersection_points(mesh, ips)
     
-    # Varianta B vytváří pouze dvě tetraedry, což může být vhodné pro některé případy.
+    # Create two new tetrahedra using the first positive node
+    # Note: We only use pos_global[1] since we don't need pos2
     pos1 = pos_global[1]
-    pos2 = pos_global[2]
-    # tet1 = [ pos1, ordered_ips[1], ordered_ips[2], ordered_ips[3] ]
-    # tet2 = [ pos2, ordered_ips[1], ordered_ips[3], ordered_ips[4] ]
-    tet1 = [ pos1, ordered_ips[4], ordered_ips[2], ordered_ips[1] ] # ok podle náčrtu
-    tet2 = [ pos2, ordered_ips[1], ordered_ips[3], ordered_ips[4] ] # ok podle náčrtu
-    return [ tet1, tet2 ]
+    tet1 = [pos1, ordered_ips[3], ordered_ips[2], ordered_ips[1]]
+    tet2 = [pos1, ordered_ips[1], ordered_ips[3], pos_global[2]]
+    return [tet1]
+    # return [tet2]
+    # return [tet1, tet2]
 end
 
 
-  
   function apply_stencil(mesh::BlockMesh, tet::Vector{Int64})
     f = [ mesh.node_sdf[i] for i in tet ]
     np = count(x -> x > (0), f)
@@ -335,24 +346,26 @@ end
     # Všechny uzly jsou na hranici nebo uvnitř tělesa:
     np_zero = count(x -> x >= (0), f) # SDF >= 0
     if np_zero == 4
-        return [ tet ]  # Tetraedr se ponechá
-        # return Vector{Vector{Int64}}() # --> smazat
+        # return [ tet ]  # Tetraedr se ponechá
+        return Vector{Vector{Int64}}() # --> smazat
     end
 
     if np == 1
         # println(tet)
-        return stencil_1p3(mesh, tet)
-        # return Vector{Vector{Int64}}() # --> smazat
+        # return stencil_1p3(mesh, tet)
+        #TODO: tohle je asi blbě:
+        return Vector{Vector{Int64}}() # --> smazat
     elseif np == 3
         # println(tet)
-        return stencil_3p1(mesh, tet)
-        # return Vector{Vector{Int64}}() # --> smazat
+        # return stencil_3p1(mesh, tet)
+        return Vector{Vector{Int64}}() # --> smazat
     elseif np == 2
         # Rozlišujeme variantu podle toho, zda se jeden uzel dotýká hranice
         if any(iszero, f)
+            # println("on boundary")
+            # println(tet)
             return stencil_2p2_variantB(mesh, tet)
-            println("on boundary")
-            return Vector{Vector{Int64}}()
+            # return Vector{Vector{Int64}}()
         else
             return stencil_2p2_variantA(mesh, tet)
             # return Vector{Vector{Int64}}() # --> smazat
