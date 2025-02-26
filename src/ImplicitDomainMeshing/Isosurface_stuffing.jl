@@ -121,8 +121,8 @@ function get_cell_sdf_values(mesh::BlockMesh, i::Int, j::Int, k::Int)
   )
 end
 
-# Zpracování jedné buňky pomocí A15 lattice discretizace
-function process_cell_A15!(mesh::BlockMesh, i::Int, j::Int, k::Int)
+# lattice discretizace
+function process_cell!(mesh::BlockMesh, i::Int, j::Int, k::Int)
     # Získáme SDF hodnoty všech 8 vrcholů buňky
     sdf_values = get_cell_sdf_values(mesh, i, j, k)
     # Pokud buňka nemá žádný uzel s f ≥ 0, přeskočíme ji
@@ -221,7 +221,7 @@ function create_INE!(mesh::BlockMesh)
   return mesh
 end
 
-# Generování sítě s využitím A15 lattice discretizace
+# Generování sítě
 function generate_mesh!(mesh::BlockMesh)
   empty!(mesh.X)
   empty!(mesh.IEN)
@@ -231,7 +231,7 @@ function generate_mesh!(mesh::BlockMesh)
   for i in 1:mesh.nx-1
     for j in 1:mesh.ny-1
       for k in 1:mesh.nz-1
-        process_cell_A15!(mesh, i, j, k)
+        process_cell!(mesh, i, j, k)
       end
     end
   end
@@ -271,4 +271,4 @@ end
 # Hlavní běh – vytvoříme síť a exportujeme ji do souboru
 mesh = BlockMesh()
 generate_mesh!(mesh)
-export_mesh_vtk(mesh, "A15_mesh.vtu")
+export_mesh_vtk(mesh, "final_mesh.vtu")
