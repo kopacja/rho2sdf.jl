@@ -1,299 +1,144 @@
 using Rho2sdf
+using Rho2sdf.TerminalUtils
+using Rho2sdf.PrimitiveGeometries
 using Rho2sdf.ShapeFunctions
 using Rho2sdf.MeshGrid
 using Rho2sdf.SignedDistances
 using Rho2sdf.DataExport
 using Rho2sdf.SdfSmoothing
-using Rho2sdf.PrimitiveGeometries
 using MAT
 using JLD2
 using LinearAlgebra
+using BenchmarkTools
 
-taskName = "sphere"
-N = 10  # Number of cells along the longest side
-ρₜ = 0.5 # Threshold density (isosurface level)
+using StaticArrays
+using Base.Threads
+using FastGaussQuadrature  # Pro funkci gausslegendre
 
-# data = matread(taskName * ".mat")
-      data = matread("test/" * taskName * ".mat")
-      (X, IEN, rho) = MeshGrid.MeshInformations(data)
+function calculate_mesh_volume_old(X::Vector{Vector{Float64}}, IEN::Vector{Vector{Int64}}, rho::Vector{Float64})
 
-      ## Generate FEM mesh structure:
-      println("Type of X: ", typeof(X))
-      println("Type of IEN: ", typeof(IEN))
-      println("Type of rho: ", typeof(rho))
-      println("Type of C3D8_SFaD: ", typeof(C3D8_SFaD))
-      mesh = MeshGrid.Mesh(X, IEN, rho, C3D8_SFaD)
+  print_info("Computing volume...")
+  # Gauss quadrature points and weights for hexahedron
+  # Using 3×3×3 integration points
+  gp = [-√(3 / 5), 0.0, √(3 / 5)]
+  w = [5 / 9, 8 / 9, 5 / 9]
 
-      ## Map elemental densities to the nodes:
-      ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
-      #ρₙ = MeshGrid.elementToNodalValues(mesh, rho) # average
+  ngp = length(gp)
 
-#_____________
-N = 10  # Number of cells along the longest side
-      ρₜ = 0.5 # Threshold density (isosurface level)
+  N = MVector{8,Float64}(undef)
+    dN = MMatrix{8,3,Float64}(undef)
 
-      (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("block", [2, 1, 1])
-      # ρₙ = [0.0, 0.0, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5]
+  # Initialize total volume
+  domain_volume = 0.0
+  TO_volume = 0.0
 
-      mesh = MeshGrid.Mesh(X, IEN, rho, C3D8_SFaD)
-      # ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
-
-      # Modif ρₙ:
-      ρₙ = [0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5]
-
-
-
-function calculate_isocontour_volume(X::Vector{Vector{Float64}}, 
-                                IEN::Vector{Vector{Int64}}, 
-                                nodal_values::Vector{Float64},
-                                iso_threshold::Float64)
-    # Gauss quadrature points and weights (3×3×3 for better accuracy)
-    gp = [-√(3/5), 0.0, √(3/5)]
-    w = [5/9, 8/9, 5/9]
-    # gp = [-0.8611363115940526, -0.3399810435848563, 0.3399810435848563, 0.8611363115940526]
-    # w = [0.34785484513745385, 0.6521451548625462, 0.6521451548625462, 0.34785484513745385]
-    ngp = length(gp)
-
-    # Initialize volume counter
-    total_volume = 0.0
-
-    # Loop through all elements
-    for elem in 1:length(IEN)
-        # Get nodal coordinates and values for current element
-        xe = zeros(3, 8)
-        elem_values = zeros(8)
-        for (i, node_idx) in enumerate(IEN[elem])
-            xe[:, i] = X[node_idx]
-            elem_values[i] = nodal_values[node_idx]
-        end
-
-        # Calculate element volume using Gaussian quadrature
-        for k in 1:ngp, j in 1:ngp, i in 1:ngp
-            ξ, η, ζ = gp[i], gp[j], gp[k]
-            local_coords = [ξ, η, ζ]
-            
-            # Get shape functions and their derivatives
-            N, dN, _, _ = C3D8_SFaD(local_coords)
-            # N, dN = shape_functions(local_coords)
-            
-            # Calculate interpolated value at integration point
-            interpolated_value = sum(N .* elem_values)
-            
-            # Jacobian matrix
-            J = zeros(3, 3)
-            for n in 1:8
-                J += xe[:, n] * dN[n, :]'
-            end
-            
-            # Add contribution to volume only if above threshold
-            if interpolated_value >= iso_threshold
-                total_volume += w[i] * w[j] * w[k] * abs(det(J))
-            end
-        end
+  # Loop through all elements
+  for elem in 1:length(IEN)
+    # Get nodal coordinates for current element
+    xe = zeros(3, 8)
+    for (i, node_idx) in enumerate(IEN[elem])
+      xe[:, i] = X[node_idx]
     end
-    
-    return total_volume
-end
-ρₜ = 0.
-calculate_isocontour_volume(X, IEN, ρₙ, ρₜ)
 
+    # Calculate element volume using Gaussian quadrature
+    elem_volume = 0.0
 
-function calculate_mesh_volume(X::Vector{Vector{Float64}}, IEN::Vector{Vector{Int64}}, rho::Vector{Float64})
+    for k in 1:ngp, j in 1:ngp, i in 1:ngp
+      ξ, η, ζ = gp[i], gp[j], gp[k]
+      local_coords = [ξ, η, ζ]
 
-    @info "Compute volume"
-    # Gauss quadrature points and weights for hexahedron
-    # Using 2×2×2 integration points
-    # gp = [-1 / √3, 1 / √3]
-    # w = [1.0, 1.0]
-    gp = [-0.8611363115940526, -0.3399810435848563, 0.3399810435848563, 0.8611363115940526]
-    w = [0.34785484513745385, 0.6521451548625462, 0.6521451548625462, 0.34785484513745385]
-    # Using 3×3×3 integration points
-    # gp = [-√(3 / 5), 0.0, √(3 / 5)]
-    # w = [5 / 9, 8 / 9, 5 / 9]
-  
-    ngp = length(gp)
-  
-    # Initialize total volume
-    domain_volume = 0.0
-    TO_volume = 0.0
-  
-    # Loop through all elements
-    for elem in 1:length(IEN)
-      # Get nodal coordinates for current element
-      xe = zeros(3, 8)
-      for (i, node_idx) in enumerate(IEN[elem])
-        xe[:, i] = X[node_idx]
+      # Shape functions derivatives
+      compute_hex8_shape!(N, dN, local_coords[1], local_coords[2], local_coords[3])
+
+      # Jacobian matrix
+      J = zeros(3, 3)
+      for n in 1:8
+        J += xe[:, n] * dN[n, :]'
       end
+
+      # Add contribution to element volume
+      elem_volume += w[i] * w[j] * w[k] * abs(det(J))
+    end
+
+    domain_volume += elem_volume
+    TO_volume += elem_volume * rho[elem]
+  end
+
+  println("Topology optimization domain volume: ", round(domain_volume, sigdigits=6))
+  print_data("Optimized shape volume: $(round(domain_volume, sigdigits=6))")
+  println("Volume fraction: ", round(TO_volume / domain_volume, sigdigits=6))
+
+  return [domain_volume, (TO_volume / domain_volume)]
+end
+
+function calculate_mesh_volume(
+    X::Vector{Vector{Float64}},
+    IEN::Vector{Vector{Int64}},
+    rho::Vector{Float64};
+    quad_order::Int=3  # Výchozí řád integrace je 3, stejný jako v původní funkci
+  )
+    print_info("Computing volume...")
   
-      # Calculate element volume using Gaussian quadrature
+    # Výpočet Gauss-Legendreových bodů a vah pro zadaný řád integrace
+    gp_raw, w_raw = gausslegendre(quad_order)
+  
+    # Převod na statické vektory pro lepší výkon
+    gp = SVector{quad_order}(gp_raw)
+    w = SVector{quad_order}(w_raw)
+  
+    # Pre-alokace polí pro tvarové funkce a jejich derivace
+    N = MVector{8,Float64}(undef)
+    dN = MMatrix{8,3,Float64}(undef)
+  
+    # Atomické proměnné pro thread-safe akumulaci objemů
+    domain_volume = Atomic{Float64}(0.0)
+    TO_volume = Atomic{Float64}(0.0)
+  
+    # Paralelní zpracování elementů
+    @threads for elem in 1:length(IEN)
+      # Konverze souřadnic elementu na statickou matici
+      xe = @SMatrix [X[IEN[elem][j]][i] for i in 1:3, j in 1:8]
+  
+      # Výpočet objemu elementu pomocí Gaussovy kvadratury
       elem_volume = 0.0
+      for k in 1:quad_order, j in 1:quad_order, i in 1:quad_order
+        local_coords = SVector{3}(gp[i], gp[j], gp[k])
   
-      for k in 1:ngp, j in 1:ngp, i in 1:ngp
-        ξ, η, ζ = gp[i], gp[j], gp[k]
-        local_coords = [ξ, η, ζ]
+        # Výpočet tvarových funkcí a jejich derivací
+        compute_hex8_shape!(N, dN, local_coords[1], local_coords[2], local_coords[3])
   
-        # Shape functions derivatives
-        _, dN, _, _ = C3D8_SFaD(local_coords)
+        # Výpočet Jakobiánu pomocí optimalizovaného maticového násobení
+        J = xe * dN
   
-        # Jacobian matrix
-        J = zeros(3, 3)
-        for n in 1:8
-          J += xe[:, n] * dN[n, :]'
-        end
-  
-        # Add contribution to element volume
+        # Akumulace příspěvku k objemu
         elem_volume += w[i] * w[j] * w[k] * abs(det(J))
       end
   
-      domain_volume += elem_volume
-      TO_volume += elem_volume * rho[elem]
+      # Thread-safe aktualizace objemů
+      atomic_add!(domain_volume, elem_volume)
+      atomic_add!(TO_volume, elem_volume * rho[elem])
     end
   
-    println("Topology optimization domain volume: ", domain_volume)
-    println("Optimized shape volume: ", TO_volume)
-    println("Volume fraction: ", (TO_volume / domain_volume))
+    # Získání finálních hodnot objemů
+    final_domain_volume = domain_volume[]
+    final_TO_volume = TO_volume[]
   
-    return [domain_volume, (TO_volume / domain_volume)]
+    # Výpis výsledků
+    println("Topology optimization domain volume: ", round(final_domain_volume, sigdigits=6))
+    print_data("Optimized shape volume: $(round(final_domain_volume, sigdigits=6))")
+    println("Volume fraction: ", round(final_TO_volume / final_domain_volume, sigdigits=6))
+  
+    return [final_domain_volume, (final_TO_volume / final_domain_volume)]
   end
-  domain_volume, target_volume = calculate_mesh_volume(X, IEN, ρₙ)
+  
+  taskName = "sphere"
 
+      N = 10  # Number of cells along the longest side
+      # ρₜ = 0.5 # Threshold density (isosurface level)
+      ## Read FEM mesh:
+    #   data = matread(taskName * ".mat")
+      data = matread("test/" * taskName * ".mat")
+      (X, IEN, rho) = MeshGrid.MeshInformations(data)
 
-  function calculate_isocontour_volume(mesh::Mesh,
-                                nodal_values::Vector{Float64},
-                                iso_threshold::Float64)
-    X = mesh.X
-    IEN = mesh.IEN
-    # Gauss quadrature points and weights (3×3×3 for better accuracy)
-    gp = [-√(3/5), 0.0, √(3/5)]
-    w = [5/9, 8/9, 5/9]
-    ngp = length(gp)
-
-    # Initialize volume counter
-    total_volume = 0.0
-
-    # Get number of elements from IEN matrix dimensions
-    num_elements = size(IEN, 2)  # IEN je 8×1000, takže počet elementů je ve druhém rozměru
-
-    # Loop through all elements
-    for elem in 1:num_elements
-        # Get nodal coordinates and values for current element
-        xe = zeros(3, 8)
-        elem_values = zeros(8)
-        for i in 1:8  # Pro každý uzel elementu
-            node_idx = IEN[i, elem]  # Získáme globální index uzlu z IEN matice
-            xe[:, i] = X[:, node_idx]  # Získáme souřadnice uzlu z X matice
-            elem_values[i] = nodal_values[node_idx]
-        end
-
-        # Calculate element volume using Gaussian quadrature
-        for k in 1:ngp, j in 1:ngp, i in 1:ngp
-            ξ, η, ζ = gp[i], gp[j], gp[k]
-            local_coords = [ξ, η, ζ]
-            
-            # Get shape functions and their derivatives
-            N, dN, _, _ = C3D8_SFaD(local_coords)
-            
-            # Calculate interpolated value at integration point
-            interpolated_value = sum(N .* elem_values)
-            
-            # Jacobian matrix
-            J = zeros(3, 3)
-            for n in 1:8
-                J += xe[:, n] * dN[n, :]'
-            end
-            
-            # Add contribution to volume only if above threshold
-            if interpolated_value >= iso_threshold
-                total_volume += w[i] * w[j] * w[k] * abs(det(J))
-            end
-        end
-    end
-    
-    return total_volume
-end
-calculate_isocontour_volume(mesh, ρₙ, 0.5)
-
-
-###__________________________
-
-function find_threshold_for_volume(mesh::Mesh,
-                              nodal_values::Vector{Float64},
-                              target_volume::Float64;
-                              tolerance::Float64 = 1e-4,
-                              max_iterations::Int = 100)
-    # Inicializace hraničních hodnot pro binary search
-    # Víme, že hodnoty jsou mezi 0 a 1, takže to jsou naše počáteční meze
-    lower_bound = 0.0
-    upper_bound = 1.0
-    
-    # Vypočítáme počáteční objemy pro kontrolu řešitelnosti
-    min_volume = calculate_isocontour_volume(mesh, nodal_values, upper_bound)
-    max_volume = calculate_isocontour_volume(mesh, nodal_values, lower_bound)
-    
-    # Kontrola, zda je požadovaný objem v možném rozsahu
-    if target_volume > max_volume || target_volume < min_volume
-        error("Požadovaný objem $(target_volume) je mimo možný rozsah [$(min_volume), $(max_volume)]")
-    end
-    
-    # Proměnné pro sledování průběhu
-    current_iteration = 0
-    best_threshold = 0.0
-    best_volume_error = Inf
-    
-    println("Hledání prahové hodnoty pro cílový objem: $(target_volume)")
-    println("Iterace | Práh | Objem | Odchylka")
-    println("-" ^ 50)
-    
-    while current_iteration < max_iterations
-        # Výpočet středové hodnoty intervalu
-        threshold = (lower_bound + upper_bound) / 2
-        
-        # Výpočet objemu pro aktuální práh
-        current_volume = calculate_isocontour_volume(mesh, nodal_values, threshold)
-        
-        # Výpočet relativní chyby
-        volume_error = abs(current_volume - target_volume) / target_volume
-        
-        # Výpis průběhu
-        println(@sprintf("%3d | %.4f | %.4f | %.4e", 
-                current_iteration, threshold, current_volume, volume_error))
-        
-        # Aktualizace nejlepšího nalezeného řešení
-        if volume_error < best_volume_error
-            best_threshold = threshold
-            best_volume_error = volume_error
-        end
-        
-        # Kontrola konvergence
-        if volume_error < tolerance
-            println("\nŘešení nalezeno!")
-            break
-        end
-        
-        # Úprava mezí intervalu podle výsledku
-        if current_volume > target_volume
-            lower_bound = threshold
-        else
-            upper_bound = threshold
-        end
-        
-        current_iteration += 1
-    end
-    
-    # Kontrola, zda jsme dosáhli maximálního počtu iterací
-    if current_iteration == max_iterations
-        println("\nDosažen maximální počet iterací!")
-        println("Vracím nejlepší nalezené řešení.")
-    end
-    
-    # Výpis finálního výsledku
-    final_volume = calculate_isocontour_volume(mesh, nodal_values, best_threshold)
-    println("\nVýsledek:")
-    println("Nalezená prahová hodnota: $(best_threshold)")
-    println("Dosažený objem: $(final_volume)")
-    println("Relativní chyba: $(best_volume_error)")
-    
-    return best_threshold, final_volume, best_volume_error
-end
-using Printf
-find_threshold_for_volume(mesh, ρₙ, target_volume)
+      calculate_mesh_volume_old(X, IEN, rho)
+calculate_mesh_volume(X, IEN, rho)
