@@ -759,24 +759,26 @@ end
 # ----------------------------
 # Main execution – create mesh and export it to file
 # ----------------------------
-mesh = BlockMesh()
-# Choose scheme: "A15" or "Schlafli"
-@time generate_mesh!(mesh, "A15")
+function run_all()
+  mesh = BlockMesh()
+  # Choose scheme: "A15" or "Schlafli"
+  @time generate_mesh!(mesh, "A15")
 
-@time warp!(mesh)
+  @time warp!(mesh)
+  # @time warp!(mesh, 0.8)
 
-update_connectivity!(mesh)
+  # Nejprve aktualizujeme topologii meshe
+  update_connectivity!(mesh)
 
-export_mesh_vtk(mesh, "block-mesh_warped.vtu")
+  export_mesh_vtk(mesh, "block-mesh_warped.vtu")
 
-slice_ambiguous_tetrahedra!(mesh)
+  slice_ambiguous_tetrahedra!(mesh)
+  update_connectivity!(mesh)
+  @time warp_nodes_to_isosurface!(mesh)
 
-update_connectivity!(mesh)
+  # update_connectivity!(mesh)
 
-@time warp_nodes_to_isosurface!(mesh)
+  export_mesh_vtk(mesh, "block-mesh.vtu")
+end
 
-# update_connectivity!(mesh)
-
-export_mesh_vtk(mesh, "block-mesh.vtu")
-
-
+run_all()
