@@ -638,128 +638,187 @@ end
 
 # Function to warp nodes onto the isosurface based on element connectivity
 function warp_nodes_to_isosurface!(mesh::BlockMesh)
-    @info "Starting node warping to isosurface..."
-    
-    # Track nodes that have been processed to avoid duplicating work
-    processed_nodes = Set{Int}()
-    nodes_moved = 0
-    
-    # First pass: Find nodes with negative SDF and process them
-    for node_idx in 1:length(mesh.X)
-        # Skip already processed nodes
-        node_idx in processed_nodes && continue
-        
-        # Only process nodes with negative SDF values
-        if mesh.node_sdf[node_idx] < 0
-            # Get all elements containing this node
-            elements = mesh.INE[node_idx]
-            
-            # Skip nodes that aren't part of any elements
-            isempty(elements) && continue
-            
-            # Try to find an element with exactly 3 negative nodes
-            found_3neg_element = false
-            edge_to_warp = nothing
-            
-            for elem_idx in elements
-                tet = mesh.IEN[elem_idx]
-                # Count negative nodes in this tetrahedron
-                neg_nodes = filter(i -> mesh.node_sdf[i] < 0, tet)
-                
-                if length(neg_nodes) == 3 && node_idx in neg_nodes
-                    # This element has exactly 3 negative nodes including our target node
-                    found_3neg_element = true
-                    
-                    # Find the positive node
-                    pos_node = first(filter(i -> mesh.node_sdf[i] >= 0, tet))
-                    
-                    # Calculate the SDF values
-                    pos_sdf = mesh.node_sdf[pos_node]
-                    neg_sdf = mesh.node_sdf[node_idx]
-                    
-                    # Check if the edge between positive and negative node crosses zero
-                    if sign(pos_sdf) != sign(neg_sdf)
-                        # Found a suitable edge to warp along
-                        edge_to_warp = (pos_node, node_idx)
-                        break
-                    end
-                end
-            end
-            
-            # If no element with 3 negative nodes was found, find an edge that crosses the zero level
-            if !found_3neg_element || edge_to_warp === nothing
-                # Initialize edge_to_warp as nothing to indicate no suitable edge found yet
-                edge_to_warp = nothing
-    
-                # Check all elements containing our negative node
-                for elem_idx in elements
-                    tet = mesh.IEN[elem_idx]
-        
-                    # Look for edges connecting our negative node to positive nodes
-                    for other_node in tet
-                        # Skip if it's the same node
-                        other_node == node_idx && continue
-            
-                        # Check if the other node has positive SDF (crosses zero level)
-                        if mesh.node_sdf[other_node] > 0
-                            # We found a suitable edge connecting negative to positive
-                            edge_to_warp = (other_node, node_idx)
-                            break
-                        end
-                    end
-        
-                    # If we found a suitable edge, no need to check more elements
-                    edge_to_warp !== nothing && break
-                end
-            end
-            
-            # If we found an edge to warp along, perform the warping
-            if edge_to_warp !== nothing
-                pos_node, neg_node = edge_to_warp
-                
-                # Interpolate to find the zero crossing
-                new_node_idx = interpolate_zero(
-                    mesh.X[pos_node],  # coordinates of positive vertex
-                    mesh.X[neg_node],  # coordinates of negative vertex
-                    mesh.node_sdf[pos_node],  # SDF value of positive vertex
-                    mesh.node_sdf[neg_node],  # SDF value of negative vertex
-                    mesh
-                )
-                
-                # Update the node's position and SDF value if a new node wasn't created
-                if new_node_idx == neg_node
-                    mesh.X[neg_node] = mesh.X[new_node_idx]
-                    mesh.node_sdf[neg_node] = 0.0
-                    nodes_moved += 1
-                else
-                    # If a new node was created, we need to update all elements that contain the old node
-                    for elem_idx in elements
-                        tet = mesh.IEN[elem_idx]
-                        for i in 1:length(tet)
-                            if tet[i] == neg_node
-                                mesh.IEN[elem_idx][i] = new_node_idx
-                            end
-                        end
-                    end
-                    nodes_moved += 1
-                end
-            end
-            
-            # Mark this node as processed
-            push!(processed_nodes, node_idx)
-        end
-    end
-    
-    @info "Node warping complete. $nodes_moved nodes were moved to the isosurface."
-    
-    # After warping, we need to update the mesh connectivity
-    update_connectivity!(mesh)
+  @info "Starting node warping to isosurface..."
+  
+  # Track nodes that have been processed to avoid duplicating work
+  processed_nodes = Set{Int}()
+  nodes_moved = 0
+  nodes_skipped = 0
+  
+  # Helper function to check if moving a node would cause element inversion
+  function would_cause_inversion(node_idx, new_position)
+      # Store original position
+      original_position = mesh.X[node_idx]
+      
+      # Temporarily move the node
+      mesh.X[node_idx] = new_position
+      
+      # Check all elements containing this node
+      inversion_found = false
+      for elem_idx in mesh.INE[node_idx]
+          tet = mesh.IEN[elem_idx]
+          vertices = [mesh.X[v] for v in tet]
+          
+          # Calculate Jacobian determinant (proportional to signed volume)
+          jacobian_det = dot(
+              cross(vertices[2] - vertices[1], vertices[3] - vertices[1]),
+              vertices[4] - vertices[1]
+          )
+          
+          if jacobian_det < 0
+              inversion_found = true
+              break
+          end
+      end
+      
+      # Restore original position
+      mesh.X[node_idx] = original_position
+      
+      return inversion_found
+  end
+  
+  # First pass: Find nodes with negative SDF and process them
+  for node_idx in 1:length(mesh.X)
+      # Skip already processed nodes
+      node_idx in processed_nodes && continue
+      
+      # Only process nodes with negative SDF values
+      if mesh.node_sdf[node_idx] < 0
+          # Get all elements containing this node
+          elements = mesh.INE[node_idx]
+          
+          # Skip nodes that aren't part of any elements
+          isempty(elements) && continue
+          
+          # Try to find an element with exactly 3 negative nodes
+          found_3neg_element = false
+          edge_to_warp = nothing
+          
+          for elem_idx in elements
+              tet = mesh.IEN[elem_idx]
+              # Count negative nodes in this tetrahedron
+              neg_nodes = filter(i -> mesh.node_sdf[i] < 0, tet)
+              
+              if length(neg_nodes) == 3 && node_idx in neg_nodes
+                  # This element has exactly 3 negative nodes including our target node
+                  found_3neg_element = true
+                  
+                  # Find the positive node
+                  pos_node = first(filter(i -> mesh.node_sdf[i] >= 0, tet))
+                  
+                  # Calculate the SDF values
+                  pos_sdf = mesh.node_sdf[pos_node]
+                  neg_sdf = mesh.node_sdf[node_idx]
+                  
+                  # Check if the edge between positive and negative node crosses zero
+                  if sign(pos_sdf) != sign(neg_sdf)
+                      # Calculate approximate zero crossing using linear interpolation
+                      t = pos_sdf / (pos_sdf - neg_sdf)
+                      zero_point = mesh.X[pos_node] + t * (mesh.X[node_idx] - mesh.X[pos_node])
+                      
+                      # Check if moving to this point would cause inversion
+                      if !would_cause_inversion(node_idx, zero_point)
+                          # Found a suitable edge to warp along
+                          edge_to_warp = (pos_node, node_idx)
+                          break
+                      end
+                  end
+              end
+          end
+          
+          # If no suitable edge found yet, try all edges connecting to positive nodes
+          if edge_to_warp === nothing
+              for elem_idx in elements
+                  tet = mesh.IEN[elem_idx]
+      
+                  # Look for edges connecting our negative node to positive nodes
+                  for other_node in tet
+                      # Skip if it's the same node
+                      other_node == node_idx && continue
+          
+                      # Check if the other node has positive SDF (crosses zero level)
+                      if mesh.node_sdf[other_node] > 0
+                          # Calculate approximate zero crossing
+                          pos_sdf = mesh.node_sdf[other_node]
+                          neg_sdf = mesh.node_sdf[node_idx]
+                          
+                          # Make sure signs are opposite (to cross the zero level)
+                          if sign(pos_sdf) == sign(neg_sdf)
+                              continue
+                          end
+                          
+                          t = pos_sdf / (pos_sdf - neg_sdf)
+                          zero_point = mesh.X[other_node] + t * (mesh.X[node_idx] - mesh.X[other_node])
+                          
+                          # Check if moving to this point would cause inversion
+                          if !would_cause_inversion(node_idx, zero_point)
+                              # Found a suitable edge to warp along
+                              edge_to_warp = (other_node, node_idx)
+                              break
+                          end
+                      end
+                  end
+      
+                  # If we found a suitable edge, no need to check more elements
+                  edge_to_warp !== nothing && break
+              end
+          end
+          
+          # If we found an edge to warp along, perform the warping
+          if edge_to_warp !== nothing
+              pos_node, neg_node = edge_to_warp
+              
+              # Interpolate to find the zero crossing
+              try
+                  new_node_idx = interpolate_zero(
+                      mesh.X[pos_node],  # coordinates of positive vertex
+                      mesh.X[neg_node],  # coordinates of negative vertex
+                      mesh.node_sdf[pos_node],  # SDF value of positive vertex
+                      mesh.node_sdf[neg_node],  # SDF value of negative vertex
+                      mesh
+                  )
+                  
+                  # Update the node's position and SDF value if a new node wasn't created
+                  if new_node_idx == neg_node
+                      mesh.node_sdf[neg_node] = 0.0
+                      nodes_moved += 1
+                  else
+                      # If a new node was created, update all elements that contain the old node
+                      for elem_idx in elements
+                          tet = mesh.IEN[elem_idx]
+                          for i in 1:length(tet)
+                              if tet[i] == neg_node
+                                  mesh.IEN[elem_idx][i] = new_node_idx
+                              end
+                          end
+                      end
+                      nodes_moved += 1
+                  end
+              catch e
+                  @warn "Error during interpolation for node $node_idx: $e"
+                  nodes_skipped += 1
+              end
+          else
+              # No suitable edge was found - all would cause inversion
+              @warn "Node $node_idx couldn't be moved to isosurface - all potential movements would cause element inversion"
+              nodes_skipped += 1
+          end
+          
+          # Mark this node as processed
+          push!(processed_nodes, node_idx)
+      end
+  end
+  
+  @info "Node warping complete. $nodes_moved nodes were moved to the isosurface. $nodes_skipped nodes were skipped to prevent element inversion."
+  
+  # After warping, we need to update the mesh connectivity
+  update_connectivity!(mesh)
 end
 
 # ----------------------------
 # Main execution – create mesh and export it to file
 # ----------------------------
-function run_all()
+# function run_all()
   mesh = BlockMesh()
   # Choose scheme: "A15" or "Schlafli"
   @time generate_mesh!(mesh, "A15")
@@ -779,6 +838,6 @@ function run_all()
   # update_connectivity!(mesh)
 
   export_mesh_vtk(mesh, "block-mesh.vtu")
-end
+# end
 
 run_all()
