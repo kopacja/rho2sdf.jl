@@ -262,7 +262,7 @@ end
 # Merge duplicate nodes after mesh generation (unchanged logic, only type annotations updated)
 # ----------------------------
 function merge_duplicate_nodes!(mesh::BlockMesh)
-  tol = mesh.grid_tol
+  tol = mesh.grid_tol*10^4
   new_nodes = Vector{SVector{3,Float64}}()
   new_node_sdf = Vector{Float64}()
   node_map = Dict{Int,Int}()
@@ -455,7 +455,7 @@ function warp_node_to_isocontour!(mesh::BlockMesh, node_index::Int, max_iter)
     current_position -= dp
   end
   current_sdf = eval_sdf(mesh, current_position)
-  if abs(current_sdf) < tol
+  if abs(current_sdf) < tol*2
     mesh.node_sdf[node_index] = 0.
   else
     println("current_sdf: ", current_sdf)
@@ -505,56 +505,6 @@ function update_connectivity!(mesh::BlockMesh)
   @info "Aktualizace topologie dokončena: $(length(mesh.X)) uzlů, $(length(mesh.IEN)) tetraedrů."
 end
 
-# === Kompletní šablony podle literatury ===
-"""
-  apply_complete_stencil(mesh, tet)
-
-Funkce `apply_complete_stencil` vezme daný tetraedr (se čtyřmi uzly a jejich SDF hodnotami)
-a na základě signatury (počtu kladných vs. záporných) aplikuje příslušnou triangulační šablonu.
-Šablony jsou definovány následovně:
-
-1. **np == 1 (1 kladný, 3 záporné):**  
-   Vypočítají se průsečíky na hranách spojujících kladný vrchol s každým záporným.
-   Výsledkem je jeden nový tetraedr:  
-     `[P, I1, I2, I3]`
-
-2. **np == 3 (3 kladné, 1 záporný):**  
-   Vypočítají se průsečíky na hranách spojujících záporný vrchol s každým kladným.
-   Výsledkem je rozdělení do tří tetraedrů:  
-     ```
-     [P1, P2, I(P1,P_neg), I(P2,P_neg)]
-     [P2, P3, I(P2,P_neg), I(P3,P_neg)]
-     [P3, P1, I(P3,P_neg), I(P1,P_neg)]
-     ```
-   (v naší implementaci mírně odlišné pořadí, viz níže)
-
-3. **np == 2 (ambiguózní případ):**  
-   Nejprve se spočítají průsečíky na všech hranách spojujících kladné a záporné vrcholy.
-   Těmito průsečíky vzniká čtyřúhelník. Podle literatury existují dvě varianty:
-   
-   - **Variant A (standardní):**  
-     Po výběru optimální diagonály (na základě minimální cost a “barev” hran)
-     se čtyřúhelník reuspořádá a aplikuje se následující rozdělení do tří tetraedrů:
-       ```
-       T1: [P1, I1, I2, I3]
-       T2: [P2, I1, I3, I4]
-       T3: [P1, P2, I1, I3]
-       ```
-       
-   - **Variant B (pro uzly na hranici):**  
-     Pokud některý z vrcholů leží na hranici, použije se jednodušší šablona rozdělující tetraedr na dvě části:
-       ```
-       T1: [P1, I1, I2, I3]
-       T2: [P2, I1, I3, I4]
-       ```
-       
-   Funkce rozhodne mezi variantami na základě testu `is_on_boundary`.
-
-4. **np == 4 (všechny vrcholy kladné):**  
-   Tetraedr se ponechá beze změny.
-  
-V případě, že všechny hodnoty jsou záporné, tetraedr se vynechá.
-"""
 
 # Funkce, která projde všechny tetraedry v konektivitě a aplikuje kompletní stencils
 function slice_ambiguous_tetrahedra!(mesh::BlockMesh)
@@ -578,42 +528,22 @@ end
 # ----------------------------
 # Main execution – create mesh and export it to file
 # ----------------------------
-mesh = BlockMesh()
-# Choose scheme: "A15" or "Schlafli"
-@time generate_mesh!(mesh, "A15")
-
-@time warp!(mesh)
-# @time warp!(mesh, 0.8)
-
-# Nejprve aktualizujeme topologii meshe
-update_connectivity!(mesh)
-
-export_mesh_vtk(mesh, "block-mesh_warped.vtu")
-
-slice_ambiguous_tetrahedra!(mesh)
-
-update_connectivity!(mesh)
-
-export_mesh_vtk(mesh, "block-mesh.vtu")
-
-#________________________
 function run_all()
   mesh = BlockMesh()
-# Choose scheme: "A15" or "Schlafli"
-@time generate_mesh!(mesh, "A15")
+  # Choose scheme: "A15" or "Schlafli"
+  @time generate_mesh!(mesh, "A15")
 
-@time warp!(mesh)
-# @time warp!(mesh, 0.8)
+  @time warp!(mesh)
 
-# Nejprve aktualizujeme topologii meshe
-update_connectivity!(mesh)
+  # Nejprve aktualizujeme topologii meshe
+  update_connectivity!(mesh)
 
-export_mesh_vtk(mesh, "block-mesh_warped.vtu")
+  export_mesh_vtk(mesh, "block-mesh_warped.vtu")
 
-slice_ambiguous_tetrahedra!(mesh)
+  slice_ambiguous_tetrahedra!(mesh)
+  update_connectivity!(mesh)
 
-update_connectivity!(mesh)
-
-export_mesh_vtk(mesh, "block-mesh.vtu")
+  export_mesh_vtk(mesh, "block-mesh.vtu")
 end
+
 run_all()
