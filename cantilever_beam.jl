@@ -21,7 +21,7 @@ IEN = [subvector .- 1 for subvector in IEN]  # This will work
 ## Generate FEM mesh structure:
 mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
 
-meshToVTU(mesh, (taskName * "_Raw"))
+InputDataToVTU(mesh, (taskName * "_Raw"))
 
 ## Grid:
 sdf_grid = MeshGrid.interactive_sdf_grid_setup(mesh)
