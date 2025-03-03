@@ -22,6 +22,7 @@ N = 10  # Number of cells along the longest side
 
 mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
 # ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
+InputDataToVTU(mesh, (taskName * "_Raw"))
 
 # Modif ρₙ:
 ρₙ = [0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5]
