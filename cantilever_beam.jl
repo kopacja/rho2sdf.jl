@@ -17,14 +17,11 @@ taskName = "cantilever_beam_vfrac_04"
 data = matread("test/" * taskName * ".mat")
 (X, IEN, rho) = MeshInformations(data)
 IEN = [subvector .- 1 for subvector in IEN]  # This will work
-X # Vector{Vector{Float64}}:
-IEN # Vector{Vector{Int64}}:
-rho # Vector{Float64}:
-maximum(maximum(IEN))
-minimum(minimum(IEN))
 
 ## Generate FEM mesh structure:
 mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
+
+meshToVTU(mesh, (taskName * "_Raw"))
 
 ## Grid:
 sdf_grid = MeshGrid.interactive_sdf_grid_setup(mesh)
