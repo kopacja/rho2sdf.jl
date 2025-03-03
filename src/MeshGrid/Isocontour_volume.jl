@@ -20,12 +20,13 @@ function calculate_isocontour_volume(
   num_elements = size(IEN, 2)
   total_volume = Atomic{Float64}(0.0)
 
-  # Pre-allocate arrays for shape functions and their derivatives
-  N = MVector{8,Float64}(undef)
-  dN = MMatrix{8,3,Float64}(undef)
-
   # Parallel element processing
   @threads for elem in 1:num_elements
+    # Create thread-local copies of shape functions and derivatives
+    # This prevents race conditions when multiple threads modify the same memory
+    local_N = MVector{8,Float64}(undef)
+    local_dN = MMatrix{8,3,Float64}(undef)
+    
     # Get element nodal values as static vector
     elem_values = SVector{8}([nodal_values[IEN[i, elem]] for i in 1:8])
     min_value = minimum(elem_values)
@@ -52,16 +53,16 @@ function calculate_isocontour_volume(
       # Create local coordinates as static vector
       local_coords = SVector{3}(gp[i], gp[j], gp[k])
 
-      # Compute shape functions and their derivatives
-      compute_hex8_shape!(N, dN, local_coords[1], local_coords[2], local_coords[3])
+      # Compute shape functions and their derivatives using thread-local variables
+      compute_hex8_shape!(local_N, local_dN, local_coords[1], local_coords[2], local_coords[3])
 
       if check_threshold
-        interpolated_value = dot(N, elem_values)
+        interpolated_value = dot(local_N, elem_values)
         interpolated_value < iso_threshold && continue
       end
 
       # Calculate Jacobian (3×8 matrix × 8×3 matrix = 3×3 matrix)
-      J = xe * dN
+      J = xe * local_dN
 
       # Add contribution to element volume
       element_volume += w[i] * w[j] * w[k] * abs(det(J))
