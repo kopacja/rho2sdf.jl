@@ -24,8 +24,10 @@ mutable struct BlockMesh
   node_hash::Dict{NTuple{3,Float64},Int64}    # Global dictionary for merging nodes
 
   function BlockMesh()
-    @load "src/ImplicitDomainMeshing/data/Z_block_FineGrid_B-0.2_smooth-1.jld2" fine_grid
-    @load "src/ImplicitDomainMeshing/data/Z_block_FineSDF_B-0.2_smooth-1.jld2" fine_sdf
+    @load "src/ImplicitDomainMeshing/data/Z_cantilever_beam_vfrac_04_FineGrid_B-1.0_smooth-1.jld2" fine_grid
+    @load "src/ImplicitDomainMeshing/data/Z_cantilever_beam_vfrac_04_FineSDF_B-1.0_smooth-1.jld2" fine_sdf
+    # @load "src/ImplicitDomainMeshing/data/Z_block_FineGrid_B-0.1_smooth-1.jld2" fine_grid
+    # @load "src/ImplicitDomainMeshing/data/Z_block_FineSDF_B-0.1_smooth-1.jld2" fine_sdf
 
     # Convert fine_grid into a 3D array of SVectors
     grid = Array{SVector{3,Float64},3}(undef, size(fine_grid))
@@ -166,9 +168,50 @@ end
 # ----------------------------
 function process_cell_A15!(mesh::BlockMesh, i::Int, j::Int, k::Int)
   tol = mesh.grid_tol
-  sdf_values = get_cell_sdf_values(mesh, i, j, k)
-  if !any(x -> x >= 0, sdf_values)
-    return
+  
+  # Nejprve zkontrolujeme SDF hodnoty aktuální buňky
+  current_sdf_values = get_cell_sdf_values(mesh, i, j, k)
+  
+  # Pokud je některá hodnota v aktuální buňce kladná nebo blízká nule, určitě buňku zpracujeme
+  if any(x -> x >= -tol, current_sdf_values)
+    # Pokračujeme běžným zpracováním
+  else
+    # Všechny hodnoty v aktuální buňce jsou záporné - zkontrolujeme okolní buňky
+    
+    # Definujeme posuny pro sousední buňky (přímí sousedé ve všech směrech)
+    neighbor_offsets = [
+      (1,0,0), (-1,0,0),   # sousedé ve směru x
+      (0,1,0), (0,-1,0),   # sousedé ve směru y
+      (0,0,1), (0,0,-1)    # sousedé ve směru z
+    ] #TODO: select only relevant one
+    
+    # Inicializujeme příznak, že všechny okolní buňky mají záporné SDF hodnoty
+    all_neighbors_negative = true
+    
+    # Kontrolujeme SDF hodnoty sousedních buněk
+    for (di, dj, dk) in neighbor_offsets
+      # Vypočítáme indexy sousední buňky
+      ni, nj, nk = i + di, j + dj, k + dk
+      
+      # Kontrola hranic mřížky
+      if 1 <= ni < mesh.nx && 1 <= nj < mesh.ny && 1 <= nk < mesh.nz
+        # Získáme SDF hodnoty pro sousední buňku
+        neighbor_sdf = get_cell_sdf_values(mesh, ni, nj, nk)
+        
+        # Pokud má nějaká hodnota v sousední buňce kladnou nebo nulovou hodnotu,
+        # nastavíme příznak a ukončíme kontrolu
+        if any(x -> x >= -tol, neighbor_sdf)
+          all_neighbors_negative = false
+          break
+        end
+      end
+    end
+    
+    # Pokud jsou všechny hodnoty v aktuální buňce i všech okolních buňkách záporné,
+    # můžeme buňku bezpečně přeskočit
+    if all_neighbors_negative
+      return
+    end
   end
 
   # Retrieve min and max corners of the cell
@@ -204,7 +247,20 @@ function process_cell_A15!(mesh::BlockMesh, i::Int, j::Int, k::Int)
   # Process tetrahedral connectivity from A15 scheme
   @inbounds for tet in tetra_connectivity
     global_tet = [local_mapping[li] for li in tet]
-    tet_sdf = [mesh.node_sdf[idx] for idx in global_tet]
+  
+    # Get the coordinates of the tetrahedron vertices
+    tet_coords = [mesh.X[idx] for idx in global_tet]
+  
+    # Directly evaluate SDF at each vertex position for maximum accuracy
+    # This is more accurate than using pre-computed values
+    tet_sdf = [eval_sdf(mesh, coord) for coord in tet_coords]
+  
+    # Update the stored SDF values with these more accurate evaluations
+    for (i, idx) in enumerate(global_tet)
+      mesh.node_sdf[idx] = tet_sdf[i]
+    end
+  
+    # Include tetrahedron only if at least one vertex is inside or on the boundary
     if any(x -> x >= 0, tet_sdf)
       push!(mesh.IEN, global_tet)
     end
@@ -215,9 +271,10 @@ end
 # Function for discretizing a cell using Schlafli orthoscheme (unchanged logic, only minor type annotation changes)
 # ----------------------------
 function process_cell_Schlafli!(mesh::BlockMesh, i::Int, j::Int, k::Int)
+  tol = mesh.grid_tol
   # Get SDF values at the 8 corners of the cell
   sdf_values = get_cell_sdf_values(mesh, i, j, k)
-  if !any(x -> x >= 0, sdf_values)
+  if !any(x -> x >= -tol, sdf_values)
     return
   end
 
@@ -840,4 +897,4 @@ end
   export_mesh_vtk(mesh, "block-mesh.vtu")
 # end
 
-run_all()
+# run_all()
