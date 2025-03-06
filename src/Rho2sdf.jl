@@ -29,6 +29,9 @@ using .DataExport
 include("SdfSmoothing/SdfSmoothing.jl")
 using .SdfSmoothing
 
+include("ImplicitDomainMeshing/ImplicitDomainMeshing.jl")
+using .ImplicitDomainMeshing
+
 include("Visualizations/Visualizations.jl")
 using .Visualizations
 

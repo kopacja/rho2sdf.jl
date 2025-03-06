@@ -462,7 +462,7 @@ end
 # ----------------------------
 # Complete mesh optimization pipeline
 # ----------------------------
-function optimize_mesh_complete!(mesh::BlockMesh; 
+function optimize_mesh!(mesh::BlockMesh; 
                                interior_iterations::Int=20, 
                                surface_iterations::Int=10,
                                adaptive_iterations::Int=15,
@@ -497,10 +497,3 @@ function optimize_mesh_complete!(mesh::BlockMesh;
     
     return mesh
 end
-using Random
-
-# Add this after the slice_ambiguous_tetrahedra! and warp_nodes_to_isocontour! calls:
-@time optimize_mesh_complete!(mesh)
-
-# Export the final optimized mesh
-export_mesh_vtk(mesh, "block-mesh-optimized.vtu")

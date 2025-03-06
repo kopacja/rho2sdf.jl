@@ -57,4 +57,4 @@ function check_tetrahedron_volumes(mesh::BlockMesh)
 end
 
 # Usage example
-results = check_tetrahedron_volumes(mesh)
+# results = check_tetrahedron_volumes(mesh)

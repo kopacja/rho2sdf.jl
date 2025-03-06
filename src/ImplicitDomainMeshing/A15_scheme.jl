@@ -1,5 +1,3 @@
-using StaticArrays
-
 const tile_ref = [
     SVector(1.0, 0.0, 0.0),   # 0
     SVector(2.0, 2.0, 0.0),   # 1
