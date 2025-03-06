@@ -50,7 +50,13 @@ Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF_B-" * string(B) * ".vtk", s
 # RBF smoothing:
 (fine_sdf, fine_grid) = RBFs_smoothing(sdf_dists, sdf_grid, false, 1, taskName) # interpolation == true, aproximation == false, smooth
 
-tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName)
+# Definice rovin
+plane_definitions = [
+    PlaneDefinition([-1.0, 0.0, 0.0], [0.0, 10.0, 0.0], Square(30.)),
+    PlaneDefinition([1.0, 0.0, 0.0], [60.0, 2.0, 2.0], Square(5.))
+]
+
+tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName, plane_definitions)
 
 @save "Z_$(taskName)_cele_SDF_B-$(B).jld2" sdf_dists
 @save "Z_$(taskName)_cele_Grid_B-$(B).jld2" sdf_grid

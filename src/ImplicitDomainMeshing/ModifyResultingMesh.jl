@@ -1,53 +1,3 @@
-using LinearAlgebra
-
-# Abstraktní typ pro různé tvary rovin
-abstract type PlaneShape end
-
-# Definice konkrétních tvarů
-struct Rectangle <: PlaneShape
-    width::Float64  # šířka
-    height::Float64 # výška
-end
-
-# Speciální případ obdélníku
-Square(size::Float64) = Rectangle(size, size)
-
-struct Circle <: PlaneShape
-    radius::Float64 # poloměr
-end
-
-struct Ellipse <: PlaneShape
-    a::Float64      # hlavní poloosa
-    b::Float64      # vedlejší poloosa
-end
-
-# Struktura pro reprezentaci omezené roviny
-struct BoundedPlane
-    normal::Vector{Float64}   # Normálový vektor roviny
-    point::Vector{Float64}    # Bod ležící v rovině
-    shape::PlaneShape         # Omezující tvar
-    u::Vector{Float64}        # První bázový vektor v rovině
-    v::Vector{Float64}        # Druhý bázový vektor v rovině
-    
-    # Konstruktor pro výpočet bázových vektorů
-    function BoundedPlane(normal::Vector{Float64}, point::Vector{Float64}, shape::PlaneShape)
-        # Normalizace normálového vektoru
-        normal = normalize(normal)
-        
-        # Vytvoření ortogonální báze v rovině
-        # Nejprve zvolíme libovolný vektor, který není rovnoběžný s normálou
-        temp = abs(normal[1]) < 0.9 ? [1.0, 0.0, 0.0] : [0.0, 1.0, 0.0]
-        
-        # Vytvoříme první bázový vektor v rovině pomocí vektorového součinu
-        u = normalize(cross(normal, temp))
-        
-        # Vytvoříme druhý bázový vektor kolmý k normále a prvnímu bázovému vektoru
-        v = normalize(cross(normal, u))
-        
-        new(normal, point, shape, u, v)
-    end
-end
-
 # Funkce pro kontrolu, zda bod leží na omezené rovině
 function is_on_plane(plane::BoundedPlane, point::Vector{Float64}, tolerance::Float64=1e-10)
     # Kontrola, zda bod leží v rovině
@@ -82,126 +32,6 @@ function is_in_shape(shape::Ellipse, u::Float64, v::Float64)
     return (u/shape.a)^2 + (v/shape.b)^2 <= 1
 end
 
-# Funkce pro generování bodů na omezené rovině
-function generate_points(plane::BoundedPlane, num_points::Int)
-    points = Vector{Vector{Float64}}(undef, 0)
-    
-    if plane.shape isa Rectangle
-        # Generování bodů pro obdélník
-        width, height = plane.shape.width, plane.shape.height
-        
-        # Výpočet počtu bodů v každém směru
-        aspect_ratio = width / height
-        nx = ceil(Int, sqrt(num_points * aspect_ratio))
-        ny = ceil(Int, num_points / nx)
-        
-        # Generování mřížky bodů
-        for i in 1:nx
-            for j in 1:ny
-                u_coord = width * (i / (nx+1) - 0.5)
-                v_coord = height * (j / (ny+1) - 0.5)
-                
-                # Výpočet 3D souřadnic bodu
-                point = plane.point + u_coord * plane.u + v_coord * plane.v
-                push!(points, point)
-            end
-        end
-    elseif plane.shape isa Circle
-        # Pro kruh používáme polární souřadnice
-        radius = plane.shape.radius
-        
-        # Určení počtu kružnic a bodů na kružnici
-        num_circles = ceil(Int, sqrt(num_points))
-        points_per_circle = ceil(Int, num_points / num_circles)
-        
-        for r_idx in 1:num_circles
-            r = radius * (r_idx / num_circles)
-            
-            for theta_idx in 1:points_per_circle
-                theta = 2π * (theta_idx / points_per_circle)
-                
-                u_coord = r * cos(theta)
-                v_coord = r * sin(theta)
-                
-                point = plane.point + u_coord * plane.u + v_coord * plane.v
-                push!(points, point)
-            end
-        end
-    elseif plane.shape isa Ellipse
-        # Pro elipsu také používáme formu polárních souřadnic
-        a, b = plane.shape.a, plane.shape.b
-        
-        num_circles = ceil(Int, sqrt(num_points))
-        points_per_circle = ceil(Int, num_points / num_circles)
-        
-        for r_idx in 1:num_circles
-            r = r_idx / num_circles
-            
-            for theta_idx in 1:points_per_circle
-                theta = 2π * (theta_idx / points_per_circle)
-                
-                u_coord = a * r * cos(theta)
-                v_coord = b * r * sin(theta)
-                
-                point = plane.point + u_coord * plane.u + v_coord * plane.v
-                push!(points, point)
-            end
-        end
-    end
-    
-    return points
-end
-
-# Funkce pro získání obecné rovnice roviny (ax + by + cz + d = 0)
-function get_plane_equation(plane::BoundedPlane)
-    a, b, c = plane.normal
-    d = -dot(plane.normal, plane.point)
-    return (a, b, c, d)
-end
-
-# Funkce pro výpočet bodu na omezené rovině v daných 2D souřadnicích roviny
-function point_on_plane(plane::BoundedPlane, u_coord::Float64, v_coord::Float64)
-    return plane.point + u_coord * plane.u + v_coord * plane.v
-end
-
-using LinearAlgebra
-using JLD2
-# using BoundedPlanes  # Předpokládá se, že modul BoundedPlanes je již načten
-
-"""
-    PlaneDefinition
-
-Struktura pro definici roviny s omezeným tvarem.
-
-Atributy:
-- `normal`: Normálový vektor roviny
-- `point`: Bod ležící v rovině
-- `shape`: Omezující tvar (Square, Rectangle, Circle, Ellipse)
-"""
-struct PlaneDefinition
-    normal::Vector{Float64}
-    point::Vector{Float64}
-    shape::PlaneShape
-end
-
-
-"""
-    estimate_grid_spacing(fine_grid::Array{Vector{Float32}, 3})
-
-Odhadne krok pravidelné mřížky pomocí maximální absolutní hodnoty rozdílu souřadnic
-mezi prvními dvěma uzly v ose z.
-"""
-function estimate_grid_spacing(fine_grid::Array{Vector{Float32}, 3})
-    # Použití maximální absolutní hodnoty rozdílu souřadnic
-    return maximum(abs.(fine_grid[1,1,2] - fine_grid[1,1,1]))
-end
-
-
-"""
-    distance_to_bounded_plane(plane::BoundedPlane, point::Vector{Float32})
-
-Vypočítá vzdálenost z bodu k omezené rovině jako kolmou projekci.
-"""
 function distance_to_bounded_plane(plane::BoundedPlane, point::Vector{Float32})
     # Vektor z bodu roviny k aktuálnímu bodu
     vec_to_point = point - plane.point
@@ -226,79 +56,6 @@ function distance_to_bounded_plane(plane::BoundedPlane, point::Vector{Float32})
         return dot_product > 0 ? -1.0e10 : 1.0e10
     end
 end
-
-"""
-    compute_planes_sdf(fine_grid::Array{Vector{Float32}, 3}, fine_sdf::Array{Float32, 3}, plane_definitions::Vector{PlaneDefinition}; max_dist_factor::Float64=3.0)
-
-Vypočítá minimální vzdálenosti uzlů pravidelné sítě na definované roviny pomocí kolmé projekce.
-
-Argumenty:
-- `fine_grid`: 3D pole vektorů reprezentujících uzly mřížky
-- `fine_sdf`: Původní pole vzdáleností (není přímo používáno, ale je součástí signatury)
-- `plane_definitions`: Vektor definic rovin
-- `max_dist_factor`: Násobitel kroku mřížky pro maximální uvažovanou vzdálenost (výchozí: 3.0)
-
-Vrací:
-- `plane_sdf`: 3D pole reprezentující minimální vzdálenosti k rovinám
-- `plane_normals`: 3D pole reprezentující normály rovin v bodech s minimální vzdáleností
-"""
-function compute_planes_sdf(fine_grid::Array{Vector{Float32}, 3}, fine_sdf::Array{Float32, 3}, 
-                           plane_definitions::Vector{PlaneDefinition}; max_dist_factor::Float64=3.0)
-    # Vytvoření omezených rovin ze zadaných definic
-    planes = [BoundedPlane(def.normal, def.point, def.shape) for def in plane_definitions]
-    
-    # Získání rozměrů mřížky
-    nx, ny, nz = size(fine_grid)
-    
-    # Inicializace výstupních polí
-    plane_sdf = fill(1.0f10, nx, ny, nz)  # Předalokace vysokou kladnou hodnotou
-    # Inicializace pole normál prázdnými vektory místo nulových
-    plane_normals = Array{Vector{Float32}, 3}(undef, nx, ny, nz)
-    for i in 1:nx, j in 1:ny, k in 1:nz
-        plane_normals[i, j, k] = Vector{Float32}()  # Prázdný vektor
-    end
-    
-    # Odhad kroku mřížky
-    spacing = estimate_grid_spacing(fine_grid)
-    
-    # Maximální vzdálenost pro uvažování (násobek kroku mřížky)
-    max_dist = max_dist_factor * spacing
-    
-    # Výpočet vzdáleností pro každý uzel v mřížce
-    for i in 1:nx, j in 1:ny, k in 1:nz
-        point = fine_grid[i, j, k]
-        
-        # Projít všechny roviny a najít nejmenší vzdálenost
-        for (p_idx, plane) in enumerate(planes)
-            dist = distance_to_bounded_plane(plane, point)
-            
-            # Porovnání absolutních hodnot, ale uložení znaménkové hodnoty
-            if abs(dist) <= max_dist && abs(dist) < abs(plane_sdf[i, j, k])
-                plane_sdf[i, j, k] = dist
-                plane_normals[i, j, k] = Vector{Float32}(plane_definitions[p_idx].normal)
-            end
-        end
-    end
-    
-    return plane_sdf, plane_normals
-end
-
-# Načtení dat
-@load "src/ImplicitDomainMeshing/data/Z_cantilever_beam_vfrac_04_FineGrid_B-1.0_smooth-1.jld2" fine_grid
-@load "src/ImplicitDomainMeshing/data/Z_cantilever_beam_vfrac_04_FineSDF_B-1.0_smooth-1.jld2" fine_sdf
-
-# Definice rovin
-plane_definitions = [
-    PlaneDefinition([-1.0, 0.0, 0.0], [0.0, 10.0, 0.0], Square(30.)),
-    PlaneDefinition([1.0, 0.0, 0.0], [60.0, 2.0, 2.0], Square(5.))
-]
-
-# Výpočet minimálních vzdáleností k rovinám a odpovídajících normál
-plane_sdf, plane_normals = compute_planes_sdf(fine_grid, fine_sdf, plane_definitions)
-
-# export_to_paraview_with_vtk(fine_grid, plane_sdf, "sdf_kontrola")
-
-
 
 # Funkce pro vyhodnocení vzdálenosti bodu od rovin (planes_sdf)
 function eval_planes_sdf(mesh::BlockMesh, p::SVector{3,Float64}, plane_definitions::Vector{PlaneDefinition})
@@ -375,6 +132,12 @@ end
 
 # Hlavní funkce pro modifikaci sítě podle planes_sdf
 function warp_mesh_by_planes_sdf!(mesh::BlockMesh, plane_definitions::Vector{PlaneDefinition}; max_iter::Int=20)
+    # Kontrola, zda jsou předány nějaké definice rovin
+    if isempty(plane_definitions)
+        @info "Žádné definice rovin nebyly předány, přeskakuji warping podle rovin."
+        return
+    end
+    
     # Nejprve najdeme uzly s negativní planes_sdf hodnotou
     negative_indices = Int[]
     for i in 1:length(mesh.X)
@@ -395,12 +158,10 @@ function warp_mesh_by_planes_sdf!(mesh::BlockMesh, plane_definitions::Vector{Pla
     update_connectivity!(mesh)
     
     # Finální úpravy
-    slice_ambiguous_tetrahedra!(mesh)
-    update_connectivity!(mesh)
+    # slice_ambiguous_tetrahedra!(mesh)
+    # update_connectivity!(mesh)
     
     @info "Úprava sítě podle planes_sdf dokončena"
 end
 
-warp_mesh_by_planes_sdf!(mesh, plane_definitions)
-
-export_mesh_vtk(mesh, "block-mesh-cut.vtu")
+#TODO: nejdřív warp a pak řez elementů
