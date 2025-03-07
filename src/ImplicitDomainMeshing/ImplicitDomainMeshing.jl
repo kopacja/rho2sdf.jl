@@ -34,25 +34,17 @@ function GenerateTetMesh(fine_sdf::Array, fine_grid::Array, scheme::String, name
 
   update_connectivity!(mesh) # Update mesh topology
 
-  # export_mesh_vtk(mesh, "$(name)_warped.vtu")
-  
   slice_ambiguous_tetrahedra!(mesh) # Remove elements outside the body
 
   update_connectivity!(mesh)
 
   adjust_nodes_to_isosurface!(mesh) # Simple cut of elements to follow the isocontour
 
-  # update_connectivity!(mesh)
-  
   optimize_mesh!(mesh)
 
-  # check_tetrahedron_volumes(mesh)
   export_mesh_vtk(mesh, "$(name)_TriMesh.vtu")
 
-  println("test objemu")
-  
-  TetMesh_volumes(mesh)
-  # Aplikace řezů rovinou pouze pokud jsou definovány
+  # Apply cutting planes only if they are defined
   if !isempty(plane_definitions)
     warp_mesh_by_planes_sdf!(mesh, plane_definitions)
     update_connectivity!(mesh)
