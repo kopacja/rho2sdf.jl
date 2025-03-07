@@ -1,6 +1,6 @@
 module ImplicitDomainMeshing
 
-export GenerateTetMesh, PlaneDefinition, Rectangle, Square, Circle, Ellipse
+export GenerateTetMesh, PlaneDefinition, Rectangle, Square, Circle, Ellipse, slice_mesh_with_plane!
  
 using Statistics
 using StaticArrays
@@ -18,7 +18,10 @@ include("Stencils.jl")
 include("OptimizeTetMesh.jl")
 # Modify the resulting mesh to enable application of boundary conditions
 include("ModifyResultingMesh.jl")
-# include("TetraMeshVolume.jl")
+# Compute mesh volume
+include("TetMeshVolume.jl")
+# Slice mesh with place (for visualization mesh quality)
+include("Utils/SliceMeshWithPlane.jl")
 
 # Main function for tetrahedral discretization:
 function GenerateTetMesh(fine_sdf::Array, fine_grid::Array, scheme::String, name::String, plane_definitions::Vector{PlaneDefinition}=PlaneDefinition[])
@@ -45,13 +48,18 @@ function GenerateTetMesh(fine_sdf::Array, fine_grid::Array, scheme::String, name
 
   # check_tetrahedron_volumes(mesh)
   export_mesh_vtk(mesh, "$(name)_TriMesh.vtu")
+
+  println("test objemu")
   
+  TetMesh_volumes(mesh)
   # Aplikace řezů rovinou pouze pokud jsou definovány
   if !isempty(plane_definitions)
     warp_mesh_by_planes_sdf!(mesh, plane_definitions)
     update_connectivity!(mesh)
     export_mesh_vtk(mesh, "$(name)_TriMesh_cut.vtu")
   end
+
+  TetMesh_volumes(mesh)
   
   return mesh
 end

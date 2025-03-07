@@ -1,5 +1,3 @@
-using Statistics
-
 function compute_quality_metrics!(mesh::BlockMesh)
     # Pre-allocate arrays for metrics
     aspect_ratios = Float64[]

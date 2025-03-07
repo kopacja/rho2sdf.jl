@@ -176,26 +176,26 @@ end
 # ----------------------------
 # Combined optimization function that performs smoothing followed by cleanup
 # ----------------------------
-function optimize_mesh!(mesh::BlockMesh; max_iterations::Int=20, damping_factor::Float64=0.5)
-    # First perform Laplacian smoothing
-    laplacian_smooth!(mesh, max_iterations=max_iterations, damping_factor=damping_factor)
-    
-    # Then update connectivity to remove any duplicate nodes that might have been created
-    update_connectivity!(mesh)
-    
-    # Calculate and report mesh quality statistics
-    quality_stats = [compute_element_quality(mesh, i) for i in 1:length(mesh.IEN)]
-    min_quality = minimum(quality_stats)
-    max_quality = maximum(quality_stats)
-    avg_quality = sum(quality_stats) / length(quality_stats)
-    
-    @info "Mesh optimization complete. Quality statistics:" 
-    @info "  Min quality: $min_quality"
-    @info "  Max quality: $max_quality"
-    @info "  Avg quality: $avg_quality"
-    
-    return mesh
-end
+# function optimize_mesh!(mesh::BlockMesh; max_iterations::Int=20, damping_factor::Float64=0.5)
+#     # First perform Laplacian smoothing
+#     laplacian_smooth!(mesh, max_iterations=max_iterations, damping_factor=damping_factor)
+#
+#     # Then update connectivity to remove any duplicate nodes that might have been created
+#     update_connectivity!(mesh)
+#
+#     # Calculate and report mesh quality statistics
+#     quality_stats = [compute_element_quality(mesh, i) for i in 1:length(mesh.IEN)]
+#     min_quality = minimum(quality_stats)
+#     max_quality = maximum(quality_stats)
+#     avg_quality = sum(quality_stats) / length(quality_stats)
+#
+#     @info "Mesh optimization complete. Quality statistics:" 
+#     @info "  Min quality: $min_quality"
+#     @info "  Max quality: $max_quality"
+#     @info "  Avg quality: $avg_quality"
+#
+#     return mesh
+# end
 
 # ----------------------------
 # Improved mesh optimization with adaptive damping

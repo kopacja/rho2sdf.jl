@@ -58,8 +58,10 @@ plane_definitions = [
 
 tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName, plane_definitions)
 
-@save "Z_$(taskName)_cele_SDF_B-$(B).jld2" sdf_dists
-@save "Z_$(taskName)_cele_Grid_B-$(B).jld2" sdf_grid
-@save "Z_$(taskName)_cele_Points_B-$(B).jld2" points
-@save "Z_$(taskName)_cele_Mesh_B-$(B).jld2" mesh
+slice_mesh_with_plane!(tetMesh, "x", 0.6, export_file="sliced_mesh.vtu")
+
+# @save "Z_$(taskName)_cele_SDF_B-$(B).jld2" sdf_dists
+# @save "Z_$(taskName)_cele_Grid_B-$(B).jld2" sdf_grid
+# @save "Z_$(taskName)_cele_Points_B-$(B).jld2" points
+# @save "Z_$(taskName)_cele_Mesh_B-$(B).jld2" mesh
 
