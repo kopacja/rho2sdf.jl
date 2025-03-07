@@ -107,29 +107,35 @@ function shape_functions(ξηζ::SVector{3,Float64})::SVector{8,Float64}
 end
 
 # ----------------------------
-# Pomocná funkce: Vyhodnocení SDF pomocí trilineární interpolace
+# Helper function: SDF evaluation using trilinear interpolation
 # ----------------------------
 function eval_sdf(mesh::BlockMesh, p::SVector{3,Float64})
-  # Získáme minimální a maximální souřadnice mřížky
+  # Get minimum and maximum grid coordinates
   vmin = mesh.grid[1, 1, 1]
   vmax = mesh.grid[end, end, end]
-  # Normalizace souřadnic bodu p do intervalu [0,1]
+  
+  # Normalize point coordinates to interval [0,1]
   r = (p .- vmin) ./ (vmax .- vmin)
-  # Přepočet na indexy v mřížce
+  
+  # Convert to grid indices
   i_f = r[1] * (mesh.nx - 1) + 1
   j_f = r[2] * (mesh.ny - 1) + 1
   k_f = r[3] * (mesh.nz - 1) + 1
+  
   i0 = clamp(floor(Int, i_f), 1, mesh.nx - 1)
   j0 = clamp(floor(Int, j_f), 1, mesh.ny - 1)
   k0 = clamp(floor(Int, k_f), 1, mesh.nz - 1)
+  
   i1 = i0 + 1
   j1 = j0 + 1
   k1 = k0 + 1
-  # Lokální váhy
+  
+  # Local weights
   xd = i_f - i0
   yd = j_f - j0
   zd = k_f - k0
-  # Získání SDF hodnot na osmi rozích buňky
+  
+  # Get SDF values at the eight corners of the cell
   c000 = mesh.SDF[i0, j0, k0]
   c100 = mesh.SDF[i1, j0, k0]
   c010 = mesh.SDF[i0, j1, k0]
@@ -138,62 +144,65 @@ function eval_sdf(mesh::BlockMesh, p::SVector{3,Float64})
   c101 = mesh.SDF[i1, j0, k1]
   c011 = mesh.SDF[i0, j1, k1]
   c111 = mesh.SDF[i1, j1, k1]
-  # Trilineární interpolace
+  
+  # Trilinear interpolation
   c00 = c000 * (1 - xd) + c100 * xd
   c01 = c001 * (1 - xd) + c101 * xd
   c10 = c010 * (1 - xd) + c110 * xd
   c11 = c011 * (1 - xd) + c111 * xd
+  
   c0 = c00 * (1 - yd) + c10 * yd
   c1 = c01 * (1 - yd) + c11 * yd
+  
   return c0 * (1 - zd) + c1 * zd
 end
 
 # ----------------------------
-# Function for discretizing a cell using A15 scheme (unchanged logic, but with refactored shape function and slight optimizations)
+# Function for discretizing a cell using A15 scheme
 # ----------------------------
 function process_cell_A15!(mesh::BlockMesh, i::Int, j::Int, k::Int)
   tol = mesh.grid_tol
   
-  # Nejprve zkontrolujeme SDF hodnoty aktuální buňky
+  # First check the SDF values of the current cell
   current_sdf_values = get_cell_sdf_values(mesh, i, j, k)
   
-  # Pokud je některá hodnota v aktuální buňce kladná nebo blízká nule, určitě buňku zpracujeme
+  # If any value in the current cell is positive or close to zero, we definitely process the cell
   if any(x -> x >= -tol, current_sdf_values)
-    # Pokračujeme běžným zpracováním
+    # Continue with regular processing
   else
-    # Všechny hodnoty v aktuální buňce jsou záporné - zkontrolujeme okolní buňky
-    
-    # Definujeme posuny pro sousední buňky (přímí sousedé ve všech směrech)
+    # All values in the current cell are negative - check neighboring cells
+  
+    # Define offsets for neighboring cells (direct neighbors in all directions)
     neighbor_offsets = [
-      (1,0,0), (-1,0,0),   # sousedé ve směru x
-      (0,1,0), (0,-1,0),   # sousedé ve směru y
-      (0,0,1), (0,0,-1)    # sousedé ve směru z
+      (1,0,0), (-1,0,0),   # neighbors in x direction
+      (0,1,0), (0,-1,0),   # neighbors in y direction
+      (0,0,1), (0,0,-1)    # neighbors in z direction
     ] #TODO: select only relevant one
     
-    # Inicializujeme příznak, že všechny okolní buňky mají záporné SDF hodnoty
+    # Initialize a flag indicating that all neighboring cells have negative SDF values
     all_neighbors_negative = true
     
-    # Kontrolujeme SDF hodnoty sousedních buněk
+    # Check SDF values of neighboring cells
     for (di, dj, dk) in neighbor_offsets
-      # Vypočítáme indexy sousední buňky
+      # Calculate indices of neighboring cell
       ni, nj, nk = i + di, j + dj, k + dk
       
-      # Kontrola hranic mřížky
+      # Check grid boundaries
       if 1 <= ni < mesh.nx && 1 <= nj < mesh.ny && 1 <= nk < mesh.nz
-        # Získáme SDF hodnoty pro sousední buňku
+        # Get SDF values for neighboring cell
         neighbor_sdf = get_cell_sdf_values(mesh, ni, nj, nk)
         
-        # Pokud má nějaká hodnota v sousední buňce kladnou nebo nulovou hodnotu,
-        # nastavíme příznak a ukončíme kontrolu
+        # If any value in the neighboring cell has a positive or zero value,
+        # set the flag and end the check
         if any(x -> x >= -tol, neighbor_sdf)
           all_neighbors_negative = false
           break
         end
       end
     end
-    
-    # Pokud jsou všechny hodnoty v aktuální buňce i všech okolních buňkách záporné,
-    # můžeme buňku bezpečně přeskočit
+        
+    # If all values in the current cell and all neighboring cells are negative,
+    # we can safely skip the cell
     if all_neighbors_negative
       return
     end
