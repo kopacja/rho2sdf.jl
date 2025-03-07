@@ -1,13 +1,16 @@
-# Abstraktní typ pro různé tvary rovin
+# These planes are used for adjusting (aligning) the tetrahedral mesh
+# to enable proper application of boundary conditions
+
+# Abstract type for different plane shapes
 abstract type PlaneShape end
 
-# Definice konkrétních tvarů
+# Definition of specific shapes
 struct Rectangle <: PlaneShape
     width::Float64
     height::Float64
 end
 
-# Speciální případ obdélníku
+# Special case of rectangle
 Square(size::Float64) = Rectangle(size, size)
 
 struct Circle <: PlaneShape
@@ -19,14 +22,14 @@ struct Ellipse <: PlaneShape
     b::Float64
 end
 
-# Struktura pro definici roviny
+# Structure for plane definition
 struct PlaneDefinition
     normal::Vector{Float64}
     point::Vector{Float64}
     shape::PlaneShape
 end
 
-# Struktura pro reprezentaci omezené roviny
+# Structure for representing a bounded plane
 struct BoundedPlane
     normal::Vector{Float64}
     point::Vector{Float64}
@@ -34,19 +37,19 @@ struct BoundedPlane
     u::Vector{Float64}
     v::Vector{Float64}
     
-    # Konstruktor pro výpočet bázových vektorů
+    # Constructor for calculating basis vectors
     function BoundedPlane(normal::Vector{Float64}, point::Vector{Float64}, shape::PlaneShape)
-        # Normalizace normálového vektoru
+        # Normalization of the normal vector
         normal = normalize(normal)
         
-        # Vytvoření ortogonální báze v rovině
-        # Nejprve zvolíme libovolný vektor, který není rovnoběžný s normálou
+        # Creating an orthogonal basis in the plane
+        # First choose any vector that is not parallel to the normal
         temp = abs(normal[1]) < 0.9 ? [1.0, 0.0, 0.0] : [0.0, 1.0, 0.0]
         
-        # Vytvoříme první bázový vektor v rovině pomocí vektorového součinu
+        # Create the first basis vector in the plane using cross product
         u = normalize(cross(normal, temp))
         
-        # Vytvoříme druhý bázový vektor kolmý k normále a prvnímu bázovému vektoru
+        # Create the second basis vector perpendicular to the normal and the first basis vector
         v = normalize(cross(normal, u))
         
         new(normal, point, shape, u, v)
