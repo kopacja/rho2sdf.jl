@@ -138,30 +138,303 @@ function warp_mesh_by_planes_sdf!(mesh::BlockMesh, plane_definitions::Vector{Pla
         return
     end
     
-    # Nejprve najdeme uzly s negativní planes_sdf hodnotou
-    negative_indices = Int[]
+    # Vypočítat nejdelší hranu a následně threshold pro posun - stejná logika jako ve funkci warp!
+    max_edge = longest_edge(mesh)
+    threshold_sdf = 0.3 * max_edge
+    
+    @info "Planes warping: max edge = $max_edge, threshold_sdf = $threshold_sdf"
+    
+    # Příprava pro warp - najdeme uzly v blízkosti roviny (v obou směrech)
+    nodes_to_warp = Int[]
     for i in 1:length(mesh.X)
         plane_sdf = eval_planes_sdf(mesh, mesh.X[i], plane_definitions)
-        if plane_sdf < 0
-            push!(negative_indices, i)
+        # Pokud je uzel dostatečně blízko roviny (z obou stran), přidáme ho k warpovým uzlům
+        # if abs(plane_sdf) < threshold_sdf
+        if plane_sdf < threshold_sdf    
+            push!(nodes_to_warp, i)
         end
     end
     
-    @info "Nalezeno $(length(negative_indices)) uzlů s negativní planes_sdf hodnotou"
+    @info "Nalezeno $(length(nodes_to_warp)) uzlů v blízkosti rovin k warpu"
     
-    # Warp uzlů s negativní planes_sdf hodnotou na izopovrch
-    for node_idx in negative_indices
+    # Warp uzlů v blízkosti roviny na nulovou hladinu
+    for node_idx in nodes_to_warp
         warp_node_to_planes_isocontour!(mesh, node_idx, plane_definitions, max_iter)
     end
     
     # Aktualizace topologie sítě
     update_connectivity!(mesh)
     
-    # Finální úpravy
-    # slice_ambiguous_tetrahedra!(mesh)
-    # update_connectivity!(mesh)
+    # Odstranění elementů, které mají všechny uzly na nulové hladině nebo nemají alespoň jeden uzel s kladnou SDF
+    new_IEN = Vector{Vector{Int64}}()
+    for tet in mesh.IEN
+        # Získáme SDF hodnoty pro všechny uzly tetraedru
+        tet_sdf = [eval_planes_sdf(mesh, mesh.X[i], plane_definitions) for i in tet]
+        
+        # Počet uzlů na nulové hladině
+        zero_nodes = count(x -> abs(x) < mesh.grid_tol, tet_sdf)
+        
+        # Počet uzlů s kladnou SDF hodnotou
+        pos_nodes = count(x -> x > 0, tet_sdf)
+        
+        # Zachováme tetraedron pouze pokud:
+        # 1. Má alespoň jeden uzel s kladnou hodnotou (vzhledem k planes_sdf)
+        # 2. Nemá všechny uzly na nulové hladině
+        if pos_nodes > 0 && zero_nodes < 4
+            push!(new_IEN, tet)
+        end
+    end
+    
+    # Aktualizace konektivity
+    mesh.IEN = new_IEN
+    @info "Po odstranění nevhodných elementů: $(length(mesh.IEN)) tetraedrů"
+    
+    # Finální aktualizace topologie
+    update_connectivity!(mesh)
     
     @info "Úprava sítě podle planes_sdf dokončena"
 end
 
-#TODO: nejdřív warp a pak řez elementů
+#TODO: Create a mesh trimming that will support element cutting and subsequent mesh optimization.
+
+# # Function to warp nodes onto plane surfaces based on element connectivity
+# function adjust_nodes_to_planes!(mesh::BlockMesh, plane_definitions::Vector{PlaneDefinition})
+#     @info "Starting node warping to plane surfaces..."
+    
+#     # Track nodes that have been processed to avoid duplicating work
+#     processed_nodes = Set{Int}()
+#     nodes_moved = 0
+#     nodes_skipped = 0
+    
+#     # Helper function to check if moving a node would cause element inversion
+#     function would_cause_inversion(node_idx, new_position)
+#         # Store original position
+#         original_position = mesh.X[node_idx]
+        
+#         # Temporarily move the node
+#         mesh.X[node_idx] = new_position
+        
+#         # Check all elements containing this node
+#         inversion_found = false
+#         for elem_idx in mesh.INE[node_idx]
+#             tet = mesh.IEN[elem_idx]
+#             vertices = [mesh.X[v] for v in tet]
+            
+#             # Calculate Jacobian determinant (proportional to signed volume)
+#             jacobian_det = dot(
+#                 cross(vertices[2] - vertices[1], vertices[3] - vertices[1]),
+#                 vertices[4] - vertices[1]
+#             )
+            
+#             if jacobian_det < 0
+#                 inversion_found = true
+#                 break
+#             end
+#         end
+        
+#         # Restore original position
+#         mesh.X[node_idx] = original_position
+        
+#         return inversion_found
+#     end
+    
+#     # Helper function for interpolating to plane surface
+#     function interpolate_to_plane(p1::SVector{3,Float64}, p2::SVector{3,Float64}, 
+#                                  f1::Float64, f2::Float64)
+#         # Ensure f1 and f2 have opposite signs (crossing the plane)
+#         if sign(f1) == sign(f2)
+#             error("Points must be on opposite sides of the plane")
+#         end
+        
+#         # Linear interpolation to find zero crossing
+#         t = f1 / (f1 - f2)
+#         return p1 + t * (p2 - p1)
+#     end
+    
+#     # First pass: Find nodes with negative plane_sdf and process them
+#     for node_idx in 1:length(mesh.X)
+#         # Skip already processed nodes
+#         node_idx in processed_nodes && continue
+        
+#         # Evaluate plane_sdf for this node
+#         node_plane_sdf = eval_planes_sdf(mesh, mesh.X[node_idx], plane_definitions)
+        
+#         # Only process nodes with negative plane_sdf values (inside cutting planes)
+#         if node_plane_sdf < 0
+#             # Get all elements containing this node
+#             elements = mesh.INE[node_idx]
+            
+#             # Skip nodes that aren't part of any elements
+#             isempty(elements) && continue
+            
+#             # Try to find an element with exactly 3 negative nodes
+#             edge_to_warp = nothing
+            
+#             for elem_idx in elements
+#                 tet = mesh.IEN[elem_idx]
+                
+#                 # Get plane_sdf values for all nodes in this tetrahedron
+#                 tet_plane_sdf = [eval_planes_sdf(mesh, mesh.X[i], plane_definitions) for i in tet]
+                
+#                 # Count negative nodes in this tetrahedron
+#                 neg_nodes = [i for (i, sdf) in zip(tet, tet_plane_sdf) if sdf < 0]
+                
+#                 if length(neg_nodes) == 3 && node_idx in neg_nodes
+#                     # This element has exactly 3 negative nodes including our target node
+                    
+#                     # Find the positive node
+#                     pos_node = first([i for (i, sdf) in zip(tet, tet_plane_sdf) if sdf >= 0])
+                    
+#                     # Calculate the plane_sdf values
+#                     pos_sdf = eval_planes_sdf(mesh, mesh.X[pos_node], plane_definitions)
+#                     neg_sdf = node_plane_sdf
+                    
+#                     # Check if the edge between positive and negative node crosses zero
+#                     if sign(pos_sdf) != sign(neg_sdf)
+#                         # Calculate approximate zero crossing using linear interpolation
+#                         zero_point = interpolate_to_plane(
+#                             mesh.X[pos_node], 
+#                             mesh.X[node_idx], 
+#                             pos_sdf, 
+#                             neg_sdf
+#                         )
+                        
+#                         # Check if moving to this point would cause inversion
+#                         if !would_cause_inversion(node_idx, zero_point)
+#                             # Found a suitable edge to warp along
+#                             edge_to_warp = (pos_node, node_idx)
+#                             break
+#                         end
+#                     end
+#                 end
+#             end
+            
+#             # If no suitable edge found yet, try all edges connecting to positive nodes
+#             if edge_to_warp === nothing
+#                 for elem_idx in elements
+#                     tet = mesh.IEN[elem_idx]
+        
+#                     # Look for edges connecting our negative node to positive nodes
+#                     for other_node in tet
+#                         # Skip if it's the same node
+#                         other_node == node_idx && continue
+            
+#                         # Evaluate plane_sdf for the other node
+#                         other_plane_sdf = eval_planes_sdf(mesh, mesh.X[other_node], plane_definitions)
+                        
+#                         # Check if the other node has positive plane_sdf (crosses zero level)
+#                         if other_plane_sdf > 0
+#                             # Calculate approximate zero crossing
+#                             pos_sdf = other_plane_sdf
+#                             neg_sdf = node_plane_sdf
+                            
+#                             # Make sure signs are opposite (to cross the zero level)
+#                             if sign(pos_sdf) == sign(neg_sdf)
+#                                 continue
+#                             end
+                            
+#                             # Calculate the plane intersection point
+#                             zero_point = interpolate_to_plane(
+#                                 mesh.X[other_node],
+#                                 mesh.X[node_idx],
+#                                 pos_sdf,
+#                                 neg_sdf
+#                             )
+                            
+#                             # Check if moving to this point would cause inversion
+#                             if !would_cause_inversion(node_idx, zero_point)
+#                                 # Found a suitable edge to warp along
+#                                 edge_to_warp = (other_node, node_idx)
+#                                 break
+#                             end
+#                         end
+#                     end
+        
+#                     # If we found a suitable edge, no need to check more elements
+#                     edge_to_warp !== nothing && break
+#                 end
+#             end
+            
+#             # If we found an edge to warp along, perform the warping
+#             if edge_to_warp !== nothing
+#                 pos_node, neg_node = edge_to_warp
+                
+#                 # Get plane_sdf values for interpolation
+#                 pos_sdf = eval_planes_sdf(mesh, mesh.X[pos_node], plane_definitions)
+#                 neg_sdf = eval_planes_sdf(mesh, mesh.X[neg_node], plane_definitions)
+                
+#                 # Calculate precise intersection point
+#                 intersection_point = interpolate_to_plane(
+#                     mesh.X[pos_node],
+#                     mesh.X[neg_node],
+#                     pos_sdf,
+#                     neg_sdf
+#                 )
+                
+#                 # Quantize the point to avoid duplicates
+#                 p_key = quantize(intersection_point, mesh.grid_tol)
+                
+#                 # Check if this point already exists in the mesh
+#                 if haskey(mesh.node_hash, p_key)
+#                     # Get existing node index
+#                     new_node_idx = mesh.node_hash[p_key]
+                    
+#                     # Update all elements that contain the old node
+#                     for elem_idx in elements
+#                         tet = mesh.IEN[elem_idx]
+#                         for i in 1:length(tet)
+#                             if tet[i] == neg_node
+#                                 mesh.IEN[elem_idx][i] = new_node_idx
+#                             end
+#                         end
+#                     end
+#                     nodes_moved += 1
+#                 else
+#                     # Update the current node's position
+#                     mesh.X[neg_node] = intersection_point
+                    
+#                     # Update the node's hash entry
+#                     mesh.node_hash[p_key] = neg_node
+                    
+#                     nodes_moved += 1
+#                 end
+#             else
+#                 # No suitable edge was found - all would cause inversion
+#                 @warn "Node $node_idx couldn't be moved to plane surface - all potential movements would cause element inversion"
+#                 nodes_skipped += 1
+#             end
+            
+#             # Mark this node as processed
+#             push!(processed_nodes, node_idx)
+#         end
+#     end
+    
+#     @info "Node warping to planes complete. $nodes_moved nodes were moved to plane surfaces. $nodes_skipped nodes were skipped to prevent element inversion."
+    
+#     # Odstranění elementů, které mají všechny uzly na nulové hladině nebo nemají alespoň jeden uzel s kladnou SDF
+#     new_IEN = Vector{Vector{Int64}}()
+#     for tet in mesh.IEN
+#         # Získáme SDF hodnoty pro všechny uzly tetraedru
+#         tet_sdf = [eval_planes_sdf(mesh, mesh.X[i], plane_definitions) for i in tet]
+        
+#         # Počet uzlů na nulové hladině
+#         zero_nodes = count(x -> abs(x) < mesh.grid_tol, tet_sdf)
+        
+#         # Počet uzlů s kladnou SDF hodnotou
+#         pos_nodes = count(x -> x > 0, tet_sdf)
+        
+#         # Zachováme tetraedron pouze pokud:
+#         # 1. Má alespoň jeden uzel s kladnou hodnotou (vzhledem k planes_sdf)
+#         # 2. Nemá všechny uzly na nulové hladině
+#         if pos_nodes > 0 && zero_nodes < 4
+#             push!(new_IEN, tet)
+#         end
+#     end
+    
+#     # Aktualizace konektivity
+#     mesh.IEN = new_IEN
+#     @info "After removing elements inside cutting planes: $(length(mesh.IEN)) tetrahedra remain"
+    
+#     # After warping, we need to update the mesh connectivity
+#     update_connectivity!(mesh)
+#   end
