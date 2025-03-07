@@ -1,3 +1,5 @@
+# Reference nodes for a 3D finite element mesh (box size 4x4)
+# Each vector represents the (x,y,z) coordinates of a node
 const tile_ref = [
     SVector(1.0, 0.0, 0.0),   # 0
     SVector(2.0, 2.0, 0.0),   # 1
@@ -28,9 +30,10 @@ const tile_ref = [
     SVector(5.0, 4.0, 0.0)    # 26
 ]
 
-# Definice konektivity tetraedrů (indexy 0-based, převedeme na 1-based při zpracování)
+# Tetrahedral element connectivity for A15 mesh structure
+# Each vector contains the indices of 4 nodes that form a tetrahedron
 const tetra_connectivity = [
-    [3,4,15,14], # 0
+    [3,4,15,14],
     [3,15,13,14],
     [6,21,17,10],
     [6,17,23,24],
@@ -59,7 +62,7 @@ const tetra_connectivity = [
     [2,8,1,7],
     [14,8,2,7],
     [12,15,19,14],
-    [19,27,16,4], # zde se vyskytuje index 27 (0-based), který po posunu dává 28 – předpokládáme, že jde o drobnou nepřesnost v literatuře
+    [19,27,16,4],
     [17,12,18,19],
     [14,9,11,13],
     [14,12,11,10],
@@ -78,32 +81,51 @@ const tetra_connectivity = [
     [14,16,17,7]
 ]
 
+"""
+    compute_hex8_shape!(N, d¹N_dξ¹, ξ₁, ξ₂, ξ₃)
+
+Compute the shape functions and their derivatives for an 8-node hexahedral element.
+
+This function calculates both the shape function values and their derivatives with respect
+to the natural coordinates (ξ₁, ξ₂, ξ₃) at a given point in the reference element.
+
+# Arguments
+- `N::MVector{8,Float64}`: Output vector for shape function values
+- `d¹N_dξ¹::MMatrix{8,3,Float64}`: Output matrix for shape function derivatives
+- `ξ₁::Float64`: First natural coordinate (-1 ≤ ξ₁ ≤ 1)
+- `ξ₂::Float64`: Second natural coordinate (-1 ≤ ξ₂ ≤ 1)
+- `ξ₃::Float64`: Third natural coordinate (-1 ≤ ξ₃ ≤ 1)
+
+# Note
+This function uses precomputation of common expressions to improve performance.
+It directly modifies the input arrays N and d¹N_dξ¹ rather than returning new ones.
+"""
+
 @inline function compute_hex8_shape!(
-    # @inline function compute_shape_functions!(
     N::MVector{8,Float64},
     d¹N_dξ¹::MMatrix{8,3,Float64},
     ξ₁::Float64,
     ξ₂::Float64,
     ξ₃::Float64
   )
-    # Předpočítání základních výrazů - compiler může optimalizovat do registrů
+    # Precomputation of basic expressions - compiler can optimize into registers
     ξ₁m1 = ξ₁ - 1
     ξ₁p1 = ξ₁ + 1
     ξ₂m1 = ξ₂ - 1
     ξ₂p1 = ξ₂ + 1
     ξ₃m1 = ξ₃ - 1
     ξ₃p1 = ξ₃ + 1
+ 
+    # Precomputation of common products
+    t1 = ξ₁m1 * ξ₂m1  # For nodes 1 and 5
+    t2 = ξ₁p1 * ξ₂m1  # For nodes 2 and 6
+    t3 = ξ₁p1 * ξ₂p1  # For nodes 3 and 7
+    t4 = ξ₁m1 * ξ₂p1  # For nodes 4 and 8
   
-    # Předpočítání společných součinů
-    t1 = ξ₁m1 * ξ₂m1  # Pro uzly 1 a 5
-    t2 = ξ₁p1 * ξ₂m1  # Pro uzly 2 a 6
-    t3 = ξ₁p1 * ξ₂p1  # Pro uzly 3 a 7
-    t4 = ξ₁m1 * ξ₂p1  # Pro uzly 4 a 8
-  
-    # Konstantní koeficient
+    # Constant coefficient
     coef = 0.125
   
-    # Výpočet hodnot shape funkcí - přímo do výstupního vektoru
+    # Calculation of shape function values - directly into the output vector
     N[1] = -coef * t1 * ξ₃m1
     N[2] = coef * t2 * ξ₃m1
     N[3] = -coef * t3 * ξ₃m1
@@ -113,11 +135,11 @@ const tetra_connectivity = [
     N[7] = coef * t3 * ξ₃p1
     N[8] = -coef * t4 * ξ₃p1
   
-    # Předpočítání společných výrazů pro derivace
+    # Precomputation of common expressions for derivatives
     d1_coef = coef * ξ₃m1
     d1_coefp = coef * ξ₃p1
   
-    # Derivace podle ξ₁
+    # Derivatives with respect to ξ₁
     d¹N_dξ¹[1, 1] = -d1_coef * ξ₂m1
     d¹N_dξ¹[2, 1] = d1_coef * ξ₂m1
     d¹N_dξ¹[3, 1] = -d1_coef * ξ₂p1
@@ -127,7 +149,7 @@ const tetra_connectivity = [
     d¹N_dξ¹[7, 1] = d1_coefp * ξ₂p1
     d¹N_dξ¹[8, 1] = -d1_coefp * ξ₂p1
   
-    # Derivace podle ξ₂
+    # Derivatives with respect to ξ₂
     d¹N_dξ¹[1, 2] = -d1_coef * ξ₁m1
     d¹N_dξ¹[2, 2] = d1_coef * ξ₁p1
     d¹N_dξ¹[3, 2] = -d1_coef * ξ₁p1
@@ -137,7 +159,7 @@ const tetra_connectivity = [
     d¹N_dξ¹[7, 2] = d1_coefp * ξ₁p1
     d¹N_dξ¹[8, 2] = -d1_coefp * ξ₁m1
   
-    # Derivace podle ξ₃
+    # Derivatives with respect to ξ₃
     d¹N_dξ¹[1, 3] = -coef * t1
     d¹N_dξ¹[2, 3] = coef * t2
     d¹N_dξ¹[3, 3] = -coef * t3
@@ -148,28 +170,45 @@ const tetra_connectivity = [
     d¹N_dξ¹[8, 3] = -coef * t4
   end
   
-  
+"""
+    hex8_shape(Ξ::Vector{Float64}) -> Vector{Float64}
+
+Compute the shape functions for an 8-node hexahedral element at a given point.
+
+This is a simplified version of `compute_hex8_shape!` that only calculates 
+the shape function values (not derivatives) and returns a new vector.
+
+# Arguments
+- `Ξ::Vector{Float64}`: 3D vector containing the natural coordinates [ξ₁, ξ₂, ξ₃]
+
+# Returns
+- `N::Vector{Float64}`: Vector of 8 shape function values
+
+# Note
+Each shape function corresponds to a node of the hexahedral element and 
+is used for interpolation within the element.
+"""
 
 function hex8_shape(Ξ::Vector{Float64})
     ξ₁ = Ξ[1]
     ξ₂ = Ξ[2]
     ξ₃ = Ξ[3]
-    # Předpočítání základních výrazů - compiler může optimalizovat do registrů
+    # Precomputation of basic expressions - compiler can optimize into registers
     ξ₁m1 = ξ₁ - 1
     ξ₁p1 = ξ₁ + 1
     ξ₂m1 = ξ₂ - 1
     ξ₂p1 = ξ₂ + 1
     ξ₃m1 = ξ₃ - 1
     ξ₃p1 = ξ₃ + 1
-    # Předpočítání společných součinů
-    t1 = ξ₁m1 * ξ₂m1  # Pro uzly 1 a 5
-    t2 = ξ₁p1 * ξ₂m1  # Pro uzly 2 a 6
-    t3 = ξ₁p1 * ξ₂p1  # Pro uzly 3 a 7
-    t4 = ξ₁m1 * ξ₂p1  # Pro uzly 4 a 8
-    # Konstantní koeficient
+    # Precomputation of common products
+    t1 = ξ₁m1 * ξ₂m1  # For nodes 1 and 5
+    t2 = ξ₁p1 * ξ₂m1  # For nodes 2 and 6
+    t3 = ξ₁p1 * ξ₂p1  # For nodes 3 and 7
+    t4 = ξ₁m1 * ξ₂p1  # For nodes 4 and 8
+    # Constant coefficient
     coef = 0.125
     N = zeros(Float64, 8)
-    # Výpočet hodnot shape funkcí - přímo do výstupního vektoru
+    # Calculation of shape function values - directly into the output vector
     N[1] = -coef * t1 * ξ₃m1
     N[2] = coef * t2 * ξ₃m1
     N[3] = -coef * t3 * ξ₃m1
