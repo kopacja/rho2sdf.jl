@@ -428,7 +428,7 @@ function export_mesh_vtk(mesh::BlockMesh, filename::String)
 end
 
 # ----------------------------
-# Pomocná funkce: Aproximace gradientu SDF v bodě p pomocí centrálních diferencí
+# Helper function: Approximation of the SDF gradient at point p using central differences
 # ----------------------------
 function approximate_gradient(mesh::BlockMesh, p::SVector{3,Float64}; h::Float64=1e-3)
   dx = SVector{3,Float64}(h, 0.0, 0.0)
@@ -440,8 +440,8 @@ function approximate_gradient(mesh::BlockMesh, p::SVector{3,Float64}; h::Float64
   return SVector{3,Float64}(df_dx, df_dy, df_dz)
 end
 
-# Funkce pro výpočet délky nejdelší hrany mezi uzly ve všech tetraedrech
-# TODO: Stačí vzít počáteční diskretizaci a vzít pouze jeden element (pro zrychlení)
+# Function to calculate the length of the longest edge between nodes in all tetrahedra
+# TODO: Just take the initial discretization and take only one element (for speedup)
 function longest_edge(mesh::BlockMesh)
   # Pre-allocate maximum length with type stability
   max_length = zero(eltype(mesh.X[1]))
@@ -459,7 +459,7 @@ function longest_edge(mesh::BlockMesh)
 end
 
 
-# Pomocná funkce – odhad gradientu SDF v okolí uzlu
+# Estimate the gradient of the SDF around the node
 # First, let's modify compute_gradient to work with both node indices and positions
 function compute_gradient(mesh::BlockMesh, p::SVector{3,Float64}; δ::Float64=1e-3)
   # Pre-allocate unit vectors as static vectors for better performance
@@ -516,27 +516,25 @@ function warp_node_to_isocontour!(mesh::BlockMesh, node_index::Int, max_iter)
   mesh.X[node_index] = current_position
 end
 
-# Hlavní funkce pro warping uzlů – ordered warping
+# Main function for node warping - ordered warping
 #
-# Nejprve se upraví uzly s negativní SDF hodnotou (uvnitř izopovrchu) a poté uzly s kladnou hodnotou.
-# Uzly se posunují směrem k nulové hladině SDF (izopovrchu) a práh posunu se počítá jako
-# threshold_sdf = 0.2 * (délka nejdelší hrany tetraedru).
+# First, nodes with positive SDF value (inside the isosurface) are adjusted, 
+# then nodes with negative values.
+# Nodes are moved toward the zero level of SDF (isosurface) and the displacement threshold 
+# is calculated as threshold_sdf = 0.5 * (length of the longest tetrahedral edge).
 function warp!(mesh::BlockMesh, max_iter::Int=160)
-  # Vypočítat nejdelší hranu a následně threshold pro posun
+  # Calculate the longest edge and then the threshold for displacement
   max_edge = longest_edge(mesh)
   threshold_sdf = 0.5 * max_edge
-
   @info "Warping: max edge = $max_edge, threshold_sdf = $threshold_sdf"
-
-  # První průchod: uzly s kladnou SDF hodnotou (uvnitř)
+  # First pass: nodes with positive SDF value (inside)
   for i in 1:length(mesh.X)
     sdf = mesh.node_sdf[i]
     if sdf > 0 && abs(sdf) < threshold_sdf
       warp_node_to_isocontour!(mesh, i, max_iter)
     end
   end
-
-  # Druhý průchod: uzly s negativní SDF hodnotou (vně)
+  # Second pass: nodes with negative SDF value (outside)
   for i in 1:length(mesh.X)
     sdf = mesh.node_sdf[i]
     if sdf < 0 && abs(sdf) < threshold_sdf
@@ -546,14 +544,12 @@ function warp!(mesh::BlockMesh, max_iter::Int=160)
 end
 
 # ---------------------------------------------------
-# Funkce: Aktualizace topologie meshe (mesh.X, mesh.IEN, mesh.INE)
+# Function: Update mesh topology (mesh.X, mesh.IEN, mesh.INE)
 # ---------------------------------------------------
 function update_connectivity!(mesh::BlockMesh)
-  @info "Aktualizuji topologii meshe: cleanup, slučování duplicit a tvorba inverzní konektivity..."
-  cleanup_unused_nodes!(mesh)        # Přepočítá mesh.X, mesh.node_sdf a reindexuje mesh.IEN a mesh.node_map
-  merge_duplicate_nodes!(mesh)    # Sloučí duplicitní uzly a upraví konektivitu v mesh.IEN
-  create_INE!(mesh)                    # Vytvoří inverzní konektivitu (mesh.INE)
-  @info "Aktualizace topologie dokončena: $(length(mesh.X)) uzlů, $(length(mesh.IEN)) tetraedrů."
+  @info "Updating mesh topology: cleanup, merging duplicates and creating inverse connectivity..."
+  cleanup_unused_nodes!(mesh)        # Recalculates mesh.X, mesh.node_sdf and reindexes mesh.IEN and mesh.node_map
+  merge_duplicate_nodes!(mesh)       # Merges duplicate nodes and adjusts connectivity in mesh.IEN
+  create_INE!(mesh)                  # Creates inverse connectivity (mesh.INE)
+  @info "Topology update completed: $(length(mesh.X)) nodes, $(length(mesh.IEN)) tetrahedra."
 end
-
-
