@@ -1,77 +1,77 @@
-# Funkce pro kontrolu, zda bod leží na omezené rovině
+# Function to check if a point lies on a bounded plane
 function is_on_plane(plane::BoundedPlane, point::Vector{Float64}, tolerance::Float64=1e-10)
-    # Kontrola, zda bod leží v rovině
+    # Check if the point lies in the plane
     dist_to_plane = abs(dot(plane.normal, point - plane.point))
     if dist_to_plane > tolerance
         return false
     end
     
-    # Projekce bodu do souřadného systému roviny
+    # Project the point to the plane's coordinate system
     vec_to_point = point - plane.point
     
-    # Souřadnice bodu v rovině
+    # Coordinates of the point in the plane
     u_coord = dot(vec_to_point, plane.u)
     v_coord = dot(vec_to_point, plane.v)
     
-    # Kontrola, zda projektovaný bod leží v daném tvaru
+    # Check if the projected point lies within the specified shape
     return is_in_shape(plane.shape, u_coord, v_coord)
 end
 
-# Kontrola, zda bod (v souřadnicích roviny) leží v obdélníku
+# Check if a point (in plane coordinates) lies within a rectangle
 function is_in_shape(shape::Rectangle, u::Float64, v::Float64)
     return abs(u) <= shape.width/2 && abs(v) <= shape.height/2
 end
 
-# Kontrola, zda bod (v souřadnicích roviny) leží v kruhu
+# Check if a point (in plane coordinates) lies within a circle
 function is_in_shape(shape::Circle, u::Float64, v::Float64)
     return u^2 + v^2 <= shape.radius^2
 end
 
-# Kontrola, zda bod (v souřadnicích roviny) leží v elipse
+# Check if a point (in plane coordinates) lies within an ellipse
 function is_in_shape(shape::Ellipse, u::Float64, v::Float64)
     return (u/shape.a)^2 + (v/shape.b)^2 <= 1
 end
 
 function distance_to_bounded_plane(plane::BoundedPlane, point::Vector{Float32})
-    # Vektor z bodu roviny k aktuálnímu bodu
+    # Vector from the plane point to the current point
     vec_to_point = point - plane.point
     
-    # Výpočet dot produktu pro určení strany roviny
+    # Calculate dot product to determine which side of the plane
     dot_product = dot(plane.normal, vec_to_point)
     
-    # Vzdálenost k nekonečné rovině (absolutní hodnota pro kontroly)
+    # Distance to infinite plane (absolute value for checks)
     dist_to_infinite_plane = abs(dot_product)
     
-    # Projekce bodu na nekonečnou rovinu
+    # Project point onto the infinite plane
     projected_point = point - dot_product * plane.normal
     
-    # Kontrola, zda projektovaný bod leží v rámci omezené roviny
+    # Check if the projected point lies within the bounded plane
     if is_on_plane(plane, projected_point)
-        # Pokud projekce leží v omezené rovině, vrátíme vzdálenost k nekonečné rovině
-        # se znaménkem - záporné ve směru normály, kladné v opačném směru
+        # If the projection lies within the bounded plane, return distance to the infinite plane
+        # with sign - negative in normal direction, positive in opposite direction
         return dot_product > 0 ? -dist_to_infinite_plane : dist_to_infinite_plane
     else
-        # Pokud projekce neleží v omezené rovině, vrátíme vysokou hodnotu
-        # se zachováním správného znaménka
+        # If the projection is outside the bounded plane, return a high value
+        # while maintaining the correct sign
         return dot_product > 0 ? -1.0e10 : 1.0e10
     end
 end
 
-# Funkce pro vyhodnocení vzdálenosti bodu od rovin (planes_sdf)
+# Function to evaluate the distance of a point from planes (planes_sdf)
 function eval_planes_sdf(mesh::BlockMesh, p::SVector{3,Float64}, plane_definitions::Vector{PlaneDefinition})
-    # Vytvoříme omezené roviny z definic
+    # Create bounded planes from definitions
     planes = [BoundedPlane(def.normal, def.point, def.shape) for def in plane_definitions]
     
-    # Inicializace s vysokou kladnou hodnotou
+    # Initialize with a high positive value
     min_dist = 1.0e10
     
-    # Kontrola vzdálenosti ke každé rovině
+    # Check distance to each plane
     for plane in planes
-        # Převod na Vector{Float32} pro kompatibilitu s funkcí distance_to_bounded_plane
+        # Convert to Vector{Float32} for compatibility with the distance_to_bounded_plane function
         p_float32 = Vector{Float32}([p[1], p[2], p[3]])
         dist = distance_to_bounded_plane(plane, p_float32)
         
-        # Aktualizace minimální vzdálenosti (porovnáváme absolutní hodnoty)
+        # Update minimum distance (comparing absolute values)
         if abs(dist) < abs(min_dist)
             min_dist = dist
         end
@@ -80,13 +80,13 @@ function eval_planes_sdf(mesh::BlockMesh, p::SVector{3,Float64}, plane_definitio
     return min_dist
 end
 
-# Aproximace gradientu planes_sdf pro určení směru warpu
+# Approximate the gradient of planes_sdf to determine warp direction
 function approximate_planes_gradient(mesh::BlockMesh, p::SVector{3,Float64}, plane_definitions::Vector{PlaneDefinition}; h::Float64=1e-3)
     dx = SVector{3,Float64}(h, 0.0, 0.0)
     dy = SVector{3,Float64}(0.0, h, 0.0)
     dz = SVector{3,Float64}(0.0, 0.0, h)
     
-    # Výpočet parciálních derivací pomocí centrálních diferencí
+    # Calculate partial derivatives using central differences
     df_dx = (eval_planes_sdf(mesh, p + dx, plane_definitions) - eval_planes_sdf(mesh, p - dx, plane_definitions)) / (2 * h)
     df_dy = (eval_planes_sdf(mesh, p + dy, plane_definitions) - eval_planes_sdf(mesh, p - dy, plane_definitions)) / (2 * h)
     df_dz = (eval_planes_sdf(mesh, p + dz, plane_definitions) - eval_planes_sdf(mesh, p - dz, plane_definitions)) / (2 * h)
@@ -94,34 +94,34 @@ function approximate_planes_gradient(mesh::BlockMesh, p::SVector{3,Float64}, pla
     return SVector{3,Float64}(df_dx, df_dy, df_dz)
 end
 
-# Funkce pro posunutí uzlu na nulovou hladinu planes_sdf
+# Function to move a node to the zero level of planes_sdf
 function warp_node_to_planes_isocontour!(mesh::BlockMesh, node_index::Int, plane_definitions::Vector{PlaneDefinition}, max_iter::Int)
     tol = mesh.grid_tol
     current_position = mesh.X[node_index]
     
     for iter in 1:max_iter
-        # Vyhodnocení planes_sdf v aktuální pozici
+        # Evaluate planes_sdf at current position
         f = eval_planes_sdf(mesh, current_position, plane_definitions)
         
-        # Pokud jsme dostatečně blízko izopovrchu, končíme
+        # If we're close enough to the isosurface, end
         abs2(f) < tol * tol && break
         
-        # Výpočet gradientu pro směr posunu
+        # Calculate gradient for displacement direction
         grad = approximate_planes_gradient(mesh, current_position, plane_definitions)
         norm_grad_squared = sum(abs2, grad)
         
-        # Pokud je gradient příliš malý, končíme
+        # If gradient is too small, end
         norm_grad_squared < 1e-16 && break
         
-        # Newtonův krok
+        # Newton step
         dp = (f / norm_grad_squared) * grad
         current_position -= dp
     end
     
-    # Výpočet aktuální planes_sdf hodnoty po warping
+    # Calculate current planes_sdf value after warping
     current_sdf = eval_planes_sdf(mesh, current_position, plane_definitions)
     
-    # Aktualizace pozice uzlu a jeho SDF hodnoty
+    # Update node position and its SDF value
     mesh.X[node_index] = current_position
     if abs(current_sdf) < tol*2
         mesh.node_sdf[node_index] = 0.0
@@ -130,69 +130,69 @@ function warp_node_to_planes_isocontour!(mesh::BlockMesh, node_index::Int, plane
     end
 end
 
-# Hlavní funkce pro modifikaci sítě podle planes_sdf
-function warp_mesh_by_planes_sdf!(mesh::BlockMesh, plane_definitions::Vector{PlaneDefinition}; max_iter::Int=20)
-    # Kontrola, zda jsou předány nějaké definice rovin
+# Main function for modifying the mesh according to planes_sdf
+function warp_mesh_by_planes_sdf!(mesh::BlockMesh, plane_definitions::Vector{PlaneDefinition}, warp_param::Float64; max_iter::Int=20)
+    # Check if any plane definitions were provided
     if isempty(plane_definitions)
-        @info "Žádné definice rovin nebyly předány, přeskakuji warping podle rovin."
+        @info "No plane definitions provided, skipping plane-based warping."
         return
     end
     
-    # Vypočítat nejdelší hranu a následně threshold pro posun - stejná logika jako ve funkci warp!
+    # Calculate the longest edge and then the threshold for displacement - same logic as in the warp! function
     max_edge = longest_edge(mesh)
-    threshold_sdf = 0.3 * max_edge
+    threshold_sdf = warp_param * max_edge
     
     @info "Planes warping: max edge = $max_edge, threshold_sdf = $threshold_sdf"
     
-    # Příprava pro warp - najdeme uzly v blízkosti roviny (v obou směrech)
+    # Preparation for warping - find nodes near planes (in both directions)
     nodes_to_warp = Int[]
     for i in 1:length(mesh.X)
         plane_sdf = eval_planes_sdf(mesh, mesh.X[i], plane_definitions)
-        # Pokud je uzel dostatečně blízko roviny (z obou stran), přidáme ho k warpovým uzlům
+        # If the node is close enough to the plane (from both sides), add it to nodes to warp
         # if abs(plane_sdf) < threshold_sdf
         if plane_sdf < threshold_sdf    
             push!(nodes_to_warp, i)
         end
     end
     
-    @info "Nalezeno $(length(nodes_to_warp)) uzlů v blízkosti rovin k warpu"
+    @info "Found $(length(nodes_to_warp)) nodes near planes for warping"
     
-    # Warp uzlů v blízkosti roviny na nulovou hladinu
+    # Warp nodes near planes to the zero level
     for node_idx in nodes_to_warp
         warp_node_to_planes_isocontour!(mesh, node_idx, plane_definitions, max_iter)
     end
     
-    # Aktualizace topologie sítě
+    # Update mesh topology
     update_connectivity!(mesh)
     
-    # Odstranění elementů, které mají všechny uzly na nulové hladině nebo nemají alespoň jeden uzel s kladnou SDF
+    # Remove elements that have all nodes at the zero level or don't have at least one node with positive SDF
     new_IEN = Vector{Vector{Int64}}()
     for tet in mesh.IEN
-        # Získáme SDF hodnoty pro všechny uzly tetraedru
+        # Get SDF values for all nodes of the tetrahedron
         tet_sdf = [eval_planes_sdf(mesh, mesh.X[i], plane_definitions) for i in tet]
         
-        # Počet uzlů na nulové hladině
+        # Count nodes at zero level
         zero_nodes = count(x -> abs(x) < mesh.grid_tol, tet_sdf)
         
-        # Počet uzlů s kladnou SDF hodnotou
+        # Count nodes with positive SDF value
         pos_nodes = count(x -> x > 0, tet_sdf)
         
-        # Zachováme tetraedron pouze pokud:
-        # 1. Má alespoň jeden uzel s kladnou hodnotou (vzhledem k planes_sdf)
-        # 2. Nemá všechny uzly na nulové hladině
+        # Keep the tetrahedron only if:
+        # 1. It has at least one node with positive value (relative to planes_sdf)
+        # 2. It doesn't have all nodes at the zero level
         if pos_nodes > 0 && zero_nodes < 4
             push!(new_IEN, tet)
         end
     end
     
-    # Aktualizace konektivity
+    # Update connectivity
     mesh.IEN = new_IEN
-    @info "Po odstranění nevhodných elementů: $(length(mesh.IEN)) tetraedrů"
+    @info "After removing unsuitable elements: $(length(mesh.IEN)) tetrahedra"
     
-    # Finální aktualizace topologie
+    # Final topology update
     update_connectivity!(mesh)
     
-    @info "Úprava sítě podle planes_sdf dokončena"
+    @info "Mesh modification according to planes_sdf completed"
 end
 
 #TODO: Create a mesh trimming that will support element cutting and subsequent mesh optimization.
