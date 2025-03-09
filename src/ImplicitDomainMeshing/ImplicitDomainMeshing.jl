@@ -24,7 +24,7 @@ include("TetMeshVolume.jl")
 include("Utils/SliceMeshWithPlane.jl")
 
 # Main function for tetrahedral discretization:
-function GenerateTetMesh(fine_sdf::Array, fine_grid::Array, scheme::String, name::String, plane_definitions::Vector{PlaneDefinition}=PlaneDefinition[])
+function GenerateTetMesh(fine_sdf::Array, fine_grid::Array, scheme::String, name::String, warp_param::Float64, plane_definitions::Vector{PlaneDefinition}=PlaneDefinition[])
   mesh = BlockMesh(fine_sdf, fine_grid)
 
   # Choose scheme: "A15" or "Schlafli"
@@ -46,7 +46,7 @@ function GenerateTetMesh(fine_sdf::Array, fine_grid::Array, scheme::String, name
 
   # Apply cutting planes only if they are defined
   if !isempty(plane_definitions)
-    warp_mesh_by_planes_sdf!(mesh, plane_definitions)
+    warp_mesh_by_planes_sdf!(mesh, plane_definitions, warp_param)
     update_connectivity!(mesh)
     export_mesh_vtk(mesh, "$(name)_TriMesh_cut.vtu")
   end
