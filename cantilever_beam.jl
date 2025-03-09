@@ -55,8 +55,8 @@ plane_definitions = [
     PlaneDefinition([-1.0, 0.0, 0.0], [0.0, 10.0, 0.0], Square(30.)),
     PlaneDefinition([1.0, 0.0, 0.0], [60.0, 2.0, 2.0], Square(5.))
 ]
-
-tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName, warp_param = 0.3, plane_definitions)
+warp_param = 0.3
+tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName, warp_param, plane_definitions)
 
 slice_mesh_with_plane!(tetMesh, "x", 0.6, export_file="sliced_mesh.vtu")
 
