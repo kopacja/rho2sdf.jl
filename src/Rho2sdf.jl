@@ -1,5 +1,7 @@
 module Rho2sdf
 
+export MeshInformations
+
 using LinearAlgebra
 using Statistics
 using DelimitedFiles
