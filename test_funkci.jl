@@ -65,7 +65,7 @@ function calculate_mesh_volume_old(X::Vector{Vector{Float64}}, IEN::Vector{Vecto
   end
 
   println("Topology optimization domain volume: ", round(domain_volume, sigdigits=6))
-  print_data("Optimized shape volume: $(round(domain_volume, sigdigits=6))")
+  print_data("Optimized shape volume: $(round(TO_volume, sigdigits=6))")
   println("Volume fraction: ", round(TO_volume / domain_volume, sigdigits=6))
 
   return [domain_volume, (TO_volume / domain_volume)]
@@ -125,20 +125,20 @@ function calculate_mesh_volume(
   
     # Výpis výsledků
     println("Topology optimization domain volume: ", round(final_domain_volume, sigdigits=6))
-    print_data("Optimized shape volume: $(round(final_domain_volume, sigdigits=6))")
+    print_data("Optimized shape volume: $(round(final_TO_volume, sigdigits=6))")
     println("Volume fraction: ", round(final_TO_volume / final_domain_volume, sigdigits=6))
   
     return [final_domain_volume, (final_TO_volume / final_domain_volume)]
   end
   
-  taskName = "sphere"
-
-      N = 10  # Number of cells along the longest side
-      # ρₜ = 0.5 # Threshold density (isosurface level)
-      ## Read FEM mesh:
-    #   data = matread(taskName * ".mat")
-      data = matread("test/" * taskName * ".mat")
-      (X, IEN, rho) = MeshGrid.MeshInformations(data)
-
-      calculate_mesh_volume_old(X, IEN, rho)
-calculate_mesh_volume(X, IEN, rho)
+#   taskName = "sphere"
+#
+#       N = 10  # Number of cells along the longest side
+#       # ρₜ = 0.5 # Threshold density (isosurface level)
+#       ## Read FEM mesh:
+#     #   data = matread(taskName * ".mat")
+#       data = matread("test/" * taskName * ".mat")
+#       (X, IEN, rho) = MeshGrid.MeshInformations(data)
+#
+#       calculate_mesh_volume_old(X, IEN, rho)
+# calculate_mesh_volume(X, IEN, rho)
