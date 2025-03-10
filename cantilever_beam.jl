@@ -48,7 +48,7 @@ B = round(sdf_grid.cell_size, digits=4)
 Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF_B-" * string(B) * ".vtk", sdf_grid, sdf_dists, "distance")
 
 # RBF smoothing:
-(fine_sdf, fine_grid) = RBFs_smoothing(sdf_dists, sdf_grid, false, 1, taskName) # interpolation == true, aproximation == false, smooth
+(fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, false, 1, taskName) # interpolation == true, aproximation == false, smooth
 
 # Definice rovin
 plane_definitions = [

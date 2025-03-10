@@ -42,7 +42,7 @@ B = round(sdf_grid.cell_size, digits=4)
 Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF_B-" * string(B) * ".vtk", sdf_grid, sdf_dists, "distance")
 
 # RBF smoothing:
-RBFs_smoothing(sdf_dists, sdf_grid, false, 2, taskName) # interpolation == true, aproximation == false, smooth
+RBFs_smoothing(mesh, sdf_dists, sdf_grid, false, 2, taskName) # interpolation == true, aproximation == false, smooth
 
 @save "Z_$(taskName)_cele_SDF_B-$(B).jld2" sdf_dists
 @save "Z_$(taskName)_cele_Grid_B-$(B).jld2" sdf_grid
