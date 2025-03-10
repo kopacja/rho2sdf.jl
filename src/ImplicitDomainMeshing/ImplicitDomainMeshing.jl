@@ -7,6 +7,7 @@ using StaticArrays
 using LinearAlgebra
 using Random
 using WriteVTK
+using Printf
 
 include("CuttingPlaneTypes.jl")
 include("A15_scheme.jl")
@@ -40,6 +41,7 @@ function GenerateTetMesh(fine_sdf::Array, fine_grid::Array, scheme::String, name
 
   adjust_nodes_to_isosurface!(mesh) # Simple cut of elements to follow the isocontour
 
+  TetMesh_volumes(mesh)
   optimize_mesh!(mesh)
 
   export_mesh_vtk(mesh, "$(name)_TriMesh.vtu")
