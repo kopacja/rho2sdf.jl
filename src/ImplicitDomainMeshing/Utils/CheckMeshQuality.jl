@@ -1,3 +1,14 @@
+using LinearAlgebra
+using Statistics
+using StaticArrays
+using CairoMakie
+
+"""
+    compute_quality_metrics!(mesh::BlockMesh)
+
+Computes geometric quality metrics for each tetrahedron in the mesh. 
+Returns statistics for aspect ratio, dihedral angles, and shape quality.
+"""
 function compute_quality_metrics!(mesh::BlockMesh)
     # Pre-allocate arrays for metrics
     aspect_ratios = Float64[]
@@ -58,6 +69,12 @@ function compute_quality_metrics!(mesh::BlockMesh)
     )
 end
 
+"""
+    check_inverted_elements(mesh::BlockMesh)
+
+Identifies inverted tetrahedral elements by checking for negative Jacobian determinants.
+Returns a list of indices of inverted elements.
+"""
 function check_inverted_elements(mesh::BlockMesh)
     inverted_elements = Int[]
     
@@ -76,6 +93,13 @@ function check_inverted_elements(mesh::BlockMesh)
     return inverted_elements
 end
 
+"""
+    check_boundary_integrity(mesh::BlockMesh)
+
+Checks the topological integrity of the mesh boundary by identifying boundary faces
+and verifying that the boundary is watertight (closed).
+Returns a dictionary with boundary information.
+"""
 function check_boundary_integrity(mesh::BlockMesh)
     # Extract all triangular faces (each face appears once or twice)
     faces = Dict{Set{Int}, Vector{Int}}()
@@ -120,209 +144,98 @@ function check_boundary_integrity(mesh::BlockMesh)
     )
 end
 
-function check_non_manifold_vertices(mesh::BlockMesh)
-    # For each vertex, get all boundary faces containing it
-    vertex_boundary_faces = [Set() for _ in 1:length(mesh.X)]
+"""
+    check_element_orientation_consistency(mesh::BlockMesh)
+
+Checks the orientation consistency of mesh elements by verifying that
+for each interior face shared by two tetrahedra, the 4th vertices of both
+tetrahedra lie on opposite sides of the face.
+
+Returns a list of inconsistently oriented element pairs.
+"""
+function check_element_orientation_consistency(mesh::BlockMesh)
+    # Create a dictionary mapping faces to their parent tetrahedra
+    faces_to_tets = Dict{Set{Int}, Vector{Int}}()
     
-    # First, identify boundary faces
-    faces = Dict{Set{Int}, Vector{Int}}()
-    for (elem_idx, tet) in enumerate(mesh.IEN)
+    # Populate the dictionary
+    for (tet_idx, tet) in enumerate(mesh.IEN)
+        # For each face in the tetrahedron
         for face in [(tet[1], tet[2], tet[3]), 
-                    (tet[1], tet[2], tet[4]), 
-                    (tet[1], tet[3], tet[4]), 
-                    (tet[2], tet[3], tet[4])]
+                     (tet[1], tet[2], tet[4]), 
+                     (tet[1], tet[3], tet[4]), 
+                     (tet[2], tet[3], tet[4])]
             face_set = Set(face)
-            if haskey(faces, face_set)
-                push!(faces[face_set], elem_idx)
+            if haskey(faces_to_tets, face_set)
+                push!(faces_to_tets[face_set], tet_idx)
             else
-                faces[face_set] = [elem_idx]
+                faces_to_tets[face_set] = [tet_idx]
             end
         end
     end
     
-    # Boundary faces appear exactly once
-    boundary_faces = [face for (face, elems) in faces if length(elems) == 1]
+    # List to store inconsistent orientations
+    inconsistent_orientations = Vector{Tuple{Int, Int, Set{Int}}}()
     
-    # For each boundary face, add it to the corresponding vertex sets
-    for face in boundary_faces
-        for vertex in face
-            push!(vertex_boundary_faces[vertex], face)
+    # Check orientation consistency for each interior face
+    for (face_set, tet_indices) in faces_to_tets
+        # Skip boundary faces (belong to only one tetrahedron)
+        if length(tet_indices) != 2
+            continue
+        end
+        
+        # Get the two tetrahedra sharing this face
+        tet1_idx, tet2_idx = tet_indices
+        tet1 = mesh.IEN[tet1_idx]
+        tet2 = mesh.IEN[tet2_idx]
+        
+        # Identify vertices of the face
+        face_verts = collect(face_set)
+        
+        # Find the vertices that are not part of the face
+        tet1_opposite_vertex = setdiff(tet1, face_verts)[1]
+        tet2_opposite_vertex = setdiff(tet2, face_verts)[1]
+        
+        # Get coordinates of vertices
+        face_coords = [mesh.X[v] for v in face_verts]
+        tet1_opposite_coords = mesh.X[tet1_opposite_vertex]
+        tet2_opposite_coords = mesh.X[tet2_opposite_vertex]
+        
+        # Calculate face normal (using first three vertices)
+        edge1 = face_coords[2] - face_coords[1]
+        edge2 = face_coords[3] - face_coords[1]
+        face_normal = normalize(cross(edge1, edge2))
+        
+        # Vectors from a face vertex to opposite vertices
+        vec_to_tet1_opposite = tet1_opposite_coords - face_coords[1]
+        vec_to_tet2_opposite = tet2_opposite_coords - face_coords[1]
+        
+        # Check if the opposite vertices are on opposite sides of the face
+        dot_product1 = dot(face_normal, vec_to_tet1_opposite)
+        dot_product2 = dot(face_normal, vec_to_tet2_opposite)
+        
+        # If dot products have the same sign, the orientation is inconsistent
+        if dot_product1 * dot_product2 > 0
+            push!(inconsistent_orientations, (tet1_idx, tet2_idx, face_set))
         end
     end
     
-    # Check if the boundary faces at each vertex form a single, connected ring
-    non_manifold_vertices = Int[]
-    
-    for (idx, faces) in enumerate(vertex_boundary_faces)
-        isempty(faces) && continue  # Skip interior vertices
-        
-        # A vertex is non-manifold if its star is not a topological disk
-        # This is a simplified check - a complete check needs more complex topology analysis
-        edges = Set()
-        for face in faces
-            face_vec = collect(face)
-            for i in 1:3
-                if face_vec[i] == idx
-                    edge = Set([face_vec[mod1(i+1, 3)], face_vec[mod1(i+2, 3)]])
-                    if edge in edges
-                        edges = setdiff(edges, [edge])
-                    else
-                        push!(edges, edge)
-                    end
-                end
-            end
-        end
-        
-        if !isempty(edges)
-            push!(non_manifold_vertices, idx)
-        end
-    end
-    
-    return non_manifold_vertices
+    return inconsistent_orientations
 end
 
-function export_quality_metrics_vtk(mesh::BlockMesh, filename::String)
-    # Compute per-element quality metrics
-    aspect_ratios = Float64[]
-    dihedral_angles = Float64[]
-    shape_qualities = Float64[]
-    
-    for tet in mesh.IEN
-        # Implement quality metrics as in compute_quality_metrics function
-        # ... (calculation code)
-        
-        push!(aspect_ratios, aspect_ratio)
-        push!(dihedral_angles, minimum(dihedral_angles))
-        push!(shape_qualities, mean_ratio)
-    end
-    
-    # Export the mesh with quality metrics as cell data
-    npoints = length(mesh.X)
-    points = zeros(Float64, 3, npoints)
-    for i in 1:npoints
-        points[:, i] = mesh.X[i]
-    end
-    
-    cells = [MeshCell(VTKCellTypes.VTK_TETRA, tet) for tet in mesh.IEN]
-    vtkfile = vtk_grid(filename, points, cells)
-    
-    # Add quality metrics as cell data
-    vtk_cell_data(vtkfile, aspect_ratios, "aspect_ratio")
-    vtk_cell_data(vtkfile, dihedral_angles, "min_dihedral_angle")
-    vtk_cell_data(vtkfile, shape_qualities, "shape_quality")
-    
-    # Add SDF values as point data
-    vtk_point_data(vtkfile, mesh.node_sdf, "sdf")
-    
-    vtk_save(vtkfile)
-end
+"""
+    verify_mesh_intersections(mesh::BlockMesh)
 
+Performs a comprehensive check for element intersections using a three-phase approach:
+1. Topological phase: Build adjacency graphs
+2. Spatial phase: Filter potential collisions using AABBs
+3. Geometric phase: Precise intersection testing
 
-function assess_mesh_quality(mesh::BlockMesh, output_prefix::String)
-    # Calculate geometric quality metrics
-    quality_metrics = compute_quality_metrics!(mesh)
-    
-    # Check for inverted elements
-    inverted = check_inverted_elements(mesh)
-    
-    # Check topological integrity
-    boundary_check = check_boundary_integrity(mesh)
-    non_manifold_check = check_non_manifold_vertices(mesh)
-    
-    # Export mesh with quality metrics for visualization
-    # export_quality_metrics_vtk(mesh, "$(output_prefix)_quality.vtu")
-    
-    # Print summary report
-    println("Mesh Quality Assessment Report")
-    println("=============================")
-    println("Total elements: $(length(mesh.IEN))")
-    println("Total nodes: $(length(mesh.X))")
-    println()
-    
-    println("Geometric Quality:")
-    println("  Aspect ratio: range [$(quality_metrics["aspect_ratio"].minimum), $(quality_metrics["aspect_ratio"].maximum)], mean $(quality_metrics["aspect_ratio"].mean)")
-    println("  Min dihedral angle: range [$(quality_metrics["min_dihedral_angle"].minimum), $(quality_metrics["min_dihedral_angle"].maximum)], mean $(quality_metrics["min_dihedral_angle"].mean)")
-    println("  Shape quality: range [$(quality_metrics["shape_quality"].minimum), $(quality_metrics["shape_quality"].maximum)], mean $(quality_metrics["shape_quality"].mean)")
-    println()
-    
-    println("Element Validity:")
-    println("  Inverted elements: $(length(inverted))")
-    if !isempty(inverted)
-        println("  First 5 inverted elements: $(inverted[1:min(5, length(inverted))])")
-    end
-    println()
-    
-    println("Topological Integrity:")
-    println("  Boundary faces: $(boundary_check["boundary_faces"])")
-    println("  Watertight boundary: $(boundary_check["is_closed"])")
-    println("  Non-manifold vertices: $(length(non_manifold_check))")
-    println()
-    
-    # Return comprehensive results
-    return Dict(
-        "quality_metrics" => quality_metrics,
-        "inverted_elements" => inverted,
-        "boundary_check" => boundary_check,
-        "non_manifold_vertices" => non_manifold_check
-    )
-end
-
-assess_mesh_quality(mesh, "IS-simple")
-
-
-#_____________________________________
-
-function edge_triangle_intersection(edge_start, edge_end, tri_verts)
-    # Směrový vektor hrany
-    edge_dir = edge_end - edge_start
-    
-    # Normála trojúhelníku
-    tri_normal = normalize(cross(tri_verts[2] - tri_verts[1], tri_verts[3] - tri_verts[1]))
-    
-    # Kontrola, zda hrana protíná rovinu trojúhelníku
-    denom = dot(tri_normal, edge_dir)
-    
-    # Hrany rovnoběžné s rovinou ignorujeme
-    if abs(denom) < 1e-10
-        return false
-    end
-    
-    # Parametr průsečíku hrany s rovinou
-    t = dot(tri_normal, tri_verts[1] - edge_start) / denom
-    
-    # Průsečík musí ležet na hraně
-    if t < 0 || t > 1
-        return false
-    end
-    
-    # Průsečík s rovinou
-    intersection = edge_start + t * edge_dir
-    
-    # Kontrola, zda průsečík leží uvnitř trojúhelníku (barycentrické souřadnice)
-    v0 = tri_verts[3] - tri_verts[1]
-    v1 = tri_verts[2] - tri_verts[1]
-    v2 = intersection - tri_verts[1]
-    
-    # Skalární součiny pro barycentrické souřadnice
-    dot00 = dot(v0, v0)
-    dot01 = dot(v0, v1)
-    dot02 = dot(v0, v2)
-    dot11 = dot(v1, v1)
-    dot12 = dot(v1, v2)
-    
-    # Barycentrické souřadnice
-    inv_denom = 1.0 / (dot00 * dot11 - dot01 * dot01)
-    u = (dot11 * dot02 - dot01 * dot12) * inv_denom
-    v = (dot00 * dot12 - dot01 * dot02) * inv_denom
-    
-    # Test, zda je průsečík uvnitř trojúhelníku
-    return (u >= 0) && (v >= 0) && (u + v <= 1)
-end
-
+Returns detailed statistics and lists of problematic elements.
+"""
 function verify_mesh_intersections(mesh::BlockMesh)
-    @info "Verifikace integrity sítě - kontrola průniků elementů..."
+    @info "Verifying mesh integrity - checking for element intersections..."
     
-    # Výstupní statistiky
+    # Output statistics
     stats = Dict(
         "tested_pairs" => 0,
         "intersecting_pairs" => 0,
@@ -332,18 +245,18 @@ function verify_mesh_intersections(mesh::BlockMesh)
         "time_geometric" => 0.0
     )
     
-    # 1. Topologická fáze - sestavení grafu sousednosti
+    # 1. Topological phase - build adjacency graphs
     time_start = time()
     
-    # Vytvoření slovníku hran - klíč: dvojice vrcholů, hodnota: seznam elementů
+    # Create dictionary of edges - key: pair of vertices, value: list of elements
     edges_to_tets = Dict{Set{Int}, Vector{Int}}()
-    # Vytvoření slovníku stěn - klíč: trojice vrcholů, hodnota: seznam elementů
+    # Create dictionary of faces - key: triplet of vertices, value: list of elements
     faces_to_tets = Dict{Set{Int}, Vector{Int}}()
-    # Vytvoření množiny uzlů pro každý element
+    # Create set of nodes for each element
     tet_vertices = [Set(tet) for tet in mesh.IEN]
     
     for (tet_idx, tet) in enumerate(mesh.IEN)
-        # Registrace všech hran tetraedru
+        # Register all edges of the tetrahedron
         for i in 1:4
             for j in (i+1):4
                 edge = Set([tet[i], tet[j]])
@@ -355,7 +268,7 @@ function verify_mesh_intersections(mesh::BlockMesh)
             end
         end
         
-        # Registrace všech stěn tetraedru
+        # Register all faces of the tetrahedron
         faces = [
             Set([tet[1], tet[2], tet[3]]),
             Set([tet[1], tet[2], tet[4]]),
@@ -372,19 +285,19 @@ function verify_mesh_intersections(mesh::BlockMesh)
         end
     end
     
-    # Kontrola, zda nějaká stěna patří více než dvěma tetraedrům (topologická nevalidita)
+    # Check if any face belongs to more than two tetrahedra (topological invalidity)
     invalid_faces = filter(pair -> length(pair.second) > 2, faces_to_tets)
     
     if !isempty(invalid_faces)
         stats["invalid_topology"] = length(invalid_faces)
-        @warn "Nalezeno $(length(invalid_faces)) stěn sdílených více než dvěma tetraedry!"
+        @warn "Found $(length(invalid_faces)) faces shared by more than two tetrahedra!"
     end
     
-    # Vytvoření seznamu elementů, které sdílí nějaký vrchol (potenciálně by se mohly protínat)
-    # Pro každý element si uložíme množinu elementů, které s ním sdílí alespoň jeden vrchol
+    # Create list of elements that share any vertex (potential intersections)
+    # For each element, store a set of elements that share at least one vertex
     vertex_sharing_elements = [Set{Int}() for _ in 1:length(mesh.IEN)]
     
-    # Pro každý vrchol si uložíme seznam elementů, které ho obsahují
+    # For each vertex, store a list of elements that contain it
     vertex_to_tets = [Vector{Int}() for _ in 1:length(mesh.X)]
     for (tet_idx, tet) in enumerate(mesh.IEN)
         for v in tet
@@ -392,7 +305,7 @@ function verify_mesh_intersections(mesh::BlockMesh)
         end
     end
     
-    # Pro každý element najdeme elementy, které s ním sdílí vrcholy
+    # For each element, find elements that share vertices with it
     for (tet_idx, tet) in enumerate(mesh.IEN)
         for v in tet
             for other_tet in vertex_to_tets[v]
@@ -403,7 +316,7 @@ function verify_mesh_intersections(mesh::BlockMesh)
         end
     end
     
-    # Vytvoření grafu sousednosti (elementy sdílející stěnu)
+    # Create adjacency graph (elements sharing a face)
     neighbors = [Set{Int}() for _ in 1:length(mesh.IEN)]
     
     for (_, tets) in faces_to_tets
@@ -415,10 +328,10 @@ function verify_mesh_intersections(mesh::BlockMesh)
     
     stats["time_topology"] = time() - time_start
     
-    # 2. Prostorová fáze - filtrování kandidátů pro detailní testy
+    # 2. Spatial phase - filtering candidates for detailed tests
     time_start = time()
     
-    # Výpočet AABB (axis-aligned bounding box) pro každý tetraedr
+    # Calculate AABB (axis-aligned bounding box) for each tetrahedron
     tet_aabbs = Vector{Tuple{SVector{3,Float64}, SVector{3,Float64}}}(undef, length(mesh.IEN))
     
     for (tet_idx, tet) in enumerate(mesh.IEN)
@@ -436,34 +349,34 @@ function verify_mesh_intersections(mesh::BlockMesh)
         tet_aabbs[tet_idx] = (min_point, max_point)
     end
     
-    # Funkce pro kontrolu průniku dvou AABB
+    # Function to check intersection of two AABBs
     function aabb_intersect(box1, box2)
-        # Použijeme menší toleranci, abychom eliminovali false positives
+        # Use smaller tolerance to eliminate false positives
         tol = mesh.grid_tol * 0.1
         return all(box1[1][i] - tol <= box2[2][i] && box1[2][i] + tol >= box2[1][i] for i in 1:3)
     end
     
-    # Vytvoření seznamu potenciálních kolizí
-    # Tetraedry musí: 
-    # 1. Nebýt sousedy (nesdílet stěnu)
-    # 2. Jejich AABB se musí protínat
-    # 3. Nesmí sdílet hranu nebo vrchol (to je legitimní pro sousedící tetraedry)
+    # Create list of potential collisions
+    # Tetrahedra must: 
+    # 1. Not be neighbors (not share a face)
+    # 2. Their AABBs must intersect
+    # 3. Must not share an edge or vertex (legitimate for adjacent tetrahedra)
     potential_collisions = Vector{Tuple{Int,Int}}()
     
     for i in 1:length(mesh.IEN)
-        # Kontrolujeme pouze s většími indexy (vyhnutí se duplicitám)
+        # Check only with larger indices (to avoid duplicates)
         for j in (i+1):length(mesh.IEN)
-            # Přeskočím sousedy (sdílející stěnu)
+            # Skip neighbors (sharing a face)
             if j in neighbors[i]
                 continue
             end
             
-            # Přeskočím elementy sdílející jakýkoliv vrchol (to je v pořádku)
+            # Skip elements sharing any vertex (which is acceptable)
             if j in vertex_sharing_elements[i]
                 continue
             end
             
-            # Kontrola průniku AABB
+            # Check for AABB intersection
             if aabb_intersect(tet_aabbs[i], tet_aabbs[j])
                 push!(potential_collisions, (i, j))
             end
@@ -474,31 +387,31 @@ function verify_mesh_intersections(mesh::BlockMesh)
     
     stats["time_spatial"] = time() - time_start
     
-    # 3. Geometrická fáze - přesná kontrola průniků
+    # 3. Geometric phase - precise intersection checks
     time_start = time()
     
-    # Seznam skutečných průniků
+    # List of actual intersections
     intersections = Vector{Tuple{Int,Int}}()
     
-    # Funkce pro výpočet objemu tetraedru
+    # Function to compute tetrahedron volume
     function tetrahedron_volume(vertices)
         return abs(dot(cross(vertices[2]-vertices[1], vertices[3]-vertices[1]), vertices[4]-vertices[1])) / 6.0
     end
     
-    # Vylepšená funkce pro test, zda bod leží uvnitř tetraedru
+    # Improved function to test if a point is inside a tetrahedron
     function robust_point_in_tetrahedron(point, vertices)
-        # Použití robustnější metody založené na znaménku objemů podtetraedrů
-        # Tento přístup je méně náchylný na numerické chyby
+        # Using more robust method based on sign of subtetrahedra volumes
+        # This approach is less susceptible to numerical errors
         
-        # Objem celého tetraedru
+        # Volume of the entire tetrahedron
         vol_total = tetrahedron_volume(vertices)
         
-        # Je-li celkový objem téměř nulový, tetraedr je degenerovaný
+        # If total volume is almost zero, tetrahedron is degenerate
         if vol_total < 1e-12
             return false
         end
         
-        # Objem tetraedrů vytvořených bodem a třemi vrcholy původního tetraedru
+        # Volume of tetrahedra created by the point and three vertices of the original tetrahedron
         sub_vols = [
             tetrahedron_volume([point, vertices[2], vertices[3], vertices[4]]),
             tetrahedron_volume([vertices[1], point, vertices[3], vertices[4]]),
@@ -506,23 +419,23 @@ function verify_mesh_intersections(mesh::BlockMesh)
             tetrahedron_volume([vertices[1], vertices[2], vertices[3], point])
         ]
         
-        # Bod je uvnitř tetraedru, pokud je součet objemů podtetraedrů roven objemu celého tetraedru
-        # Použijeme relativní test kvůli numerickým chybám
+        # Point is inside the tetrahedron if sum of subtetrahedra volumes equals volume of entire tetrahedron
+        # Use relative test due to numerical errors
         sum_vol = sum(sub_vols)
         is_inside = abs(sum_vol - vol_total) < 1e-9 * vol_total
         
         return is_inside
     end
     
-    # Kontrola skutečných geometrických průniků mezi nesousedícími elementy
+    # Check for actual geometric intersections between non-adjacent elements
     for (i, j) in potential_collisions
         tet_i = [mesh.X[v] for v in mesh.IEN[i]]
         tet_j = [mesh.X[v] for v in mesh.IEN[j]]
         
-        # Kontrola, zda některý vrchol jednoho tetraedru leží striktně uvnitř druhého
+        # Check if any vertex of one tetrahedron lies strictly inside the other
         intersection_found = false
         
-        # Kontrola vrcholů prvního tetraedru vůči druhému
+        # Check vertices of first tetrahedron against second
         for v in tet_i
             if robust_point_in_tetrahedron(v, tet_j)
                 intersection_found = true
@@ -530,7 +443,7 @@ function verify_mesh_intersections(mesh::BlockMesh)
             end
         end
         
-        # Kontrola vrcholů druhého tetraedru vůči prvnímu
+        # Check vertices of second tetrahedron against first
         if !intersection_found
             for v in tet_j
                 if robust_point_in_tetrahedron(v, tet_i)
@@ -540,7 +453,7 @@ function verify_mesh_intersections(mesh::BlockMesh)
             end
         end
         
-        # Pokud byl nalezen průnik, zaznamenáme ho
+        # If intersection found, record it
         if intersection_found
             push!(intersections, (i, j))
         end
@@ -549,15 +462,15 @@ function verify_mesh_intersections(mesh::BlockMesh)
     stats["intersecting_pairs"] = length(intersections)
     stats["time_geometric"] = time() - time_start
     
-    # Výsledky kontroly
+    # Results of check
     if isempty(intersections) && stats["invalid_topology"] == 0
-        @info "Kontrola integrity sítě dokončena: Žádné průniky elementů nebyly nalezeny."
+        @info "Mesh integrity check completed: No element intersections found."
     else
-        @warn "Nalezeno $(length(intersections)) párů protínajících se tetraedrů!"
-        @warn "Nalezeno $(stats["invalid_topology"]) topologických nevalidit!"
+        @warn "Found $(length(intersections)) pairs of intersecting tetrahedra!"
+        @warn "Found $(stats["invalid_topology"]) topological invalidities!"
     end
     
-    # Příprava výstupu s detaily průniků pro vizualizaci
+    # Prepare output with intersection details for visualization
     detailed_result = Dict(
         "stats" => stats,
         "intersections" => intersections,
@@ -567,51 +480,229 @@ function verify_mesh_intersections(mesh::BlockMesh)
     return detailed_result
 end
 
-intersection_data = verify_mesh_intersections(mesh)
+"""
+    compute_all_dihedral_angles(mesh::BlockMesh)
 
-function export_intersection_visualization(mesh::BlockMesh, intersection_data, filename::String)
-    # Extrakce problematických elementů
-    problem_elements = Set{Int}()
+Computes all interior dihedral angles for every tetrahedron in the mesh.
+Returns a vector containing all angles in degrees.
+The interior dihedral angle is the angle between two adjacent faces measured 
+inside the tetrahedron (ideal angle in a regular tetrahedron is ~70.53°).
+"""
+function compute_all_dihedral_angles(mesh::BlockMesh)
+    all_angles = Float64[]
     
-    # Přidání protínajících se tetraedrů
-    for (i, j) in intersection_data["intersections"]
-        push!(problem_elements, i)
-        push!(problem_elements, j)
-    end
-    
-    # Přidání tetraedrů s nevalidní topologií
-    for face in intersection_data["invalid_faces"]
-        face_tets = faces_to_tets[face]
-        for tet_idx in face_tets
-            push!(problem_elements, tet_idx)
+    for tet in mesh.IEN
+        # Get node coordinates for this tetrahedron
+        vertices = [mesh.X[i] for i in tet]
+        
+        # Compute face normals (outward facing)
+        face_normals = [
+            normalize(cross(vertices[2]-vertices[1], vertices[3]-vertices[1])),
+            normalize(cross(vertices[2]-vertices[1], vertices[4]-vertices[1])),
+            normalize(cross(vertices[3]-vertices[1], vertices[4]-vertices[1])),
+            normalize(cross(vertices[3]-vertices[2], vertices[4]-vertices[2]))
+        ]
+        
+        # For a tetrahedron, we need to ensure normals are consistently outward-facing
+        # We'll check if the normal points away from the opposite vertex
+        opposite_vertices = [
+            vertices[4],  # opposite to face 1-2-3
+            vertices[3],  # opposite to face 1-2-4
+            vertices[2],  # opposite to face 1-3-4
+            vertices[1]   # opposite to face 2-3-4
+        ]
+        
+        # Ensure normals point outward (away from the tetrahedron)
+        for i in 1:4
+            face_center = (vertices[setdiff(1:4, [i])[1]] + 
+                         vertices[setdiff(1:4, [i])[2]] + 
+                         vertices[setdiff(1:4, [i])[3]]) / 3
+            
+            vector_to_opposite = opposite_vertices[i] - face_center
+            
+            # If normal points inward, flip it
+            if dot(face_normals[i], vector_to_opposite) > 0
+                face_normals[i] = -face_normals[i]
+            end
         end
+        
+        # Compute interior dihedral angles (the angle between faces inside the tetrahedron)
+        # For interior angles, we use (π - angle between outward normals)
+        # Equivalently: acos(-dot(normal1, normal2))
+        tet_angles = [acos(-clamp(dot(face_normals[i], face_normals[j]), -1.0, 1.0)) * 180/π 
+                      for i in 1:3 for j in i+1:4]
+        
+        append!(all_angles, tet_angles)
     end
     
-    # Vytvoření elementového pole pro vizualizaci (1 = problém, 0 = OK)
-    element_status = zeros(Int, length(mesh.IEN))
-    for elem_idx in problem_elements
-        element_status[elem_idx] = 1
-    end
-    
-    # Export do VTK
-    npoints = length(mesh.X)
-    points = zeros(Float64, 3, npoints)
-    for i in 1:npoints
-        points[:, i] = mesh.X[i]
-    end
-    
-    cells = [MeshCell(VTKCellTypes.VTK_TETRA, tet) for tet in mesh.IEN]
-    vtkfile = vtk_grid(filename, points, cells)
-    
-    # Přidání statusu elementů
-    vtk_cell_data(vtkfile, element_status, "problem_element")
-    
-    # Přidání SDF hodnot
-    vtk_point_data(vtkfile, mesh.node_sdf, "sdf")
-    
-    vtk_save(vtkfile)
-    
-    @info "Vizualizace průniků exportována do: $filename"
+    return all_angles
 end
 
-export_intersection_visualization(mesh, intersection_data, "průniky")
+"""
+    plot_dihedral_angles_histogram(angles::Vector{Float64}, output_path::String)
+
+Creates a histogram of dihedral angles using the Makie library.
+Highlights critical angle thresholds and saves the plot to the specified output path.
+"""
+function plot_dihedral_angles_histogram(angles::Vector{Float64}, output_path::String)
+    fig = Figure(size=(800, 600))
+    ax = Axis(fig[1, 1], 
+              xlabel = "Interior Dihedral Angle (degrees)",
+              ylabel = "Frequency",
+              title = "Histogram of Interior Dihedral Angles")
+    
+    # Create histogram
+    hist!(ax, angles, bins=50, color=:skyblue, strokewidth=1, strokecolor=:black)
+    
+    # Add vertical lines for critical and ideal angles
+    vlines!(ax, [10], color=:red, linestyle=:dash, linewidth=2, label="10° (critical low)")
+    vlines!(ax, [30], color=:orange, linestyle=:dash, linewidth=2, label="30° (warning low)")
+    vlines!(ax, [70.53], color=:green, linestyle=:solid, linewidth=2, label="70.53° (ideal)")
+    vlines!(ax, [150], color=:orange, linestyle=:dash, linewidth=2, label="150° (warning high)")
+    vlines!(ax, [170], color=:red, linestyle=:dash, linewidth=2, label="170° (critical high)")
+    
+    # Add statistics
+    angle_stats = [
+        "Min: $(round(minimum(angles), digits=2))°",
+        "Max: $(round(maximum(angles), digits=2))°",
+        "Mean: $(round(mean(angles), digits=2))°",
+        "Median: $(round(median(angles), digits=2))°"
+    ]
+    
+    critical_low_count = count(θ -> θ < 10, angles)
+    warning_low_count = count(θ -> θ >= 10 && θ < 30, angles)
+    warning_high_count = count(θ -> θ > 150 && θ <= 170, angles)
+    critical_high_count = count(θ -> θ > 170, angles)
+    
+    push!(angle_stats, "Critical low angles (<10°): $critical_low_count")
+    push!(angle_stats, "Warning low angles (10°-30°): $warning_low_count")
+    push!(angle_stats, "Warning high angles (150°-170°): $warning_high_count")
+    push!(angle_stats, "Critical high angles (>170°): $critical_high_count")
+    
+    # Add statistics text box
+    text!(ax, 90, 0.9*maximum(ax.finallimits.val.origin[2] + ax.finallimits.val.widths[2]), 
+          text=join(angle_stats, "\n"),
+          align=(:center, :top),
+          fontsize=12,
+          color=:black,
+          space=:data)
+    
+    axislegend(ax, position=:rt)
+    
+    # Save the figure
+    save(output_path, fig)
+    
+    return fig
+end
+
+"""
+    assess_mesh_quality(mesh::BlockMesh, output_prefix::String)
+
+Main function that assesses mesh quality using multiple checks:
+- Geometric quality metrics
+- Element validity (inverted elements)
+- Boundary integrity
+- Element orientation consistency
+- Element intersections
+- Dihedral angle distribution (with histogram visualization)
+
+Returns a comprehensive report and detailed results for further analysis.
+"""
+function assess_mesh_quality(mesh::BlockMesh, output_prefix::String)
+    # Calculate geometric quality metrics
+    quality_metrics = compute_quality_metrics!(mesh)
+    
+    # Check for inverted elements
+    inverted = check_inverted_elements(mesh)
+    
+    # Check topological integrity
+    boundary_check = check_boundary_integrity(mesh)
+    
+    # Check element orientation consistency
+    orientation_check = check_element_orientation_consistency(mesh)
+    
+    # Check for element intersections
+    intersection_check = verify_mesh_intersections(mesh)
+    
+    # Compute all dihedral angles and plot histogram
+    all_angles = compute_all_dihedral_angles(mesh)
+    plot_dihedral_angles_histogram(all_angles, "$(output_prefix)_dihedral_angles.png")
+    
+    # Calculate angle statistics
+    critical_low_count = count(θ -> θ < 10, all_angles)
+    warning_low_count = count(θ -> θ >= 10 && θ < 30, all_angles)
+    warning_high_count = count(θ -> θ > 150 && θ <= 170, all_angles)
+    critical_high_count = count(θ -> θ > 170, all_angles)
+    
+    total_critical = critical_low_count + critical_high_count
+    total_warning = warning_low_count + warning_high_count
+    
+    percent_critical = round(100 * total_critical / length(all_angles), digits=2)
+    percent_warning = round(100 * total_warning / length(all_angles), digits=2)
+    
+    # Calculate deviation from ideal angle
+    ideal_angle = 70.53 # degrees
+    angles_near_ideal = count(θ -> abs(θ - ideal_angle) < 5, all_angles)
+    percent_near_ideal = round(100 * angles_near_ideal / length(all_angles), digits=2)
+    
+    # Print summary report
+    println("Mesh Quality Assessment Report")
+    println("=============================")
+    println("Total elements: $(length(mesh.IEN))")
+    println("Total nodes: $(length(mesh.X))")
+    println()
+    
+    println("Geometric Quality:")
+    println("  Aspect ratio: range [$(quality_metrics["aspect_ratio"].minimum), $(quality_metrics["aspect_ratio"].maximum)], mean $(quality_metrics["aspect_ratio"].mean)")
+    println("  Min dihedral angle: range [$(quality_metrics["min_dihedral_angle"].minimum), $(quality_metrics["min_dihedral_angle"].maximum)], mean $(quality_metrics["min_dihedral_angle"].mean)")
+    println("  Shape quality: range [$(quality_metrics["shape_quality"].minimum), $(quality_metrics["shape_quality"].maximum)], mean $(quality_metrics["shape_quality"].mean)")
+    println()
+    
+    println("Dihedral Angle Analysis:")
+    println("  Total angles: $(length(all_angles))")
+    println("  Critical low angles (<10°): $critical_low_count")
+    println("  Warning low angles (10°-30°): $warning_low_count")
+    println("  Warning high angles (150°-170°): $warning_high_count")
+    println("  Critical high angles (>170°): $critical_high_count")
+    println("  Total critical angles: $total_critical ($percent_critical%)")
+    println("  Total warning angles: $total_warning ($percent_warning%)")
+    println("  Angles near ideal (65.53°-75.53°): $angles_near_ideal ($percent_near_ideal%)")
+    println("  Histogram saved to: $(output_prefix)_dihedral_angles.png")
+    println()
+    
+    println("Element Validity:")
+    println("  Inverted elements: $(length(inverted))")
+    if !isempty(inverted)
+        println("  First 5 inverted elements: $(inverted[1:min(5, length(inverted))])")
+    end
+    println()
+    
+    println("Topological Integrity:")
+    println("  Boundary faces: $(boundary_check["boundary_faces"])")
+    println("  Watertight boundary: $(boundary_check["is_closed"])")
+    println("  Elements with inconsistent orientation: $(length(orientation_check))")
+    println("  Intersecting element pairs: $(intersection_check["stats"]["intersecting_pairs"])")
+    println()
+    
+    # Return comprehensive results
+    return Dict(
+        "quality_metrics" => quality_metrics,
+        "inverted_elements" => inverted,
+        "boundary_check" => boundary_check,
+        "orientation_check" => orientation_check,
+        "intersection_check" => intersection_check,
+        "dihedral_angles" => all_angles,
+        "angle_statistics" => Dict(
+            "critical_low_count" => critical_low_count,
+            "warning_low_count" => warning_low_count,
+            "warning_high_count" => warning_high_count,
+            "critical_high_count" => critical_high_count,
+            "total_critical" => total_critical,
+            "total_warning" => total_warning,
+            "percent_critical" => percent_critical,
+            "percent_warning" => percent_warning,
+            "angles_near_ideal" => angles_near_ideal,
+            "percent_near_ideal" => percent_near_ideal
+        )
+    )
+end
