@@ -5,6 +5,8 @@ using Rho2sdf.MeshGrid
 using Rho2sdf.SignedDistances
 using Rho2sdf.DataExport
 using Rho2sdf.SdfSmoothing
+using Rho2sdf.ImplicitDomainMeshing
+using Rho2sdf.Visualizations
 using MAT
 using JLD2
 using LinearAlgebra
@@ -42,10 +44,14 @@ B = round(sdf_grid.cell_size, digits=4)
 Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF_B-" * string(B) * ".vtk", sdf_grid, sdf_dists, "distance")
 
 # RBF smoothing:
-RBFs_smoothing(mesh, sdf_dists, sdf_grid, false, 2, taskName) # interpolation == true, aproximation == false, smooth
+(fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, false, 1, taskName) # interpolation == true, aproximation == false, smooth
 
 @save "Z_$(taskName)_cele_SDF_B-$(B).jld2" sdf_dists
 @save "Z_$(taskName)_cele_Grid_B-$(B).jld2" sdf_grid
 @save "Z_$(taskName)_cele_Points_B-$(B).jld2" points
 @save "Z_$(taskName)_cele_Mesh_B-$(B).jld2" mesh
 
+# Generate tet mesh
+tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName)
+
+# assess_mesh_quality(tetMesh, taskName)

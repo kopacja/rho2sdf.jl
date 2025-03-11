@@ -7,6 +7,7 @@ using Rho2sdf.MeshGrid
 using Rho2sdf.SignedDistances
 using Rho2sdf.DataExport
 using Rho2sdf.SdfSmoothing
+using Rho2sdf.ImplicitDomainMeshing
 using Rho2sdf.Visualizations
 using MAT
 using JLD2
@@ -45,8 +46,12 @@ sdf_dists = dists .* signs
 Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF.vtk", sdf_grid, sdf_dists, "distance")
 
 # RBF smoothing:
-fine_LSF = RBFs_smoothing(sdf_dists, sdf_grid, false, 2, taskName) # interpolation == true, aproximation == false, smooth
+(fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, false, 1, taskName) # interpolation == true, aproximation == false, smooth
 
 fig = visualize_stable_isosurface(fine_LSF)
 display(fig)
 
+# Generate tet mesh
+tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName, warp_param, plane_definitions)
+
+assess_mesh_quality(tetMesh, taskName)

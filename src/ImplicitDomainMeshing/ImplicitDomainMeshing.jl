@@ -1,6 +1,6 @@
 module ImplicitDomainMeshing
 
-export GenerateTetMesh, PlaneDefinition, Rectangle, Square, Circle, Ellipse, slice_mesh_with_plane!
+export GenerateTetMesh, PlaneDefinition, Rectangle, Square, Circle, Ellipse, slice_mesh_with_plane!, assess_mesh_quality
  
 using Statistics
 using StaticArrays
@@ -23,14 +23,17 @@ include("ModifyResultingMesh.jl")
 include("TetMeshVolume.jl")
 # Slice mesh with place (for visualization mesh quality)
 include("Utils/SliceMeshWithPlane.jl")
+# Check mesh quality & plot histogram of dihedral angles
+include("Utils/CheckMeshQuality.jl")
 
 # Main function for tetrahedral discretization:
-function GenerateTetMesh(fine_sdf::Array, fine_grid::Array, scheme::String, name::String, warp_param::Float64, plane_definitions::Vector{PlaneDefinition}=PlaneDefinition[])
+function GenerateTetMesh(fine_sdf::Array, fine_grid::Array, scheme::String, name::String, warp_param::Union{Float64, Nothing}=nothing, plane_definitions::Vector{PlaneDefinition}=PlaneDefinition[])
   mesh = BlockMesh(fine_sdf, fine_grid)
 
   # Choose scheme: "A15" or "Schlafli"
   generate_mesh!(mesh, scheme)
 
+  # assess_mesh_quality(mesh, "initial_mesh")
   warp!(mesh) # Warp nearest nodes to the isocontour
 
   update_connectivity!(mesh) # Update mesh topology

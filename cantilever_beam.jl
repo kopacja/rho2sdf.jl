@@ -56,10 +56,13 @@ plane_definitions = [
     PlaneDefinition([1.0, 0.0, 0.0], [60.0, 2.0, 2.0], Square(5.))
 ]
 warp_param = 0.3
+
+# Generate tet mesh
 tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName, warp_param, plane_definitions)
 
 slice_mesh_with_plane!(tetMesh, "x", 0.6, export_file="sliced_mesh.vtu")
 
+assess_mesh_quality(tetMesh, taskName)
 # @save "Z_$(taskName)_cele_SDF_B-$(B).jld2" sdf_dists
 # @save "Z_$(taskName)_cele_Grid_B-$(B).jld2" sdf_grid
 # @save "Z_$(taskName)_cele_Points_B-$(B).jld2" points
