@@ -64,202 +64,6 @@ function WriteValue(
 end
 
 
-function compute_coords(
-  x::Vector,
-  ρₜ::Float64,
-  Xₑ::Matrix,
-  ρₑ::Vector,
-  # starting_points::Vector{Tuple{Float64, Float64, Float64}}
-)
-  starting_points = [
-    (0.0, 0.0, 0.0),
-    # (-0.5, -0.5, -0.5),
-    # (0.5, -0.5, -0.5),
-    # (0.5, 0.5, -0.5),
-    # (-0.5, 0.5, -0.5),
-    # (-0.5, -0.5, 0.5),
-    # (0.5, -0.5, 0.5),
-    # (0.5, 0.5, 0.5),
-    # (-0.5, 0.5, 0.5),
-  ]
-
-  best_solution = nothing
-  best_objective = Inf
-
-  for (ξ₁_start, ξ₂_start, ξ₃_start) in starting_points
-    model = Model(Ipopt.Optimizer)
-    set_silent(model)
-
-    set_optimizer_attribute(model, "tol", 1e-6)
-    set_optimizer_attribute(model, "max_iter", 50)
-    set_optimizer_attribute(model, "acceptable_tol", 1e-6)
-
-    @variable(model, ξ₁, lower_bound = -1.0, upper_bound = 1.0, start = ξ₁_start)
-    @variable(model, ξ₂, lower_bound = -1.0, upper_bound = 1.0, start = ξ₂_start)
-    @variable(model, ξ₃, lower_bound = -1.0, upper_bound = 1.0, start = ξ₃_start)
-
-    N8 = [
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
-    ]
-    @NLobjective(model, Min, sum((x[i] - sum(Xₑ[i, k] * N8[k] for k in 1:length(N8)))^2 for i in 1:length(x)))
-    @NLconstraint(model, sum(ρₑ[k] * N8[k] for k in 1:length(N8)) == ρₜ)
-    JuMP.optimize!(model)
-
-    current_objective = objective_value(model)
-    current_solution = value.([ξ₁, ξ₂, ξ₃])
-
-    if current_objective < best_objective
-      best_solution = current_solution
-      best_objective = current_objective
-    end
-  end
-
-  return best_solution
-end
-
-
-function find_local_coordinates(
-  sfce::Function,
-  Xₑ,
-  xₙ
-)
-  starting_points::Vector{Tuple{Float64,Float64,Float64}} = [
-    (0.0, 0.0, 0.0),
-    (-0.5, -0.5, -0.5),
-    (0.5, -0.5, -0.5),
-    (0.5, 0.5, -0.5),
-    (-0.5, 0.5, -0.5),
-    (-0.5, -0.5, 0.5),
-    (0.5, -0.5, 0.5),
-    (0.5, 0.5, 0.5),
-    (-0.5, 0.5, 0.5)
-  ]
-
-  function objective(ξ::Vector, grad::Vector)
-    ξ₁, ξ₂, ξ₃ = ξ
-
-    # Compute N(ξ)
-    N = [
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
-      1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
-      1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
-      -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
-    ]
-
-    d¹N_dξ¹ = zeros(Float64, 8, 3)
-    d¹N_dξ¹[1, :] = [
-      -0.125 * (ξ₂ - 1) * (ξ₃ - 1)
-      -0.125 * (ξ₁ - 1) * (ξ₃ - 1)
-      -0.125 * (ξ₁ - 1) * (ξ₂ - 1)
-    ]
-
-    d¹N_dξ¹[2, :] = [
-      0.125 * (ξ₂ - 1) * (ξ₃ - 1)
-      0.125 * (ξ₁ + 1) * (ξ₃ - 1)
-      0.125 * (ξ₁ + 1) * (ξ₂ - 1)
-    ]
-
-    d¹N_dξ¹[3, :] = [
-      -0.125 * (ξ₂ + 1) * (ξ₃ - 1)
-      -0.125 * (ξ₁ + 1) * (ξ₃ - 1)
-      -0.125 * (ξ₁ + 1) * (ξ₂ + 1)
-    ]
-
-    d¹N_dξ¹[4, :] = [
-      0.125 * (ξ₂ + 1) * (ξ₃ - 1)
-      0.125 * (ξ₁ - 1) * (ξ₃ - 1)
-      0.125 * (ξ₁ - 1) * (ξ₂ + 1)
-    ]
-
-    d¹N_dξ¹[5, :] = [
-      0.125 * (ξ₂ - 1) * (ξ₃ + 1)
-      0.125 * (ξ₁ - 1) * (ξ₃ + 1)
-      0.125 * (ξ₁ - 1) * (ξ₂ - 1)
-    ]
-
-    d¹N_dξ¹[6, :] = [
-      -0.125 * (ξ₂ - 1) * (ξ₃ + 1)
-      -0.125 * (ξ₁ + 1) * (ξ₃ + 1)
-      -0.125 * (ξ₁ + 1) * (ξ₂ - 1)
-    ]
-
-    d¹N_dξ¹[7, :] = [
-      0.125 * (ξ₂ + 1) * (ξ₃ + 1)
-      0.125 * (ξ₁ + 1) * (ξ₃ + 1)
-      0.125 * (ξ₁ + 1) * (ξ₂ + 1)
-    ]
-
-    d¹N_dξ¹[8, :] = [
-      -0.125 * (ξ₂ + 1) * (ξ₃ + 1)
-      -0.125 * (ξ₁ - 1) * (ξ₃ + 1)
-      -0.125 * (ξ₁ - 1) * (ξ₂ + 1)
-    ]
-
-    # Compute x(ξ)
-    x = Xₑ * N  # x is a 3-element vector
-
-    # Compute residual R = x - xₙ
-    R = x - xₙ  # R is a 3-element vector
-
-    # Compute objective function value f
-    f = dot(R, R)  # Equivalent to sum(R[i]^2 for i in 1:3)
-
-    if length(grad) > 0
-      # Compute the derivatives of N with respect to ξ
-      dN_dξ = zeros(Float64, 8, 3)  # 8 shape functions x 3 variables
-
-      # Assign your computed derivatives to dN_dξ
-      dN_dξ .= d¹N_dξ¹  # Ensure dN_dξ is correctly populated
-
-      # Compute Jacobian J = Xₑ * dN_dξ
-      J = Xₑ * dN_dξ  # J is 3x3
-
-      # Compute gradient grad = 2 * Jᵗ * R
-      grad .= 2 * (J' * R)
-    end
-
-    return f
-  end
-
-  best_solution = nothing
-  best_objective = Inf
-
-  for start_point in starting_points
-    #   opt = Opt(:LN_COBYLA, 3)
-    opt = Opt(:LD_LBFGS, 3)
-    opt.lower_bounds = [-5.0, -5.0, -5.0]
-    opt.upper_bounds = [5.0, 5.0, 5.0]
-    opt.xtol_rel = 1e-6
-    opt.maxeval = 500
-    opt.min_objective = objective
-    opt.maxtime = 1.0
-
-    (minf, minx, ret) = NLopt.optimize(opt, collect(start_point))
-
-    if minf < best_objective
-      best_objective = minf
-      best_solution = minx
-    end
-  end
-
-  if best_solution === nothing
-    return (false, [10.0, 10.0, 10.0])
-  else
-    return (true, best_solution)
-  end
-end
-
 
 # Function to create AABB from a set of points
 function compute_aabb(points::SubArray)
@@ -294,12 +98,12 @@ function IsProjectedOnFullSegment(
   tid::Int,
   x::Vector,
 )
-  (_, local_coords) = find_local_coordinates(sfce, Xₑ, xₚ)
+  (_, local_coords) = find_local_coordinates(Xₑ, xₚ)
   max_local = maximum(local_coords)
   min_local = minimum(local_coords)
 
   if max_local < 1.001 && min_local > -1.001
-    H, _, _, _ = sfce(local_coords) # shape functions and their derivatives
+    H = sfce(local_coords) # shape functions and their derivatives
     ρₑ = view(ρₙ, IEN[:, el]) # view for better performance
     ρ = H ⋅ ρₑ
 
@@ -340,7 +144,9 @@ function evalDistances(
   points::Matrix,
   ρₙ::Vector{Float64},
   ρₜ::Float64,
-)
+) 
+
+  print_info("\nComputing distace function...")
 
   linkedList = MeshGrid.LinkedList(grid, points) # pro rychlé vyhledávání
 
@@ -587,8 +393,8 @@ function evalDistances(
 
             Ξ = zeros(Float64, 3)   # local coordinates
 
-            Ξ = compute_coords(x, ρₜ, Xₑ, ρₑ)
-            H, _, _, _ = sfce(Ξ)
+            Ξ = compute_coords_on_iso(x, ρₜ, Xₑ, ρₑ)
+            H = sfce(Ξ)
             xₚ = Xₑ * H
             dist_tmp = norm(x - xₚ)
 
@@ -617,21 +423,23 @@ function evalDistances(
   end
 
   #NOTE: This part is used for checking distance function:
-  
+
   # Xg, Xp, mean_PD, max_PD = SelectProjectedNodes(mesh, grid, xp, points)
   # # println("mean of projected distance: ", mean_PD)
   # # println("maximum projected distance: ", max_PD)
+  #
+  # taskName = "block"
   #
   # nnp = size(Xg, 1)
   #
   # IEN = [[i; i + nnp] for i = 1:nnp]
   # X = vec([Xg Xp])
   #
-  # Rho2sdf.exportToVTU("lines.vtu", X, IEN, 3)
+  # Rho2sdf.exportToVTU("lines_$(taskName).vtu", X, IEN, 3)
   #
   # IEN = [[i] for i = 1:nnp]
-  # Rho2sdf.exportToVTU("Xg.vtu", Xg, IEN, 1)
-  # Rho2sdf.exportToVTU("Xp.vtu", Xp, IEN, 1)
+  # Rho2sdf.exportToVTU("Xg_$(taskName).vtu", Xg, IEN, 1)
+  # Rho2sdf.exportToVTU("Xp_$(taskName).vtu", Xp, IEN, 1)
 
   dist = abs.(dist)
 

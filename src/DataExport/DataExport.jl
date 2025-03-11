@@ -1,16 +1,16 @@
 module DataExport
    
-# export exportToVTU
-# export exportStructuredPointsToVTK
-export SelectProjectedNodes, exportToVTU, exportStructuredPointsToVTK
+export SelectProjectedNodes, exportToVTU, exportStructuredPointsToVTK, InputDataToVTU
 
 using Statistics
 using LinearAlgebra
+using WriteVTK
 using Rho2sdf
 using Rho2sdf.MeshGrid
 
 include("DataPostProcess.jl")
 include("ExportToVTU.jl")
 include("ExportToVTK.jl")
+include("InputDataToVTU.jl")
 
 end

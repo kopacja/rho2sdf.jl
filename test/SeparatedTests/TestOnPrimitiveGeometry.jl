@@ -22,7 +22,7 @@ taskName = "block"
 (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("block", [9,1,1])
 # (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 9)
 
-mesh = MeshGrid.Mesh(X, IEN, C3D8_SFaD)
+mesh = MeshGrid.Mesh(X, IEN, hex8_shape)
 ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
 
 ## Grid:

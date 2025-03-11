@@ -29,7 +29,7 @@ mutable struct NodalCoordinatesInElement{T<:Array}
     y::T
     z::T
 end
-function NodePosition3D(mesh::Mesh)
+function NodePosition3D(mesh::AbstractMesh)
     table = size(mesh.IEN)
     EN_x = zeros(Float64, table) #počet ele = počet Gausspointů
     EN_y = zeros(Float64, table)
@@ -53,7 +53,7 @@ end
 
 
 # Geometric centres of elements (GPs for first order elements)
-function GeometricCentre(mesh::Mesh, EN::NodalCoordinatesInElement)
+function GeometricCentre(mesh::AbstractMesh, EN::NodalCoordinatesInElement)
     Centre = zeros(mesh.nel, length(mesh.X[:, 1]))
     for i = 1:mesh.nel
         G_x = mean(EN.x[:, i]) # G_x = dot(EN_x[:, i], N)
@@ -170,10 +170,10 @@ function LamReduction(λ::Vector)
             lam = λ[4:length(λ)]
         end
     else
-        println("Problem with eigenvalues")
-        println("The ratio between the first and last eigenvalue: ", ε₁, "  allowed ratio: ", εₘ₁)
-        println("The ratio between the second and last eigenvalue: ", ε₂, "  allowed ratio: ", εₘ₂)
-        println("-> compute mean instead :(")
+        # println("Problem with eigenvalues")
+        # println("The ratio between the first and last eigenvalue: ", ε₁, "  allowed ratio: ", εₘ₁)
+        # println("The ratio between the second and last eigenvalue: ", ε₂, "  allowed ratio: ", εₘ₂)
+        # println("-> compute mean instead :(")
     end
     return lam
 end

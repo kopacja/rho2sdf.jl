@@ -128,28 +128,45 @@ function rbf_interpolation_kdtree(fine_grid::Array, coarse_grid::Array, weights_
 end
 
 # Adjust the level-set function to maintain the volume fraction (V_frac)
-function LS_Threshold(s_mat, V_frac::Float64, Exp::Int)
+function LS_Thresholdd(sdf::Array, grid::Array, mesh::Mesh, Exp::Int)
+  # Calculate target volume from mesh properties
+  target_volume = mesh.V_frac * mesh.V_domain
+    
+  # Initialize threshold search variables
   eps = 1.0
-  th_low, th_high = minimum(s_mat), maximum(s_mat)
+  th_low, th_high = minimum(sdf), maximum(sdf)
   n = 0
   th = 0.0
-
+    
+  # Setup arrays for volume calculation with calculate_volume_from_sdf
+  dim = size(sdf)
+  shifted_sdf = Array{Float32,3}(undef, dim)
+    
+  # Binary search to find the threshold that gives the desired volume
   while n < 40 && eps > 10.0^(-Exp)
     th = (th_low + th_high) / 2
-    volume = mean(s_mat .>= th)
-    eps = abs(V_frac - volume)
+    
+    # Convert the level set to SDF format for volume calculation
+    shifted_sdf .= sdf .- th
+   
+    # Calculate current volume using the SDF function
+    current_volume = calculate_volume_from_sdf(shifted_sdf, grid)
 
-    if volume > V_frac
+    println(current_volume)
+      
+    # Adjust threshold based on calculated volume
+    eps = abs(target_volume - current_volume)
+    if current_volume > target_volume
       th_low = th
     else
       th_high = th
     end
-
     n += 1
   end
-
+    
   return -th
 end
+
 
 # Convert 3D array back to vector
 function array_to_vector(arr::Array{T,3}) where {T}
@@ -165,6 +182,7 @@ end
 
 # Main function to perform RBF interpolation or approximation:
 function RBFs_smoothing(
+  mesh::Mesh,
   dist::Vector,
   my_grid::Grid,
   Is_interpolation::Bool,
@@ -203,7 +221,8 @@ function RBFs_smoothing(
 
   println("Computing the LSF zero level to meet the volume condition...")
   @time LSF = rbf_interpolation_kdtree(coarse_grid, coarse_grid, weights, kernel)
-  th = LS_Threshold(LSF, V_frac, 4)
+  LSF_array = vector_to_array(LSF, my_grid.N .+ 1) # data modification: vector -> array
+  th = LS_Thresholdd(LSF_array, coarse_grid, mesh, 4)
 
   println("Computing $name on the fine grid...")
   @time fine_LSF = rbf_interpolation_kdtree(fine_grid, coarse_grid, weights, kernel)
@@ -216,12 +235,13 @@ function RBFs_smoothing(
 
   fine_LSF_offset_array = vector_to_array(fine_LSF_offset, dim)
 
-  # Save SDF data to HDF5 file
-  h5open(taskName * "_" * name * "_SDF_B-" * string(B) * ".h5", "w") do file
-    write(file, "/SDF", fine_LSF_offset_array)
-    write(file, "/dx", step)
-    write(file, "/dy", step)
-    write(file, "/dz", step)
-    write(file, "/origin", Float32.(my_grid.AABB_min))
-  end
+  fine_sdf = fine_LSF_offset_array
+
+  @save "Z_$(taskName)_FineSDF_B-$(B)_smooth-$(smooth).jld2" fine_sdf
+  @save "Z_$(taskName)_FineGrid_B-$(B)_smooth-$(smooth).jld2" fine_grid
+
+  current_volume = calculate_volume_from_sdf(fine_sdf, fine_grid)
+  @info "Body volume at SDF zero level: $current_volume (target: $(round(mesh.V_frac * mesh.V_domain, digits=4)))"
+
+  return fine_sdf, fine_grid
 end

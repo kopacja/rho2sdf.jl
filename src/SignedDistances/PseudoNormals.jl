@@ -58,7 +58,7 @@ end
 
 ## Main Function: computePseudoNormals ##
 # Computation of pseudo normals for both edges and vertices in a mesh.
-function computePseudoNormals(mesh::Mesh)
+function computePseudoNormals(mesh::TriangularMesh)
     edgesPseudoNormals = computeEdgePseudoNormals(mesh)
     verticesPseudoNormals = computeVertexPseudoNormals(mesh)
     return verticesPseudoNormals, edgesPseudoNormals

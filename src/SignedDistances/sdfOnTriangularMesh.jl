@@ -52,7 +52,7 @@ end
 
 
   
-function evalSignedDistancesOnTriangularMesh(mesh::Mesh, grid::Grid)
+function evalSignedDistancesOnTriangularMesh(mesh::TriangularMesh, grid::Grid)
 
     points = MeshGrid.generateGridPoints(grid)
     linkedList = MeshGrid.LinkedList(grid, points)

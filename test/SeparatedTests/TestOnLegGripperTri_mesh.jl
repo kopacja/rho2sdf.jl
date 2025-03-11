@@ -23,7 +23,7 @@ using JLD
     (X, IEN, rho) = MeshGrid.MeshInformations(data)
 
     # input data propertis (mesh, density)
-    mesh = MeshGrid.Mesh(X, IEN, C3D8_SFaD)
+    mesh = MeshGrid.Mesh(X, IEN, hex8_shape)
     (mesh, rho) = MeshGrid.PartOfModel(mesh, rho, part_name)
     # rho = MeshGrid.ModiffElementalDensities(mesh, rho) # change density along the object
 

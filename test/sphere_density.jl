@@ -45,7 +45,7 @@ function generate_sphere_density(N::Int64, radius::Float64, cell_size::Float64)
 
         for (weight, point) ∈ zip(weights_3D, points_3D)
             Ξ = collect(point)
-            H, d¹N_dξ¹, d²N_dξ², d³N_dξ³ = Rho2sdf.sfce(Ξ)
+            H = Rho2sdf.sfce(Ξ)
             x_g = Xₑ * H
             if(norm(x_g - [N, N, N]./2) < radius)
                 sdf_density[i]  += weight[1]*weight[2]*weight[3] / 8
