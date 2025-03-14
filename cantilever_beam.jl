@@ -31,8 +31,8 @@ points = MeshGrid.generateGridPoints(sdf_grid) # uzly pravidelné mřížky
 
 ## Map elemental densities to the nodes:
 ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
-# ρₜ = find_threshold_for_volume(mesh, ρₙ)
-ρₜ = 0.5
+ρₜ = find_threshold_for_volume(mesh, ρₙ)
+# ρₜ = 0.5
 
 VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
 Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
@@ -47,8 +47,10 @@ sdf_dists = dists .* signs
 B = round(sdf_grid.cell_size, digits=4)
 Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF_B-" * string(B) * ".vtk", sdf_grid, sdf_dists, "distance")
 
+smooth = 2
+interp = true
 # RBF smoothing:
-(fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, false, 1, taskName) # interpolation == true, aproximation == false, smooth
+(fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, interp, smooth, taskName) # interpolation == true, aproximation == false, smooth
 
 # Definice rovin
 plane_definitions = [
@@ -58,11 +60,12 @@ plane_definitions = [
 warp_param = 0.3
 
 # Generate tet mesh
-tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName, warp_param, plane_definitions)
+taskName_modif = taskName * "_smooth_" * string(smooth) * "_" * (interp ? "Interpolation" : "Approximation")
+tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName_modif, warp_param, plane_definitions)
 
-slice_mesh_with_plane!(tetMesh, "x", 0.6, export_file="sliced_mesh.vtu")
+# slice_mesh_with_plane!(tetMesh, "x", 0.6, export_file="sliced_mesh.vtu")
 
-assess_mesh_quality(tetMesh, taskName)
+# assess_mesh_quality(tetMesh, taskName)
 # @save "Z_$(taskName)_cele_SDF_B-$(B).jld2" sdf_dists
 # @save "Z_$(taskName)_cele_Grid_B-$(B).jld2" sdf_grid
 # @save "Z_$(taskName)_cele_Points_B-$(B).jld2" points
