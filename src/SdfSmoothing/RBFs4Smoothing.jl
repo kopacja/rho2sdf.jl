@@ -238,8 +238,8 @@ function RBFs_smoothing(
 
   fine_sdf = fine_LSF_offset_array
 
-  @save "Z_$(taskName)_FineSDF_B-$(B)_smooth-$(smooth).jld2" fine_sdf
-  @save "Z_$(taskName)_FineGrid_B-$(B)_smooth-$(smooth).jld2" fine_grid
+  @save "Z_$(taskName)_FineSDF_B-$(B)_smooth-$(smooth)_$(name).jld2" fine_sdf
+  @save "Z_$(taskName)_FineGrid_B-$(B)_smooth-$(smooth)_$(name).jld2" fine_grid
 
   current_volume = calculate_volume_from_sdf(fine_sdf, fine_grid)
   @info "Body volume at SDF zero level: $current_volume (target: $(round(mesh.V_frac * mesh.V_domain, digits=4)))"
