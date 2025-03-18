@@ -144,7 +144,7 @@ function warp_mesh_by_planes_sdf!(mesh::BlockMesh, plane_definitions::Vector{Pla
     
     @info "Planes warping: max edge = $max_edge, threshold_sdf = $threshold_sdf"
     
-    # Preparation for warping - find nodes near planes (in both directions)
+    # Preparation for warping - find nodes near planes (in one direction)
     nodes_to_warp = Int[]
     for i in 1:length(mesh.X)
         plane_sdf = eval_planes_sdf(mesh, mesh.X[i], plane_definitions)
