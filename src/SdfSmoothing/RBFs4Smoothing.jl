@@ -231,14 +231,15 @@ function RBFs_smoothing(
   fine_LSF_offset = fine_LSF .+ th
 
   B = round(my_grid.cell_size, digits=4)
-  Rho2sdf.exportStructuredPointsToVTK(taskName * "_smooth_B-" * string(B) * "_" * name * ".vtk", my_grid, fine_LSF_offset, "distance", smooth)
+  # Rho2sdf.exportStructuredPointsToVTK(taskName * "_smooth_B-" * string(B) * "_" * "_smooth-"$(smooth) * name * ".vtk", my_grid, fine_LSF_offset, "distance", smooth)
+  Rho2sdf.exportStructuredPointsToVTK("$(taskName)_B-$(B)_smooth-$(smooth)_$(name).vtk", my_grid, fine_LSF_offset, "distance", smooth)
 
   fine_LSF_offset_array = vector_to_array(fine_LSF_offset, dim)
 
   fine_sdf = fine_LSF_offset_array
 
-  @save "Z_$(taskName)_FineSDF_B-$(B)_smooth-$(smooth).jld2" fine_sdf
-  @save "Z_$(taskName)_FineGrid_B-$(B)_smooth-$(smooth).jld2" fine_grid
+  @save "Z_$(taskName)_FineSDF_B-$(B)_smooth-$(smooth)_$(name).jld2" fine_sdf
+  @save "Z_$(taskName)_FineGrid_B-$(B)_smooth-$(smooth)_$(name).jld2" fine_grid
 
   current_volume = calculate_volume_from_sdf(fine_sdf, fine_grid)
   @info "Body volume at SDF zero level: $current_volume (target: $(round(mesh.V_frac * mesh.V_domain, digits=4)))"

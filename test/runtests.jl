@@ -9,7 +9,6 @@ using Rho2sdf.MeshGrid
 using Rho2sdf.SignedDistances
 using Rho2sdf.DataExport
 using Rho2sdf.SdfSmoothing
-using Rho2sdf.ImplicitDomainMeshing
 using MAT
 using JLD2
 using LinearAlgebra
@@ -37,8 +36,8 @@ using BenchmarkTools
 
   RUN_PLANE = false
   RUN_BLOCK = true
-  RUN_SPHERE = false
-  RUN_CHAPADLO = false
+  RUN_SPHERE = true
+  RUN_CHAPADLO = true
   RUN_CHAPADLO_cele = false
 
   if (RUN_PLANE)
@@ -86,11 +85,11 @@ using BenchmarkTools
       ## Export to VTK:
       Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF.vtk", sdf_grid, sdf_dists, "distance")
 
-      @save "Z_$(taskName)_xp.jld2" xp
-      @save "Z_$(taskName)_Mesh.jld2" mesh
-      @save "Z_$(taskName)_Grid.jld2" sdf_grid
-      @save "Z_$(taskName)_Points.jld2" points
-      @save "Z_$(taskName)_SDF.jld2" sdf_dists
+      # @save "Z_$(taskName)_xp.jld2" xp
+      # @save "Z_$(taskName)_Mesh.jld2" mesh
+      # @save "Z_$(taskName)_Grid.jld2" sdf_grid
+      # @save "Z_$(taskName)_Points.jld2" points
+      # @save "Z_$(taskName)_SDF.jld2" sdf_dists
 
     end
   end
@@ -132,11 +131,7 @@ using BenchmarkTools
 
       # RBF smoothing:
       (fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, false, 1, taskName) # interpolation == true, aproximation == false, smooth
-      
-      # Generate tet mesh
-      tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName) # Choose scheme: "A15" or "Schlafli"
-      assess_mesh_quality(tetMesh, taskName)
-
+     
       # fig = visualize_stable_isosurface(fine_LSF)
       # display(fig)
 
@@ -191,15 +186,11 @@ using BenchmarkTools
       # RBF smoothing:
       (fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, false, 1, taskName) # interpolation == true, aproximation == false, smooth
 
-      # Generate tet mesh
-      tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName) # Choose scheme: "A15" or "Schlafli"
-      assess_mesh_quality(tetMesh, taskName)
-
       # @save "Z_$(taskName)_xp.jld2" xp
       # @save "Z_$(taskName)_Mesh.jld2" mesh
-      @save "Z_$(taskName)_Grid.jld2" sdf_grid
+      # @save "Z_$(taskName)_Grid.jld2" sdf_grid
       # @save "Z_$(taskName)_Points.jld2" points
-      @save "Z_$(taskName)_SDF.jld2" sdf_dists
+      # @save "Z_$(taskName)_SDF.jld2" sdf_dists
       # @save "Z_$(taskName)_rho.jld2" ρₙ
 
     end
@@ -247,16 +238,12 @@ using BenchmarkTools
       # RBF smoothing:
       (fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, false, 1, taskName) # interpolation == true, aproximation == false, smooth
       
-      # Generate tet mesh
-      tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName) # Choose scheme: "A15" or "Schlafli"
-      assess_mesh_quality(tetMesh, taskName)
-
-      @save "Z_$(taskName)_xp.jld2" xp
-      @save "Z_$(taskName)_Mesh.jld2" mesh
-      @save "Z_$(taskName)_Grid.jld2" sdf_grid
-      @save "Z_$(taskName)_Points.jld2" points
-      @save "Z_$(taskName)_SDF.jld2" sdf_dists
-      @save "Z_$(taskName)_rho.jld2" ρₙ
+      # @save "Z_$(taskName)_xp.jld2" xp
+      # @save "Z_$(taskName)_Mesh.jld2" mesh
+      # @save "Z_$(taskName)_Grid.jld2" sdf_grid
+      # @save "Z_$(taskName)_Points.jld2" points
+      # @save "Z_$(taskName)_SDF.jld2" sdf_dists
+      # @save "Z_$(taskName)_rho.jld2" ρₙ
 
     end
   end
@@ -299,16 +286,12 @@ using BenchmarkTools
       # RBF smoothing:
       (fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, false, 1, taskName) # interpolation == true, aproximation == false, smooth
 
-      # Generate tet mesh
-      tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName) # Choose scheme: "A15" or "Schlafli"
-      assess_mesh_quality(tetMesh, taskName)
-
-      @save "Z_$(taskName)_cele_xp_B-$(B).jld2" xp
-      @save "Z_$(taskName)_cele_SDF_B-$(B).jld2" sdf_dists
-      @save "Z_$(taskName)_cele_Grid_B-$(B).jld2" sdf_grid
-      @save "Z_$(taskName)_cele_Points_B-$(B).jld2" points
-      @save "Z_$(taskName)_cele_Mesh_B-$(B).jld2" mesh
-
+      # @save "Z_$(taskName)_cele_xp_B-$(B).jld2" xp
+      # @save "Z_$(taskName)_cele_SDF_B-$(B).jld2" sdf_dists
+      # @save "Z_$(taskName)_cele_Grid_B-$(B).jld2" sdf_grid
+      # @save "Z_$(taskName)_cele_Points_B-$(B).jld2" points
+      # @save "Z_$(taskName)_cele_Mesh_B-$(B).jld2" mesh
+      #
     end
   end
 end

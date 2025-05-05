@@ -5,7 +5,6 @@ using Rho2sdf.MeshGrid
 using Rho2sdf.SignedDistances
 using Rho2sdf.DataExport
 using Rho2sdf.SdfSmoothing
-using Rho2sdf.ImplicitDomainMeshing
 using Rho2sdf.Visualizations
 using MAT
 using JLD2
@@ -50,8 +49,3 @@ Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF_B-" * string(B) * ".vtk", s
 @save "Z_$(taskName)_cele_Grid_B-$(B).jld2" sdf_grid
 @save "Z_$(taskName)_cele_Points_B-$(B).jld2" points
 @save "Z_$(taskName)_cele_Mesh_B-$(B).jld2" mesh
-
-# Generate tet mesh
-tetMesh = GenerateTetMesh(fine_sdf, fine_grid, "A15", taskName)
-
-# assess_mesh_quality(tetMesh, taskName)
