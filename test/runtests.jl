@@ -127,10 +127,13 @@ using BenchmarkTools
       sdf_dists = dists .* signs
 
       ## Export to VTK:
-      Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF.vtk", sdf_grid, sdf_dists, "distance")
+      exportSdfToVTI(taskName * "_SDF.vti", sdf_grid, sdf_dists, "distance")
 
       # RBF smoothing:
-      (fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, false, 1, taskName) # interpolation == true, aproximation == false, smooth
+      is_interp = true
+      smooth = 1
+      (fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, is_interp, smooth, taskName) # interpolation == true, aproximation == false, smooth
+      export_sdf_results(fine_sdf, fine_grid, sdf_grid, taskName, smooth, is_interp)
      
       # fig = visualize_stable_isosurface(fine_LSF)
       # display(fig)
@@ -179,13 +182,16 @@ using BenchmarkTools
       (dists, xp) = SignedDistances.evalDistances(mesh, sdf_grid, points, ρₙ, ρₜ)
       signs = @time SignedDistances.Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
       sdf_dists = dists .* signs
-
+      
       ## Export to VTK:
-      Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF.vtk", sdf_grid, sdf_dists, "distance")
+      exportSdfToVTI(taskName * "_SDF.vti", sdf_grid, sdf_dists, "distance")
 
       # RBF smoothing:
-      (fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, false, 1, taskName) # interpolation == true, aproximation == false, smooth
-
+      is_interp = true
+      smooth = 1
+      (fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, is_interp, smooth, taskName) # interpolation == true, aproximation == false, smooth
+      export_sdf_results(fine_sdf, fine_grid, sdf_grid, taskName, smooth, is_interp)
+     
       # @save "Z_$(taskName)_xp.jld2" xp
       # @save "Z_$(taskName)_Mesh.jld2" mesh
       # @save "Z_$(taskName)_Grid.jld2" sdf_grid
@@ -231,13 +237,16 @@ using BenchmarkTools
       (dists, xp) = SignedDistances.evalDistances(mesh, sdf_grid, points, ρₙ, ρₜ)
       signs = SignedDistances.Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
       sdf_dists = dists .* signs
-
+      
       ## Export to VTK:
-      Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF.vtk", sdf_grid, sdf_dists, "distance")
+      exportSdfToVTI(taskName * "_SDF.vti", sdf_grid, sdf_dists, "distance")
 
       # RBF smoothing:
-      (fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, false, 1, taskName) # interpolation == true, aproximation == false, smooth
-      
+      is_interp = true
+      smooth = 1
+      (fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, is_interp, smooth, taskName) # interpolation == true, aproximation == false, smooth
+      export_sdf_results(fine_sdf, fine_grid, sdf_grid, taskName, smooth, is_interp)
+    
       # @save "Z_$(taskName)_xp.jld2" xp
       # @save "Z_$(taskName)_Mesh.jld2" mesh
       # @save "Z_$(taskName)_Grid.jld2" sdf_grid
@@ -281,10 +290,13 @@ using BenchmarkTools
 
       ## Export to VTK:
       B = round(sdf_grid.cell_size, digits=4)
-      Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF_CellSize-" * string(B) * ".vtk", sdf_grid, sdf_dists, "distance")
+      exportSdfToVTI(taskName * "_SDF_CellSize-" * string(B) * ".vti", sdf_grid, sdf_dists, "distance")
 
       # RBF smoothing:
-      (fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, false, 1, taskName) # interpolation == true, aproximation == false, smooth
+      is_interp = true
+      smooth = 1
+      (fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, is_interp, smooth, taskName) # interpolation == true, aproximation == false, smooth
+      export_sdf_results(fine_sdf, fine_grid, sdf_grid, taskName, smooth, is_interp)
 
       # @save "Z_$(taskName)_cele_xp_B-$(B).jld2" xp
       # @save "Z_$(taskName)_cele_SDF_B-$(B).jld2" sdf_dists
