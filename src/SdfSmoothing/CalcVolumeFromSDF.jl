@@ -6,22 +6,22 @@
         detailed_quad_order::Int=9
     ) -> Float32
 
-Calculates the volume of geometry defined by the iso-surface of an SDF function.
+Calculates volume of geometry defined by SDF iso-surface.
 
 # Arguments
-- `fine_sdf::Array{Float32,3}`: SDF function values at regular grid nodes
-- `fine_grid::Array{Vector{Float32},3}`: Coordinates of regular grid nodes, each element is a vector [x,y,z]
-- `iso_threshold::Float32=0.0f0`: Iso-surface value, default 0.0
-- `detailed_quad_order::Int=9`: Order of Gauss-Legendre quadrature for accurate integration
+- `fine_sdf`: SDF values at regular grid nodes
+- `fine_grid`: Coordinates of grid nodes, each element is [x,y,z]
+- `iso_threshold`: Iso-surface value (default = 0.0)
+- `detailed_quad_order`: Gauss-Legendre quadrature order
 
 # Returns
-- `Float32`: Volume of the geometry
+- Volume of the geometry
 
 # Description
-The function iterates over all grid elements and for each element:
-1. If the element is completely outside the iso-surface (all SDF values < iso_threshold), it skips it
-2. If the element is completely inside the iso-surface (all SDF values >= iso_threshold), it adds its entire volume
-3. If the element intersects the iso-surface, it uses Gauss-Legendre quadrature for numerical integration
+For each grid element:
+1. Skip if outside iso-surface (all SDF values < threshold)
+2. Add full volume if inside iso-surface (all SDF values ≥ threshold)
+3. Use quadrature for partial elements intersecting the iso-surface
 """
 function calculate_volume_from_sdf(
     fine_sdf::Array{Float32,3},
@@ -131,28 +131,28 @@ function calculate_volume_simple(
     fine_grid::Array{Vector{Float32},3};
     iso_threshold::Float32 = 0.0f0
 )
-    # Určení rozměrů sítě
+    # Determine grid dimensions
     nx, ny, nz = size(fine_sdf)
-    @assert size(fine_grid) == (nx, ny, nz) "Rozměry fine_sdf a fine_grid musí být stejné"
+    @assert size(fine_grid) == (nx, ny, nz) "Dimensions of fine_sdf and fine_grid must match"
     
-    # Výpočet velikosti elementů
+    # Calculate element size
     edge_vector = fine_grid[2, 1, 1] .- fine_grid[1, 1, 1]
     element_edge_length = norm(edge_vector)
     element_volume = Float32(element_edge_length^3)
     
-    # Inicializace celkového objemu
+    # Initialize total volume
     total_volume = 0.0f0
     
-    # Počítadla pro statistiku
+    # Counters for statistics
     full_elements = 0
     partial_elements = 0
     empty_elements = 0
     
-    # Iterace přes všechny elementy
+    # Iterate over all elements
     for k in 1:nz-1
         for j in 1:ny-1
             for i in 1:nx-1
-                # Získání hodnot SDF v uzlech elementu
+                # Get SDF values at element nodes
                 values = [
                     fine_sdf[i, j, k],      # c000
                     fine_sdf[i+1, j, k],    # c100
@@ -164,32 +164,32 @@ function calculate_volume_simple(
                     fine_sdf[i+1, j+1, k+1] # c111
                 ]
                 
-                # Spočítat počet uzlů uvnitř materiálu (SDF >= iso_threshold)
+                # Count nodes inside material (SDF >= iso_threshold)
                 nodes_inside = count(v -> v >= iso_threshold, values)
                 
                 if nodes_inside == 8
-                    # Všechny uzly jsou uvnitř materiálu - přičteme celý objem
+                    # All nodes inside material - add full volume
                     total_volume += element_volume
                     full_elements += 1
                 elseif nodes_inside > 0
-                    # Některé uzly jsou uvnitř - přičteme poměrnou část objemu
+                    # Some nodes inside - add proportional volume
                     total_volume += (nodes_inside / 8.0f0) * element_volume
                     partial_elements += 1
                 else
-                    # Žádný uzel není uvnitř
+                    # No nodes inside
                     empty_elements += 1
                 end
             end
         end
     end
     
-    # Výpis statistiky
-    println("Statistika výpočtu objemu:")
-    println("  Počet elementů zcela uvnitř: $full_elements")
-    println("  Počet elementů částečně uvnitř: $partial_elements")
-    println("  Počet elementů zcela vně: $empty_elements")
-    println("  Celkový počet elementů: $(full_elements + partial_elements + empty_elements)")
-    println("  Vypočtený objem: $total_volume")
+    # Print statistics
+    println("Volume calculation statistics:")
+    println("  Fully inside elements: $full_elements")
+    println("  Partially inside elements: $partial_elements")
+    println("  Completely outside elements: $empty_elements")
+    println("  Total elements: $(full_elements + partial_elements + empty_elements)")
+    println("  Calculated volume: $total_volume")
     
     return total_volume
 end

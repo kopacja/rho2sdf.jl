@@ -41,15 +41,15 @@ Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
 signs = SignedDistances.Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
 sdf_dists = dists .* signs
 
-
 ## Export to VTK:
 B = round(sdf_grid.cell_size, digits=4)
-Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF_B-" * string(B) * ".vtk", sdf_grid, sdf_dists, "distance")
+exportSdfToVTI(taskName * "_SDF_B-" * string(B) * ".vti", sdf_grid, sdf_dists, "distance")
 
-smooth = 1
-interp = false
 # RBF smoothing:
-(fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, interp, smooth, taskName) # interpolation == true, aproximation == false, smooth
+is_interp = true
+smooth = 1
+(fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, is_interp, smooth, taskName) # interpolation == true, aproximation == false, smooth
+export_sdf_results(fine_sdf, fine_grid, sdf_grid, taskName, smooth, is_interp)
 
 # @save "Z_$(taskName)_cele_SDF_B-$(B).jld2" sdf_dists
 # @save "Z_$(taskName)_cele_Grid_B-$(B).jld2" sdf_grid
