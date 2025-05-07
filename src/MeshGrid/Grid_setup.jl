@@ -95,6 +95,7 @@ function noninteractive_sdf_grid_setup(mesh::Mesh)
   X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
   distances = calculate_edge_distances(mesh)
   B = analyze_mesh(distances)
+  println("Grid step selected from median edge length: $(RED)$(BOLD)$(round(B, digits=4))$(RESET)")
   sdf_grid = []
 
   println("The time duration for 100k nodes was about 3 min. ")
