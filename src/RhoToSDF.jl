@@ -93,7 +93,7 @@ function rho2sdf(taskName::String, X::Vector{Vector{Float64}}, IEN::Vector{Vecto
         interactive_sdf_grid_setup(mesh)
     else
         # Use automatic setup with default cell size factor
-        noninteractive_sdf_grid_setup(mesh, 2.0)
+        noninteractive_sdf_grid_setup(mesh)
     end
 
     # Map elemental densities to the nodes using least squares

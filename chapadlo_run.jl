@@ -22,7 +22,7 @@ mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
 
 ## Grid:
 sdf_grid = MeshGrid.interactive_sdf_grid_setup(mesh)
-# sdf_grid = MeshGrid.noninteractive_sdf_grid_setup(mesh, 2.3)
+# sdf_grid = MeshGrid.noninteractive_sdf_grid_setup(mesh)
 points = MeshGrid.generateGridPoints(sdf_grid) # uzly pravidelné mřížky
 
 ## Map elemental densities to the nodes:

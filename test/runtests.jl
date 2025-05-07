@@ -298,7 +298,7 @@ using BenchmarkTools
 
       ## Grid:
       # sdf_grid = MeshGrid.interactive_sdf_grid_setup(mesh)
-      sdf_grid = MeshGrid.noninteractive_sdf_grid_setup(mesh, 2.0)
+      sdf_grid = MeshGrid.noninteractive_sdf_grid_setup(mesh)
       points = MeshGrid.generateGridPoints(sdf_grid) # uzly pravidelné mřížky
 
       ## Map elemental densities to the nodes:
