@@ -1,7 +1,7 @@
 module MeshGrid
 
 
-export MeshInformations, elementToNodalValues, Mesh, TriangularMesh, PartOfModel, Grid, LinkedList, getMesh_AABB, generateGridPoints, extractSurfaceTriangularMesh, calculateMiniAABB_grid, ModiffElementalDensities, generateConnectivityArray, NodePosition3D, find_triangle_position, interactive_sdf_grid_setup, noninteractive_sdf_grid_setup, find_threshold_for_volume
+export MeshInformations, elementToNodalValues, Mesh, TriangularMesh, PartOfModel, Grid, LinkedList, getMesh_AABB, generateGridPoints, extractSurfaceTriangularMesh, calculateMiniAABB_grid, ModiffElementalDensities, generateConnectivityArray, NodePosition3D, find_triangle_position, interactive_sdf_grid_setup, noninteractive_sdf_grid_setup, find_threshold_for_volume, DenseInNodes
 
 using Statistics
 using LinearAlgebra

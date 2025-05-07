@@ -87,15 +87,18 @@ function analyze_mesh(distances::Matrix{Float64})
   println("Median edge length: ", round(median_edge_length, digits=4))
   println("Average edge length of the smallest element: $(RED)$(BOLD)$(round(avg_edge_smallest, digits=4))$(RESET)")
   println("Average edge length of the largest element: ", round(avg_edge_largest, digits=4))
+
+  return median_edge_length
 end
 
-function noninteractive_sdf_grid_setup(mesh::Mesh, B::Float64)
+function noninteractive_sdf_grid_setup(mesh::Mesh)
   X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
   distances = calculate_edge_distances(mesh)
-  analyze_mesh(distances)
+  B = analyze_mesh(distances)
+  println("Grid step selected from median edge length: $(RED)$(BOLD)$(round(B, digits=4))$(RESET)")
   sdf_grid = []
 
-  println("The time duration for 80k nodes was about 90 min. ")
+  println("The time duration for 100k nodes was about 3 min. ")
 
   N_new = floor(Int, maximum(X_max .- X_min) / B)
   sdf_grid = MeshGrid.Grid(X_min, X_max, N_new, 3)
@@ -105,15 +108,13 @@ function noninteractive_sdf_grid_setup(mesh::Mesh, B::Float64)
 end
 
 
-
 function interactive_sdf_grid_setup(mesh::Mesh)
   X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
   distances = calculate_edge_distances(mesh)
   analyze_mesh(distances)
   sdf_grid = []
 
-  println("The time duration for 80k nodes was about 90 min. ")
-
+  println("The time duration for 100k nodes was about 3 min. ")
   while true
     while true
       print("Write a grid step based on grid analysis: ")
@@ -121,6 +122,11 @@ function interactive_sdf_grid_setup(mesh::Mesh)
 
       try
         B = parse(Float64, user_input)
+        # Validation checks
+        if B < 0.
+          println("Error: Grid step must be non-zero and positive.")
+          continue
+        end
 
         N_new = floor(Int, maximum(X_max .- X_min) / B)
         sdf_grid = MeshGrid.Grid(X_min, X_max, N_new, 3)
@@ -146,5 +152,3 @@ function interactive_sdf_grid_setup(mesh::Mesh)
     end
   end
 end
-
-

@@ -35,9 +35,10 @@ using BenchmarkTools
   # taskName = "chapadlo"
 
   RUN_PLANE = false
-  RUN_BLOCK = true
+  RUN_BLOCK = false
   RUN_SPHERE = true
-  RUN_CHAPADLO = true
+  RUN_BEAM = true
+  RUN_CHAPADLO = false
   RUN_CHAPADLO_cele = false
 
   if (RUN_PLANE)
@@ -67,23 +68,23 @@ using BenchmarkTools
       # ρₙ = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0] # 1, 7
 
       ## Generate FEM mesh structure:
-      mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
+      mesh = Mesh(X, IEN, rho, hex8_shape)
 
       VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
-      Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
+      exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
 
       ## Grid:
-      X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
-      sdf_grid = MeshGrid.Grid(X_min, X_max, N, 3) # cartesian grid
-      points = MeshGrid.generateGridPoints(sdf_grid) # uzly pravidelné mřížky
+      X_min, X_max = getMesh_AABB(mesh.X)
+      sdf_grid = Grid(X_min, X_max, N, 3) # cartesian grid
+      points = generateGridPoints(sdf_grid) # uzly pravidelné mřížky
 
       ## SDF from densities:
-      (dists, xp) = SignedDistances.evalDistances(mesh, sdf_grid, points, ρₙ, ρₜ)
-      signs = SignedDistances.Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
+      (dists, xp) = evalDistances(mesh, sdf_grid, points, ρₙ, ρₜ)
+      signs = Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
       sdf_dists = dists .* signs
 
       ## Export to VTK:
-      Rho2sdf.exportStructuredPointsToVTK(taskName * "_SDF.vtk", sdf_grid, sdf_dists, "distance")
+      exportStructuredPointsToVTK(taskName * "_SDF.vtk", sdf_grid, sdf_dists, "distance")
 
       # @save "Z_$(taskName)_xp.jld2" xp
       # @save "Z_$(taskName)_Mesh.jld2" mesh
@@ -105,8 +106,8 @@ using BenchmarkTools
       (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("block", [2, 1, 1])
       # ρₙ = [0.0, 0.0, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5]
 
-      mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
-      # ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
+      mesh = Mesh(X, IEN, rho, hex8_shape)
+      # ρₙ = DenseInNodes(mesh, rho) # LSQ
 
       # Modif ρₙ:
       ρₙ = [0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5]
@@ -114,16 +115,16 @@ using BenchmarkTools
       # ρₜ= find_threshold_for_volume(mesh, ρₙ)
 
       VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
-      Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
+      exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
 
       ## Grid:
-      X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
-      sdf_grid = MeshGrid.Grid(X_min, X_max, N, 3) # cartesian grid
-      points = MeshGrid.generateGridPoints(sdf_grid) # uzly pravidelné mřížky
+      X_min, X_max = getMesh_AABB(mesh.X)
+      sdf_grid = Grid(X_min, X_max, N, 3) # cartesian grid
+      points = generateGridPoints(sdf_grid) # uzly pravidelné mřížky
 
       ## SDF from densities:
-      (dists, xp) = SignedDistances.evalDistances(mesh, sdf_grid, points, ρₙ, ρₜ)
-      signs = SignedDistances.Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
+      (dists, xp) = evalDistances(mesh, sdf_grid, points, ρₙ, ρₜ)
+      signs = Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
       sdf_dists = dists .* signs
 
       ## Export to VTK:
@@ -159,28 +160,28 @@ using BenchmarkTools
       ## Read FEM mesh:
       data = matread(taskName * ".mat")
       # data = matread("test/" * taskName * ".mat")
-      (X, IEN, rho) = MeshGrid.MeshInformations(data)
+      (X, IEN, rho) = MeshInformations(data)
 
       ## Generate FEM mesh structure:
-      mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
+      mesh = Mesh(X, IEN, rho, hex8_shape)
 
       ## Map elemental densities to the nodes:
-      ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
-      #ρₙ = MeshGrid.elementToNodalValues(mesh, rho) # average
+      ρₙ = DenseInNodes(mesh, rho) # LSQ
+      #ρₙ = elementToNodalValues(mesh, rho) # average
 
       ρₜ= @time find_threshold_for_volume(mesh, ρₙ)
 
       VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
-      Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
+      exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
 
       ## Grid:
-      X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
-      sdf_grid = MeshGrid.Grid(X_min, X_max, N, 3) # cartesian grid
-      points = MeshGrid.generateGridPoints(sdf_grid) # uzly pravidelné mřížky
+      X_min, X_max = getMesh_AABB(mesh.X)
+      sdf_grid = Grid(X_min, X_max, N, 3) # cartesian grid
+      points = generateGridPoints(sdf_grid) # uzly pravidelné mřížky
 
       ## SDF from densities:
-      (dists, xp) = SignedDistances.evalDistances(mesh, sdf_grid, points, ρₙ, ρₜ)
-      signs = @time SignedDistances.Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
+      (dists, xp) = evalDistances(mesh, sdf_grid, points, ρₙ, ρₜ)
+      signs = @time Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
       sdf_dists = dists .* signs
       
       ## Export to VTK:
@@ -202,6 +203,31 @@ using BenchmarkTools
     end
   end
 
+  if (RUN_BEAM)
+    @testset "Chapadlo" begin
+      ## Inputs:
+      taskName = "cantilever_beam_vfrac_04"
+      
+      ## Read FEM mesh:
+      data = matread(taskName * ".mat")
+      (X, IEN, rho) = MeshInformations(data)
+      IEN = [subvector .- 1 for subvector in IEN]  # This will work
+
+      # Custom options
+      options = Rho2sdfOptions(
+          threshold_density=0.5,
+          sdf_grid_setup=:automatic,
+          export_nodal_densities=false,
+          export_raw_sdf=false,
+          rbf_interp=true,
+          rbf_grid=:same
+      )
+
+      result = rho2sdf("beam", X, IEN, rho, options=options)
+
+    end
+  end
+
   if (RUN_CHAPADLO)
     @testset "Chapadlo" begin
       ## Inputs:
@@ -211,31 +237,31 @@ using BenchmarkTools
 
       ## Read FEM mesh:
       data = matread(taskName * ".mat")
-      (X, IEN, rho) = MeshGrid.MeshInformations(data)
+      (X, IEN, rho) = MeshInformations(data)
       #Z,idx_Z = findall(x->X[3,i] > 50 for i in [1:size(X,2)])
 
       ## Generate FEM mesh structure:
-      mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
+      mesh = Mesh(X, IEN, rho, hex8_shape)
 
       ## Map elemental densities to the nodes:
-      ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
-      #ρₙ = MeshGrid.elementToNodalValues(mesh, rho) # average
+      ρₙ = DenseInNodes(mesh, rho) # LSQ
+      #ρₙ = elementToNodalValues(mesh, rho) # average
 
       ρₜ= @time find_threshold_for_volume(mesh, ρₙ)
 
       VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
-      Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
+      exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
 
       ## Grid:
-      X_min, X_max = MeshGrid.getMesh_AABB(mesh.X)
+      X_min, X_max = getMesh_AABB(mesh.X)
       X_min[2] = 0
       X_min[3] = 50
-      sdf_grid = MeshGrid.Grid(X_min, X_max, N, 3) # cartesian grid
-      points = MeshGrid.generateGridPoints(sdf_grid) # uzly pravidelné mřížky
+      sdf_grid = Grid(X_min, X_max, N, 3) # cartesian grid
+      points = generateGridPoints(sdf_grid) # uzly pravidelné mřížky
 
       ## SDF from densities:
-      (dists, xp) = SignedDistances.evalDistances(mesh, sdf_grid, points, ρₙ, ρₜ)
-      signs = SignedDistances.Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
+      (dists, xp) = evalDistances(mesh, sdf_grid, points, ρₙ, ρₜ)
+      signs = Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
       sdf_dists = dists .* signs
       
       ## Export to VTK:
@@ -265,27 +291,27 @@ using BenchmarkTools
 
       ## Read FEM mesh:
       data = matread(taskName * ".mat")
-      (X, IEN, rho) = MeshGrid.MeshInformations(data)
+      (X, IEN, rho) = MeshInformations(data)
 
       ## Generate FEM mesh structure:
-      mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
+      mesh = Mesh(X, IEN, rho, hex8_shape)
 
       ## Grid:
-      # sdf_grid = MeshGrid.interactive_sdf_grid_setup(mesh)
-      sdf_grid = MeshGrid.noninteractive_sdf_grid_setup(mesh, 2.0)
-      points = MeshGrid.generateGridPoints(sdf_grid) # uzly pravidelné mřížky
+      # sdf_grid = interactive_sdf_grid_setup(mesh)
+      sdf_grid = noninteractive_sdf_grid_setup(mesh)
+      points = generateGridPoints(sdf_grid) # uzly pravidelné mřížky
 
       ## Map elemental densities to the nodes:
-      ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
+      ρₙ = DenseInNodes(mesh, rho) # LSQ
       
       ρₜ= find_threshold_for_volume(mesh, ρₙ)
 
       VTK_CODE = 12 # https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html
-      Rho2sdf.exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
+      exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
 
       ## SDF from densities:
-      (dists, xp) = SignedDistances.evalDistances(mesh, sdf_grid, points, ρₙ, ρₜ)
-      signs = SignedDistances.Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
+      (dists, xp) = evalDistances(mesh, sdf_grid, points, ρₙ, ρₜ)
+      signs = Sign_Detection(mesh, sdf_grid, points, ρₙ, ρₜ)
       sdf_dists = dists .* signs
 
       ## Export to VTK:

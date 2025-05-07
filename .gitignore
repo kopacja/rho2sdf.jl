@@ -9,3 +9,5 @@
 *.png
 *.vtr
 *.vti
+
+!doc/*.png

@@ -34,4 +34,7 @@ using .SdfSmoothing
 include("Visualizations/Visualizations.jl")
 using .Visualizations
 
+include("RhoToSDF.jl")
+export Rho2sdfOptions, rho2sdf
+
 end # module Rho2sdf
