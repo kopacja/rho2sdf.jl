@@ -3,6 +3,15 @@
 ## Overview
 The `rho2sdf` function converts element densities to a Signed Distance Function (SDF) representation, which is useful for extracting geometry from raw topology optimization results (SIMP method).
 
+To add an image under this section in your README, use the following Markdown syntax:
+```
+![Description of image](path/to/image.png "Optional title")
+```
+For example:
+```
+![SDF visualization example](images/sdf_example.png "SDF representation of topology optimization results")
+```
+
 ## Function Input
 
 ```julia
@@ -18,6 +27,7 @@ rho2sdf(taskName, X, IEN, rho; options=Rho2sdfOptions())
 
 ### Return Value:
 - `Tuple`: (fine_sdf, fine_grid, sdf_grid, sdf_dists)
+- `vti`: SDF visualization in Paraview
 
 ## Rho2sdfOptions
 
@@ -25,12 +35,12 @@ The `Rho2sdfOptions` struct allows for customization of the SDF generation proce
 
 ```julia
 Rho2sdfOptions(;
-    threshold_density=nothing,
-    sdf_grid_setup=:interactive,
-    export_nodal_densities=false,
-    export_raw_sdf=false,
-    rbf_interp=true,
-    rbf_grid=:normal
+    threshold_density=0.5,          # value for isocontour (0, 1)
+    sdf_grid_setup=:manual,         # manual/automatic grid setup
+    export_nodal_densities=true,    # export nodal field to Paraview
+    export_raw_sdf=true,            # export non-smoothed SDF to Paraview
+    rbf_interp=false,               # interpolate/approximate SDF values using RBFs
+    rbf_grid=:normal                # normal/fine grid for RBFs interp/approx
 )
 ```
 
@@ -38,38 +48,30 @@ Rho2sdfOptions(;
 
 #### threshold_density::Union{Float64, Nothing}
 - Threshold density value in range [0,1] used for isosurface generation
-- If `nothing` (default), it will be automatically calculated using `find_threshold_for_volume(mesh, ρₙ)`
-- If value is outside [0,1] range, a warning is issued and automatic calculation is used
-- Values 0.0 or 1.0 are considered extreme and trigger a warning
+- If `nothing`, it will be automatically calculated from volume fraction
 
 #### sdf_grid_setup::Symbol
-- Determines how the SDF grid is configured
-- Valid values:
-  - `:interactive` (default): Uses interactive grid setup allowing user configuration
-  - `:noninteractive`: Uses non-interactive setup with predefined parameters
-- Invalid values trigger a warning and fall back to `:interactive`
+- SDF grid step configuration. Valid values:
+  - `:automatic`: Uses original mesh properties for grid step
+  - `:manual` (default): Uses interactive grid setup allowing user configuration
 
 #### export_nodal_densities::Bool
 - Controls whether nodal densities are exported to VTU format
 - Default: `false`
-- When `true`, generates file: `{taskName}_nodal_densities.vtu`
 
 #### export_raw_sdf::Bool
 - Controls whether raw SDF values are exported to VTI format
 - Default: `false`
-- When `true`, generates file: `{taskName}_SDF_CellSize-{B}.vti`
 
 #### rbf_interp::Bool
 - Determines whether RBF interpolation or approximation is used
 - Default: `true` (interpolation)
-- `false` uses approximation
 
 #### rbf_grid::Symbol
 - Controls the resolution of the RBF grid
 - Valid values:
   - `:normal` (default): Standard resolution (smooth=1)
   - `:fine`: Higher resolution (smooth=2)
-- Invalid values trigger a warning and fall back to `:normal`
 
 ## Example Usage
 
@@ -80,7 +82,7 @@ result = rho2sdf("chapadlo", X, IEN, rho)
 # Custom options
 options = Rho2sdfOptions(
     threshold_density=0.5,
-    sdf_grid_setup=:noninteractive,
+    sdf_grid_setup=:manual,
     export_nodal_densities=true,
     export_raw_sdf=true,
     rbf_interp=true,
@@ -91,7 +93,7 @@ result = rho2sdf("chapadlo", X, IEN, rho, options=options)
 
 ## TODO List
 
-- [ ] Promazat nepotřebné exporty
-- [ ] Promazat nepotřebné knihovny
-- [ ] Použití IPopt knihovny pro body u kterých nebyly nalezeny lokální souřadnice
-- [ ] Implementovat tetrahedra elementy
+- [ ] Remove unnecessary exports
+- [ ] Remove unnecessary libraries
+- [ ] Use IPopt library for points where local coordinates were not found
+- [ ] Extend implementation to include tetrahedral elements
