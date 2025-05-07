@@ -3,14 +3,10 @@
 ## Overview
 The `rho2sdf` function converts element densities to a Signed Distance Function (SDF) representation, which is useful for extracting geometry from raw topology optimization results (SIMP method).
 
-To add an image under this section in your README, use the following Markdown syntax:
-```
-![Description of image](path/to/image.png "Optional title")
-```
-For example:
-```
-![SDF visualization example](images/sdf_example.png "SDF representation of topology optimization results")
-```
+<p align="center">
+  <img src="doc/Cantilever_beam-RAW.png" width="45%" alt="Raw topology optimization result" />
+  <img src="doc/Cantilever_beam-smooth_SDF_Approx.png" width="45%" alt="Smoothed SDF approximation" />
+</p>
 
 ## Function Input
 
