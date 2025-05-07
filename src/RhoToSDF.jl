@@ -5,11 +5,11 @@ Configuration options for density to SDF conversion.
 
 # Fields
 - `threshold_density::Union{Float64, Nothing}`: Threshold density in range [0,1]. If `nothing`, calculated automatically.
-- `sdf_grid_setup::Symbol`: Grid setup method: `:interactive` or `:noninteractive`.
+- `sdf_grid_setup::Symbol`: Grid setup method: `:manual` or `:automatic`.
 - `export_nodal_densities::Bool`: Whether to export nodal densities to VTU.
 - `export_raw_sdf::Bool`: Whether to export raw SDF to VTI.
 - `rbf_interp::Bool`: Use RBF interpolation (true) or approximation (false).
-- `rbf_grid::Symbol`: RBF grid resolution: `:normal` (smooth=1) or `:fine` (smooth=2).
+- `rbf_grid::Symbol`: RBF grid resolution: `:same` (smooth=1) or `:fine` (smooth=2).
 """
 struct Rho2sdfOptions
     threshold_density::Union{Float64, Nothing}
@@ -22,11 +22,11 @@ struct Rho2sdfOptions
     # Constructor with default values
     function Rho2sdfOptions(;
         threshold_density=nothing,
-        sdf_grid_setup=:interactive,
+        sdf_grid_setup=:manual,
         export_nodal_densities=false,
         export_raw_sdf=false,
         rbf_interp=true,
-        rbf_grid=:normal
+        rbf_grid=:same
     )
         # Validate threshold density if provided
         if threshold_density !== nothing
@@ -39,15 +39,15 @@ struct Rho2sdfOptions
         end
         
         # Validate sdf_grid_setup and set default if invalid
-        if !(sdf_grid_setup in [:interactive, :noninteractive])
-            @warn "Invalid sdf_grid_setup: $sdf_grid_setup. Must be either :interactive or :noninteractive. Using default :interactive instead."
-            sdf_grid_setup = :interactive
+        if !(sdf_grid_setup in [:manual, :automatic])
+            @warn "Invalid sdf_grid_setup: $sdf_grid_setup. Must be either :manual or :automatic. Using default :manual instead."
+            sdf_grid_setup = :manual
         end
         
         # Validate rbf_grid and set default if invalid
-        if !(rbf_grid in [:normal, :fine])
-            @warn "Invalid rbf_grid: $rbf_grid. Must be either :normal or :fine. Using default :normal instead."
-            rbf_grid = :normal
+        if !(rbf_grid in [:same, :fine])
+            @warn "Invalid rbf_grid: $rbf_grid. Must be either :same or :fine. Using default :same instead."
+            rbf_grid = :same
         end
         
         new(threshold_density, sdf_grid_setup, export_nodal_densities, export_raw_sdf, rbf_interp, rbf_grid)
@@ -77,7 +77,7 @@ result = rho2sdf("chapadlo", X, IEN, rho)
 # Custom options
 options = Rho2sdfOptions(
     threshold_density=0.5,
-    sdf_grid_setup=:noninteractive,
+    sdf_grid_setup=:automatic,
     export_nodal_densities=true
 )
 result = rho2sdf("chapadlo", X, IEN, rho, options=options)
@@ -89,10 +89,10 @@ function rho2sdf(taskName::String, X::Vector{Vector{Float64}}, IEN::Vector{Vecto
     mesh = Mesh(X, IEN, rho, hex8_shape)
     
     # Setup SDF grid based on selected method
-    sdf_grid = if options.sdf_grid_setup == :interactive
+    sdf_grid = if options.sdf_grid_setup == :manual
         interactive_sdf_grid_setup(mesh)
     else
-        # Use non-interactive setup with default cell size factor
+        # Use automatic setup with default cell size factor
         noninteractive_sdf_grid_setup(mesh, 2.0)
     end
 
@@ -128,7 +128,7 @@ function rho2sdf(taskName::String, X::Vector{Vector{Float64}}, IEN::Vector{Vecto
     end
     
     # RBF smoothing with selected parameters
-    smooth = options.rbf_grid == :normal ? 1 : 2  # Normal=1, Fine=2
+    smooth = options.rbf_grid == :same ? 1 : 2  # Same=1, Fine=2
     (fine_sdf, fine_grid) = RBFs_smoothing(mesh, sdf_dists, sdf_grid, options.rbf_interp, smooth, taskName)
     
     # Export final smoothed results

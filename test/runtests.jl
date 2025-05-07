@@ -35,9 +35,10 @@ using BenchmarkTools
   # taskName = "chapadlo"
 
   RUN_PLANE = false
-  RUN_BLOCK = true
-  RUN_SPHERE = true
-  RUN_CHAPADLO = true
+  RUN_BLOCK = false
+  RUN_SPHERE = false
+  RUN_BEAM = true
+  RUN_CHAPADLO = false
   RUN_CHAPADLO_cele = false
 
   if (RUN_PLANE)
@@ -215,11 +216,11 @@ using BenchmarkTools
       # Custom options
       options = Rho2sdfOptions(
           threshold_density=0.5,
-          sdf_grid_setup=:noninteractive,
+          sdf_grid_setup=:automatic,
           export_nodal_densities=false,
           export_raw_sdf=false,
           rbf_interp=true,
-          rbf_grid=:normal
+          rbf_grid=:same
       )
 
       result = rho2sdf("beam", X, IEN, rho, options=options)
