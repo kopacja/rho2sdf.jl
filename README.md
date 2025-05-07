@@ -1,5 +1,3 @@
-# Rho2SDF Documentation
-
 ## Overview
 The `rho2sdf` function transforms element densities from topology optimization into a signed distance field on a regular grid, calculating minimum distances to material boundaries defined by density isocontours, enabling precise geometric extraction.
 
