@@ -202,6 +202,31 @@ using BenchmarkTools
     end
   end
 
+  if (RUN_BEAM)
+    @testset "Chapadlo" begin
+      ## Inputs:
+      taskName = "cantilever_beam_vfrac_04"
+      
+      ## Read FEM mesh:
+      data = matread(taskName * ".mat")
+      (X, IEN, rho) = MeshInformations(data)
+      IEN = [subvector .- 1 for subvector in IEN]  # This will work
+
+      # Custom options
+      options = Rho2sdfOptions(
+          threshold_density=0.5,
+          sdf_grid_setup=:noninteractive,
+          export_nodal_densities=false,
+          export_raw_sdf=false,
+          rbf_interp=true,
+          rbf_grid=:normal
+      )
+
+      result = rho2sdf("beam", X, IEN, rho, options=options)
+
+    end
+  end
+
   if (RUN_CHAPADLO)
     @testset "Chapadlo" begin
       ## Inputs:
