@@ -1,37 +1,4 @@
 
-# N = [20, 20, 50]
-# struct Grid
-#     AABB_min::Vector{Float64}  # Minimum coordinates of the Axis-Aligned Bounding Box (AABB)
-#     AABB_max::Vector{Float64}  # Maximum coordinates of the AABB
-#     N::Vector{Int64}           # Number of divisions along each axis
-#     cell_size::Vector{Float64} # Size of each cell in the grid
-#     ngp::Int64                 # Total number of grid points
-
-#     # Marginal cells are added around the AABB to provide a buffer zone.
-#     function Grid(
-#         AABB_min::Vector{Float64},
-#         AABB_max::Vector{Float64},
-#         N::Vector{Int64},
-#         margineCells::Int64 = 3,
-#     )
-
-#         cell_size = (AABB_max .- AABB_min) ./ N
-
-#         # Adjusting the AABB with marginal cells
-#         AABB_min = AABB_min .- margineCells * cell_size
-#         AABB_max = AABB_max .+ margineCells * cell_size
-
-#         AABB_size = AABB_max .- AABB_min
-
-#         # Recalculating grid dimensions and total grid points
-#         N = N .+ 2 * margineCells # (2 = both sides)
-#         ngp = prod(N .+ 1) # number of grid points
-
-#         return new(AABB_min, AABB_max, N, cell_size, ngp)
-
-#     end
-# end
-
 mutable struct Grid
     AABB_min::Vector{Float64}  # Minimum coordinates of the Axis-Aligned Bounding Box (AABB)
     AABB_max::Vector{Float64}  # Maximum coordinates of the AABB
@@ -69,7 +36,7 @@ end
 
 
 # Struct for managing a linked list in the context of a grid. (Useful for spatial hashing or similar applications.)
-mutable struct LinkedList # rozdělení pravidelné sítě na regiony
+mutable struct LinkedList # dividing a regular grid into regions
     grid::Grid           # The grid associated with the linked list
     head::Vector{Int64}  # Array representing the head of each list
     next::Vector{Int64}  # Array representing the next element in each list
@@ -125,20 +92,6 @@ function generateGridPoints(grid::Grid)::Matrix{Float64}
     return X
 end
 
-# Paralel version:
-# function generateGridPoints(grid::Grid)::Matrix{Float64}
-#     X = zeros(3, grid.ngp)
-#     a = Atomic{Int}(1)
-#     @threads for k = 0:grid.N[3]
-#         for j = 0:grid.N[2]
-#             for i = 0:grid.N[1]
-#                 idx = atomic_add!(a, 1)
-#                 X[:, idx] = grid.AABB_min .+ grid.cell_size .* [i, j, k]
-#             end
-#         end
-#     end
-#     return X
-# end
 
 function generateConnectivityArray(grid::Grid)::Vector{Vector{Int64}}
     N = grid.N .+ 1 # N is now a number of vertex in row not number of cells
