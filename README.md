@@ -1,5 +1,5 @@
 ## Overview
-The `rho2sdf` function transforms element densities from topology optimization into a signed distance field on a regular grid, calculating minimum distances to material boundaries defined by density isocontours, enabling precise geometric extraction.
+This package converts density-based topology optimization results (from SIMP method) into smooth geometry defined by Signed Distance Functions (SDFs). The transformation precisely preserves the volume of the original optimized structure while eliminating jagged boundaries and intermediate density regions, making the resulting geometry suitable for manufacturing and further analysis.
 
 <p align="center">
   <img src="doc/Cantilever_beam-RAW.png" width="45%" alt="Raw topology optimization result" />
@@ -7,7 +7,7 @@ The `rho2sdf` function transforms element densities from topology optimization i
 </p>
 
 ## Function Input
-
+Main function for transforming TO results into an implicit geometric representation using SDF:
 ```julia
 rho2sdf(taskName, X, IEN, rho; options=Rho2sdfOptions())
 ```
