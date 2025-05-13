@@ -5,6 +5,7 @@ using Test
 using LinearAlgebra
 using Statistics
 using Rho2sdf
+using Rho2sdf.ShapeFunctions
 using Rho2sdf.PrimitiveGeometries
 using Rho2sdf.MeshGrid
 using Rho2sdf.SignedDistances
@@ -15,11 +16,11 @@ using MAT
 # data = matread(taskName * ".mat")  # Read the Matlab data file with the specified task name
 # (X, IEN, rho) = MeshGrid.MeshInformations(data)  # Extract mesh information from the data
 (X, IEN, rho) = PrimitiveGeometries.selectPrimitiveGeometry("sphere", 6)
-mesh = MeshGrid.Mesh(X, IEN)
+mesh = MeshGrid.Mesh(X, IEN, rho, hex8_shape)
 mesh = Rho2sdf.extractSurfaceTriangularMesh(mesh) 
 
 
-function computePseudoNormals1(mesh::Mesh)
+function computePseudoNormals1(mesh::TriangularMesh)
     verticesPseudoNormals = [zeros(mesh.nsd) for _ = 1:mesh.nnp]
     edgesPseudoNormals = [[zeros(mesh.nsd) for _ = 1:3] for _ = 1:mesh.nel]
 
@@ -62,7 +63,7 @@ function computePseudoNormals1(mesh::Mesh)
     return verticesPseudoNormals, edgesPseudoNormals
 end
 
-verticesPseudoNormals, edgesPseudoNormals = computePseudoNormals(mesh)
+verticesPseudoNormals, edgesPseudoNormals = SignedDistances.computePseudoNormals(mesh)
 verticesPseudoNormals1, edgesPseudoNormals1 = computePseudoNormals1(mesh)
 
 @test verticesPseudoNormals == verticesPseudoNormals1
