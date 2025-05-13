@@ -1,9 +1,10 @@
 module ShapeFunctions
 
-export sfce
+export hex8_shape, compute_hex8_shape!
 
-include("C3D8.jl")
-# include("C3D8_v1.jl")
+using StaticArrays
+
+include("hex8_shape.jl")
 
 end
 

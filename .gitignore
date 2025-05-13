@@ -1,6 +1,13 @@
-test/chapadlo_sdf.vtk
-Manifest.toml
 *.toml
 *.jld
 *.csv
 *.vtu
+*.vtk
+*.jld2
+*.h5
+**vizualizace/
+*.png
+*.vtr
+*.vti
+
+!doc/*.png
