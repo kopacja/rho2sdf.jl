@@ -1,19 +1,17 @@
 function visualize_stable_isosurface(sdf_data::Array)
     fig = Figure(size=(800, 800))
     
-    # Vypočítáme rozměry dat
+    # Calculate data dimensions
     nx, ny, nz = size(sdf_data)
     
-    # Vypočítáme úhlopříčku, ale tentokrát ji použijeme jen jako referenční velikost
-    # pro nastavení zobrazovacího prostoru
+    # Compute diagonal as reference size for visualization space
     diagonal = Float32(sqrt(nx^2 + ny^2 + nz^2))
     
-    # Důležitá změna: limity os nastavíme tak, aby odpovídaly skutečnému rozsahu dat
-    # Přidáme malý offset (diagonal/4) pro vytvoření okraje kolem tělesa
+    # Set axis limits with margin around the object
     offset = diagonal/4
     ax = Axis3(fig[1, 1];
         viewmode = :fit,
-        # Limity nastavíme symetricky kolem středu dat
+        # Symmetric limits around data center
         limits = (-offset, nx + offset,
                  -offset, ny + offset,
                  -offset, nz + offset),
@@ -24,14 +22,14 @@ function visualize_stable_isosurface(sdf_data::Array)
         zlabel = "Z"
     )
     
-    # Vykreslení izoplochy zůstává stejné
+    # Render the isosurface
     contour!(ax, sdf_data,
         levels = [0],
         transparency = false,
         color = :cornflowerblue
     )
     
-    # Nastavíme počáteční pohled
+    # Set initial view angles
     ax.azimuth = π/6
     ax.elevation = π/6
     
@@ -39,7 +37,7 @@ function visualize_stable_isosurface(sdf_data::Array)
 end
 
 """
-Vytvoříme testovací data reprezentující kouli
+Example usage:
 nx, ny, nz = 200, 100, 100
 sdf_data = [sqrt((x - nx/2)^2 + (y - ny/2)^2 + (z - nz/2)^2) - 10
             for x in 1:nx, y in 1:ny, z in 1:nz]
