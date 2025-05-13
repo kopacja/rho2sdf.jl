@@ -87,7 +87,6 @@ result = rho2sdf("chapadlo", X, IEN, rho, options=options)
 
 ## TODO List
 
-- [ ] Remove unnecessary exports
-- [ ] Remove unnecessary libraries
+- [ ] Improvements to the calculation of nodal densities
 - [ ] Use IPopt library for points where local coordinates were not found
 - [ ] Extend implementation to include tetrahedral elements
