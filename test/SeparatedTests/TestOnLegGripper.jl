@@ -26,8 +26,7 @@ using JLD
 
     # input data propertis (mesh, density)
     mesh = MeshGrid.Mesh(X, IEN, hex8_shape)
-    (mesh, rho) = MeshGrid.PartOfModel(mesh, rho, part_name)
-    # rho = MeshGrid.ModiffElementalDensities(mesh, rho) # change density along the object
+    rho = MeshGrid.ModiffElementalDensities(mesh, rho) # change density along the object
 
     ρₙ = MeshGrid.DenseInNodes(mesh, rho) # LSQ
     ## Grid:
