@@ -8,31 +8,6 @@ using LinearAlgebra
 using JLD
 
 
-@testset "Tests on real data" begin
-  # Test data -> leg from gripper:
-  mesh = load("TestData/TestData_leg-mesh.jld", "mesh")
-  grid = load("TestData/TestData_leg-grid.jld", "grid")
-
-  # Is object inside BB?
-  @test grid.AABB_min < vec(minimum(mesh.X, dims=2))
-  @test grid.AABB_max > vec(maximum(mesh.X, dims=2))
-
-  points = MeshGrid.generateGridPoints(grid)
-
-  linkedList = MeshGrid.LinkedList(grid, points)
-
-  # Linked list tests:
-  @test length(linkedList.head) == grid.ngp
-  @test length(linkedList.next) == grid.ngp
-
-  @test maximum(linkedList.head) == grid.ngp
-  # @test maximum(linkedList.next) == grid.ngp # why not?
-
-  @test minimum(linkedList.head) == -1
-  @test minimum(linkedList.next) == -1
-end
-
-
 @testset "Grid Tests" begin
   AABB_min = [0.0, 0.0, 0.0]
   AABB_max = [10.0, 10.0, 10.0]

@@ -1,13 +1,12 @@
 module SignedDistances
 
-export evalSignedDistancesOnTriangularMesh, evalDistances, computePseudoNormals, barycentricCoordinates, calculate_triangle_edges, update_distance!, SelectProjectedNodes, find_local_coordinates, Sign_Detection, compute_coords
+export evalDistances, calculate_triangle_edges, SelectProjectedNodes, Sign_Detection
 
 using Base.Threads
 using Einsum
 using Statistics
 using StaticArrays
 using LinearAlgebra
-using DelimitedFiles
 using ProgressMeter
 using NLopt
 using BenchmarkTools
@@ -21,9 +20,8 @@ using Rho2sdf
 include("FindLocalCoordinates.jl")
 include("ComputeCoordsOnIso.jl")
 
-include("Derivatives.jl")
 include("PseudoNormals.jl")
-include("sdfOnTriangularMesh.jl")
+include("TriangularMeshUtils.jl")
 include("sdfOnDensityField.jl")
 include("SignDetection.jl")
 

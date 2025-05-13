@@ -1,4 +1,0 @@
-module sdfOnDensityFieldTest
-
-
-end
