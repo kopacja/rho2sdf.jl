@@ -1,5 +1,4 @@
-using Base: print_without_params
-# using REPLVim; @async REPLVim.serve()
+# using Base: print_without_params
 using Test
 using Rho2sdf
 using Rho2sdf.TerminalUtils
@@ -19,15 +18,6 @@ using BenchmarkTools
   # @time @testset "PrimitiveGeometriesTest" begin include("PrimitiveGeometriesTest/runtests.jl") end
   # @time @testset "MeshGridTest" begin include("MeshGridTest/runtests.jl") end
   # @time @testset "SignedDistancesTest" begin include("SignedDistancesTest/runtests.jl") end
-  # @time @testset "SeparatedTests" begin include("SeparatedTests/runtests.jl") end
-  #
-  ### Tests on geometries: ###
-  # @testset "TestOnLegGripper" begin
-  # include("SeparatedTests/TestOnLegGripper.jl")
-  # end
-  # @testset "TestOnLegGripperSTL" begin include("SeparatedTests/TestOnLegGripperSTL.jl") end
-  # @testset "TestOnGripperMC" begin include("SeparatedTests/TestOnGripperMC.jl") end
-  # @testset "TestOnPrimitiveGeometry" begin include("SeparatedTests/TestOnPrimitiveGeometry.jl") end
   # end
   # exit()
   #     
@@ -36,8 +26,8 @@ using BenchmarkTools
 
   RUN_PLANE = false
   RUN_BLOCK = false
-  RUN_SPHERE = true
-  RUN_BEAM = true
+  RUN_SPHERE = false
+  RUN_BEAM = false
   RUN_CHAPADLO = false
   RUN_CHAPADLO_cele = false
 
