@@ -1,16 +1,16 @@
-
 function find_local_coordinates(
   Xₑ::AbstractMatrix{Float64},
   xₙ::AbstractVector{Float64}
 )::Tuple{Bool,Vector{Float64}}
-  # Prealokace polí - musí být uvnitř funkce, ne jako const
+
+  # Preallocation of arrays - must be inside the function, not as const
   N = MVector{8,Float64}(undef)
   d¹N_dξ¹ = MMatrix{8,3,Float64}(undef)
   x = MVector{3,Float64}(undef)
   R = MVector{3,Float64}(undef)
   J = MMatrix{3,3,Float64}(undef)
 
-  # Definice starting points jako statické pole
+  # Definition of starting points as a static array
   starting_points = @SVector [
     (0.0, 0.0, 0.0),
     (-0.5, -0.5, -0.5),
@@ -24,18 +24,18 @@ function find_local_coordinates(
   ]
 
   function objective(ξ::Vector, grad::Vector)
-    # Výpočet shape funkcí - zde @inbounds není vhodný kvůli komplexnosti výpočtů
+    # Calculation of shape functions - @inbounds not suitable here due to calculation complexity
     compute_hex8_shape!(N, d¹N_dξ¹, ξ[1], ξ[2], ξ[3])
 
-    # Použití @fastmath a @inbounds pro maticové operace
+    # Using @fastmath and @inbounds for matrix operations
     @fastmath @inbounds begin
-      # Násobení matic - známe přesné dimenze
+      # Matrix multiplication - we know exact dimensions
       mul!(x, Xₑ, N)
-      # Vektorové operace - známe délky vektorů
+      # Vector operations - we know vector lengths
       @. R = x - xₙ
     end
 
-    # Sum of squares - zde @fastmath může urychlit výpočet
+    # Sum of squares - here @fastmath can speed up the calculation
     @fastmath f = sum(abs2, R)
 
     if !isempty(grad)
@@ -49,7 +49,7 @@ function find_local_coordinates(
     return f
   end
 
-  # Prealokace výsledků s explicitními typy pro type stability
+  # Preallocation of results with explicit types for type stability
   best_solution::Vector{Float64} = Vector{Float64}(undef, 3)
   best_objective::Float64 = Inf
   found_solution::Bool = false
@@ -69,14 +69,14 @@ function find_local_coordinates(
   # Limit parameters
   opt.maxeval = 200        # Maximum number of function evaluations - usually less than 500 is sufficient
   opt.maxtime = 1.0        # Time limit in seconds - reasonable safeguard against infinite loops
-
+  
   # Additional parameters for robustness
   opt.ftol_abs = 1e-10     # Absolute function value tolerance - useful for known target precision
   opt.initial_step = 0.1   # Initial step size - suitable for normalized solution space
 
   opt.min_objective = objective  # Setting the minimization objective function
 
-  # Iterace přes starting points
+  # Iteration through starting points
   @inbounds for start_point in starting_points
     try
       minf, minx, ret = NLopt.optimize(opt, SVector{3}(start_point))
@@ -92,7 +92,6 @@ function find_local_coordinates(
 
   return found_solution ? (true, best_solution) : (false, fill(10.0, 3))
 end
-
 
 """
 Old version that works fine but it is slower

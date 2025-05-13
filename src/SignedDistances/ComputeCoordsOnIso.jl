@@ -1,4 +1,3 @@
-
 function compute_coords_on_iso(
   x::Vector,
   ρₜ::Float64,
@@ -15,29 +14,29 @@ function compute_coords_on_iso(
   lower_bounds!(opt, SVector{3}(-1.0, -1.0, -1.0))
   upper_bounds!(opt, SVector{3}(1.0, 1.0, 1.0))
 
-  # Přealokace všech pomocných vektorů
+  # Pre-allocation of all helper vectors
   N = MVector{8,Float64}(undef)
   dN = MMatrix{8,3,Float64}(undef)
   temp_sums = MVector{3,Float64}(undef)
 
-  # Closure pro sdílení přealokovaných vektorů
+  # Closure to share pre-allocated vectors
   let N = N, dN = dN, temp_sums = temp_sums
     function objective(ξ::Vector, grad::Vector)
       compute_hex8_shape!(N, dN, ξ[1], ξ[2], ξ[3])
 
-      # Předpočítání projekcí pro všechny dimenze najednou
+      # Pre-compute projections for all dimensions at once
       @inbounds for i in 1:3
         temp_sums[i] = sum(Xₑ[i, k] * N[k] for k in 1:8)
       end
 
-      # Výpočet residuálů s využitím předpočítaných sum
+      # Calculate residuals using pre-computed sums
       rx = x[1] - temp_sums[1]
       ry = x[2] - temp_sums[2]
       rz = x[3] - temp_sums[3]
 
       if !isempty(grad)
         @inbounds for j in 1:3
-          # Předpočítání derivací pro všechny dimenze
+          # Pre-compute derivatives for all dimensions
           @inbounds for i in 1:3
             temp_sums[i] = sum(Xₑ[i, k] * dN[k, j] for k in 1:8)
           end
@@ -64,18 +63,18 @@ function compute_coords_on_iso(
     equality_constraint!(opt, constraint, 1e-8)
   end
 
-  # Optimalizace s přednastavenou přesností
+  # Optimization with preset precision
   initial_ξ = zeros(SVector{3,Float64})
-  minf, minx, ret = optimize(opt, initial_ξ)
+  _, minx, ret = optimize(opt, initial_ξ)
 
   # Check convergence
   if ret == :FAILURE
     @warn "Optimization failed to converge"
+    #TODO: Save this nodes for Ipopt solver
   end
 
   return minx
 end
-
 
 """
 Old version based on Ipopt&JuMP that works fine but it is much slower:

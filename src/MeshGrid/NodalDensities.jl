@@ -1,9 +1,11 @@
 """
 Functions for calculating nodal densities (mean or least squares).
 
+This part provides functions to transform element-based values to nodal values
+using different approaches: simple averaging or least squares interpolation.
 """
 
-# Nodal densities computed by mean
+# Compute nodal values by averaging element values connected to each node
 function elementToNodalValues(
     mesh::Mesh,
     elVals::Vector{Float64},
@@ -23,15 +25,23 @@ function elementToNodalValues(
 end
 ##################################################################
 
-## Node position for each element
+## Store nodal coordinates for each element
 mutable struct NodalCoordinatesInElement{T<:Array}
     x::T
     y::T
     z::T
 end
+
+"""
+    NodePosition3D(mesh::AbstractMesh)
+
+Extract node coordinates for each element.
+Returns a NodalCoordinatesInElement struct containing 3D coordinate arrays
+where each row corresponds to an element ID.
+"""
 function NodePosition3D(mesh::AbstractMesh)
     table = size(mesh.IEN)
-    EN_x = zeros(Float64, table) #počet ele = počet Gausspointů
+    EN_x = zeros(Float64, table)
     EN_y = zeros(Float64, table)
     EN_z = zeros(Float64, table)
 
@@ -48,11 +58,16 @@ function NodePosition3D(mesh::AbstractMesh)
     end
     EN = NodalCoordinatesInElement(EN_x, EN_y, EN_z)
 
-    return EN #Výstupem jsou tři pole - souřadnice uzlů daného elementu (pozice řádku = ID elemetu)
+    return EN # Output consists of three arrays - coordinates of nodes for each element (row position = element ID)
 end
 
 
-# Geometric centres of elements (GPs for first order elements)
+"""
+    GeometricCentre(mesh::AbstractMesh, EN::NodalCoordinatesInElement)
+
+Calculate geometric centers of elements (equivalent to Gauss points for first order elements).
+Returns a matrix where each row contains the 3D coordinates of an element's center.
+"""
 function GeometricCentre(mesh::AbstractMesh, EN::NodalCoordinatesInElement)
     Centre = zeros(mesh.nel, length(mesh.X[:, 1]))
     for i = 1:mesh.nel
@@ -65,7 +80,12 @@ function GeometricCentre(mesh::AbstractMesh, EN::NodalCoordinatesInElement)
 end
 
 
-## Fitování pomocí Gausspointů -> hustota v uzlech
+"""
+    DenseInNodes(mesh::Mesh, ρ::Vector)
+
+Calculate density at nodes based on element densities using different
+interpolation methods depending on how many elements share each node.
+"""
 function DenseInNodes(
     mesh::Mesh, 
     ρ::Vector,
@@ -73,14 +93,14 @@ function DenseInNodes(
     EN = NodePosition3D(mesh)
     Centre = GeometricCentre(mesh, EN)
 
-    dense_nodes = zeros(Float64, mesh.nnp) # počet uzlů
-    for i = 1:mesh.nnp #cyklus přes uzly (od ID_1)
+    dense_nodes = zeros(Float64, mesh.nnp) # Number of nodes
+    for i = 1:mesh.nnp # Loop through nodes (from ID_1)
         No1E = length(mesh.INE[i])
-        if No1E == 1 # Uzel patří k jednomu elementu (rohy)
+        if No1E == 1 # Node belongs to one element only (corners)
             dense_nodes[i] = ρ[Int((mesh.INE[i])[1])]
         elseif No1E > 1 && No1E < 4
             dense_nodes[i] = FilterForNodalDensity(i, Centre, mesh, ρ)
-        elseif No1E > 3 # Více elementů (4) -> lze fitovat
+        elseif No1E > 3 # More elements (4+) -> can use least squares fitting
             dense_nodes[i] = NodalDensityLeastSquares(i, Centre, mesh, ρ)
         end
     end
@@ -88,7 +108,12 @@ function DenseInNodes(
 end
 
 
-# Filter for 2 a 3 nodes
+"""
+    FilterForNodalDensity(i::Int, Centre::Matrix, mesh::Mesh, ρ::Vector)
+
+Calculate nodal density using a distance-weighted approach for nodes
+that belong to 2 or 3 elements.
+"""
 function FilterForNodalDensity(
     i::Int,
     Centre::Matrix,
@@ -111,6 +136,12 @@ function FilterForNodalDensity(
 end
 
 
+"""
+    NodalDensityLeastSquares(i::Int, Centre::Matrix, mesh::Mesh, ρ::Vector)
+
+Calculate nodal density using least squares fitting for nodes that belong to 4 or more elements.
+This approach creates a linear fit based on element centers and their densities.
+"""
 function NodalDensityLeastSquares(
     i::Int,
     Centre::Matrix,
@@ -152,6 +183,12 @@ function NodalDensityLeastSquares(
 end
 
 
+"""
+    LamReduction(λ::Vector)
+
+Reduce eigenvalues based on condition number thresholds to improve numerical stability.
+Returns a filtered set of eigenvalues for least squares solution.
+"""
 function LamReduction(λ::Vector)
     lam = []
     εₘ₁ = 1.e7
@@ -170,14 +207,21 @@ function LamReduction(λ::Vector)
             lam = λ[4:length(λ)]
         end
     else
-        # println("Problem with eigenvalues")
-        # println("The ratio between the first and last eigenvalue: ", ε₁, "  allowed ratio: ", εₘ₁)
-        # println("The ratio between the second and last eigenvalue: ", ε₂, "  allowed ratio: ", εₘ₂)
-        # println("-> compute mean instead :(")
+        # If eigenvalue conditions don't match expected patterns
+        # The original commented out code included warnings about:
+        # - Problem with eigenvalues
+        # - The ratio between the first and last eigenvalue vs allowed ratio
+        # - The ratio between the second and last eigenvalue vs allowed ratio
+        # - Computing mean instead
     end
     return lam
 end
 
+"""
+    KeepRange(DN::Float64)
+
+Constrain density value to stay within valid range [0, 1].
+"""
 function KeepRange(DN::Float64)
     if DN < 0
         DN = 0.0
@@ -186,5 +230,3 @@ function KeepRange(DN::Float64)
     end
     return DN
 end
-
-
