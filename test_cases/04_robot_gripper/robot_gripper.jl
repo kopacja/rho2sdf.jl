@@ -1,10 +1,8 @@
-using Rho2sdf
-
 ## Inputs:
 taskName = "gripper_vfrac-0.3"
 
 # Import VTU mesh
-(X, IEN, rho) = import_vtu_mesh("input/$(taskName).vtu")
+(X, IEN, rho) = import_vtu_mesh("test_cases/04_robot_gripper/input/$(taskName).vtu")
 
 # Validate imported data
 validate_vtu_mesh(X, IEN, rho)
@@ -23,4 +21,4 @@ options = Rho2sdfOptions(
     export_analysis=true                # Export before/after comparison
 )
 
-result = rho2sdf("gripper", X, IEN, rho, options=options)
+result = rho2sdf("04_robot_gripper", X, IEN, rho, options=options)
