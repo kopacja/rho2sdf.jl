@@ -17,8 +17,10 @@ using Rho2sdf.TerminalUtils
 using Rho2sdf.MeshGrid
 using Rho2sdf.ShapeFunctions
 using Rho2sdf.SignedDistances
+using Rho2sdf.SdfSmoothing
 using Rho2sdf.DataExport
 using Rho2sdf.PrimitiveGeometries
+using MAT
 
 # =============================================================================
 # CONFIGURATION
@@ -26,7 +28,7 @@ using Rho2sdf.PrimitiveGeometries
 
 # Test case selection
 RUN_01_SDF_VALIDATION   = false
-RUN_02_GRID_STUDY       = true  
+RUN_02_GRID_STUDY       = false 
 RUN_03_CANTILEVER_BEAM  = true
 RUN_04_ROBOT_GRIPPER    = true
 

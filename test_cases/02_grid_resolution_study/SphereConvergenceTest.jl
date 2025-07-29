@@ -355,6 +355,11 @@ function run_Convergence_Test()
     # Test different grid resolutions - powers of 2 for better convergence analysis
     N_values = [4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128]  # Number of elements per edge
     errors = Float64[]
+
+    for N in N_values
+      relative_error = sphere_sdf_convergence_core(N)
+      push!(errors, relative_error)
+    end
     
     # Check monotonic convergence - errors should decrease as N increases
     print_info("\nConvergence analysis:")
