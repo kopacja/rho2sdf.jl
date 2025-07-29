@@ -1,6 +1,6 @@
 module SdfSmoothing
 
-export RBFs_smoothing
+export RBFs_smoothing, calculate_volume_from_sdf
 
 using JLD2
 using KernelFunctions
