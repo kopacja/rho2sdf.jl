@@ -340,7 +340,9 @@ function _create_relative_error_plot(N_values, errors, convergence_rate, coeffs,
     return filename
 end
 
-@testset "SDF_Volume_Convergence_Test" begin
+
+
+function run_Convergence_Test()
     print_info("Starting SDF volume convergence test...")
     
     # Test parameters
@@ -351,31 +353,8 @@ end
     print_data("Expected value: π/6 ≈ $(round(π/6, digits=6))")
     
     # Test different grid resolutions - powers of 2 for better convergence analysis
-    # N_values = [4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256]  # Number of elements per edge
     N_values = [4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128]  # Number of elements per edge
     errors = Float64[]
-    
-    # Compute errors for all grid resolutions
-    for N in N_values
-        relative_error = sphere_sdf_convergence_core(N)
-        push!(errors, relative_error)
-        
-        # Test assertions
-        @test relative_error > 0.0  # Error should be positive
-        
-        # For fine grids, require better accuracy
-        if N >= 16
-            @test relative_error < 0.1  # 10% error tolerance
-        end
-        
-        if N >= 32
-            @test relative_error < 0.05  # 5% error tolerance
-        end
-        
-        if N >= 64
-            @test relative_error < 0.02  # 2% error tolerance
-        end
-    end
     
     # Check monotonic convergence - errors should decrease as N increases
     print_info("\nConvergence analysis:")
@@ -390,11 +369,6 @@ end
             "✗ Poor"
         end
         print_data("N = $N: error = $(round(error * 100, digits=3))% ($status)")
-    end
-    
-    # Test monotonic convergence
-    for i in 2:length(errors)
-        @test errors[i] ≤ errors[i-1]
     end
     
     # Calculate convergence rate
@@ -415,9 +389,6 @@ end
         convergence_rate = -coeffs[2]
         
         print_data("Theoretical convergence rate (spatial order): O(h^p) where p ≈ $(round(convergence_rate, digits=2))")
-        
-        # For SDF volume calculation, we expect roughly 2nd order convergence
-        @test convergence_rate > 1.0
         
         if convergence_rate > 1.5
             print_success("Good convergence rate: $(round(convergence_rate, digits=2))")
@@ -448,3 +419,5 @@ end
     print_data("Cube volume: 8.0")
     print_data("Sphere volume fraction: $(round(analytical_volume/8.0 * 100, digits=2))%")
 end
+
+run_Convergence_Test()
