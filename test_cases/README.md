@@ -1,40 +1,39 @@
 # Test Cases for Density-to-SDF Conversion Method
 
-This directory contains four comprehensive test cases validating the proposed methodology for converting topology optimization results to smooth signed distance functions (SDFs). These tests demonstrate the method's effectiveness across different geometric complexities and practical engineering applications.
-
+This directory contains four test cases validating the proposed method for converting topology optimization results to smooth signed distance functions (SDFs).
 ## Test Cases Overview
 
 ### 1. SDF Validation
 **File:** `01_sdf_validation/roof_geometry.jl`
 
-Validates the mathematical correctness of the SDF generation algorithm using a simplified two-element configuration. The test examines projection scenarios with a roof-like structure created using an isocontour value of ρₜ = 0.5, specifically designed to challenge conventional normal vector-based sign assignment methods.
+Verifies the mathematical correctness of the SDF construction using a simplified two-element configuration with isocontour value ρₜ = 0.5. Validates distance calculation, sign assignment, and handling of all projection scenarios in geometrically complex regions.
 
 ### 2. Grid Resolution Study
 **File:** `02_grid_resolution_study/SphereConvergenceTest.jl`
 
-Analyzes the influence of Cartesian grid resolution on geometric feature extraction quality using spherical test geometry. Evaluates convergence characteristics across multiple discretization schemes:
+Establishes optimal grid resolution guidelines through two complementary analyses:
+
+**Grid Configuration Test:** Evaluates geometry extraction quality across different Cartesian grid resolutions (coarse/reference/fine) and four mesh discretization schemes:
 - Uniform hexahedral mesh
 - Non-uniform hexahedral mesh (refined bottom)
 - Uniform tetrahedral mesh  
 - Non-uniform tetrahedral mesh (refined bottom)
 
-Tests three grid configurations: coarse (3.3× baseline spacing), reference (matched spacing), and fine (8× finer spacing).
+**Convergence Test:** Validates numerical accuracy using analytical sphere geometry with progressive mesh refinement, confirming second-order spatial accuracy.
 
-### 3. Cantilever Beam
+### 3. Cantilever Beam Validation
 **File:** `03_cantilever_beam/cantilever_beam.jl`
 
-Evaluates volume preservation capabilities and geometric quality using a classical topology optimization benchmark. The cantilever beam (L=20mm, t=4mm) with point loading demonstrates the method's performance on structural optimization results with 40% volume fraction constraint.
+Demonstrates volume preservation and geometric quality through classical topology optimization benchmark (L = 20mm, 40% volume fraction). Compares SDF post-processing against linear post-processing (nodal density mapping → Paraview Contour filter → Tetgen meshing). 
 
-**Validation metrics:**
-- Volume fraction preservation
-- Structural efficiency via strain energy comparison
-- Boundary smoothness through stress analysis
-- Structural behavior consistency
+*Note: For complete structural analysis and performance validation, refer to the companion finite element analysis project.*
 
-### 4. Robot Gripper
+### 4. Robot Gripper Case Study
 **File:** `04_robot_gripper/robot_gripper.jl`
 
-Demonstrates practical applicability through a complex engineering design case. The robot gripper features combined loading conditions (distributed pressure, surface traction, body forces), geometric constraints, and real material properties (ABS M30 plastic) with 30% volume fraction constraint.
+Validates practical engineering applicability using complex robot gripper design with combined loading conditions, ABS M30 material properties, and 30% volume constraint. Demonstrates methodology performance on real-world manufacturing scenarios.
+
+*Note: For complete structural analysis and performance validation, refer to the companion finite element analysis project.*
 
 ## Installation
 
@@ -109,4 +108,4 @@ If you use this repository in your research, please cite us.
 
 The manuscript has been submitted for publication. Citation details will be provided upon acceptance. In the meantime, you can cite this repository as follows:
 
-Ježek, o. (2025). Rho2sdf.jl: A Julia Package for Converting Density-Based Topology Optimization Results to Smooth Signed Distance Functions. GitHub Repository. Available at: https://github.com/kopacja/rho2sdf.jl
+Ježek, O., et al. (2025). Rho2sdf.jl: A Julia Package for Converting Density-Based Topology Optimization Results to Smooth Signed Distance Functions. GitHub Repository. Available at: https://github.com/kopacja/rho2sdf.jl
