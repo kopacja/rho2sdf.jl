@@ -13,6 +13,7 @@
 *.vtk
 *.vtr
 *.vti
+*.pvsm
 
 # Folders:
 **vizualizace/
