@@ -27,16 +27,17 @@ using MAT
 # =============================================================================
 
 # Test case selection
-RUN_01_SDF_VALIDATION   = false
-RUN_02_GRID_STUDY       = true
-RUN_03_CANTILEVER_BEAM  = false
-RUN_04_ROBOT_GRIPPER    = false
+RUN_01_SDF_VALIDATION = false
+RUN_02_GRID_STUDY = false
+RUN_02_GRID_CONVERG = false
+RUN_03_CANTILEVER_BEAM = false
+RUN_04_ROBOT_GRIPPER = true
 
 # Grid study mesh types
-RUN_CUBE_HEX      = true
-RUN_CUBE_HEX_REF  = false
-RUN_CUBE_TET      = false
-RUN_CUBE_TET_REF  = false
+RUN_CUBE_HEX = true
+RUN_CUBE_HEX_REF = true
+RUN_CUBE_TET = true
+RUN_CUBE_TET_REF = true
 
 # Grid resolutions for study
 GRID_RESOLUTIONS = [3, 10, 80]  # coarse, optimal, fine
@@ -46,35 +47,38 @@ GRID_RESOLUTIONS = [3, 10, 80]  # coarse, optimal, fine
 # =============================================================================
 
 function main()
-    # Test Case 1: SDF Validation
-    if RUN_01_SDF_VALIDATION
-        include("01_sdf_validation/roof_geometry.jl")
+  # Test Case 1: SDF Validation
+  if RUN_01_SDF_VALIDATION
+    include("01_sdf_validation/roof_geometry.jl")
+  end
+
+  # Test Case 2: Grid Resolution Study
+  if RUN_02_GRID_STUDY
+
+    # Run for each grid resolution
+    for res in GRID_RESOLUTIONS
+      global N = res
+      include("02_grid_resolution_study/SphereInCube-Meshes.jl")
     end
-    
-    # Test Case 2: Grid Resolution Study
-    if RUN_02_GRID_STUDY
-        
-        # Run for each grid resolution
-        for N in GRID_RESOLUTIONS
-            include("02_grid_resolution_study/SphereInCube-Meshes.jl")
-        end
-        
-        # Convergence tests
-        # include("02_grid_resolution_study/SphereConvergenceTest.jl")
-    end
-    
-    # Test Case 3: Cantilever Beam
-    if RUN_03_CANTILEVER_BEAM
-        include("03_cantilever_beam/cantilever_beam.jl")
-    end
-    
-    # Test Case 4: Robot Gripper
-    if RUN_04_ROBOT_GRIPPER
-        include("04_robot_gripper/robot_gripper.jl")
-    end
+  end
+
+  if RUN_02_GRID_CONVERG
+    # Convergence tests
+    include("02_grid_resolution_study/SphereConvergenceTest.jl")
+  end
+
+  # Test Case 3: Cantilever Beam
+  if RUN_03_CANTILEVER_BEAM
+    include("03_cantilever_beam/cantilever_beam.jl")
+  end
+
+  # Test Case 4: Robot Gripper
+  if RUN_04_ROBOT_GRIPPER
+    include("04_robot_gripper/robot_gripper.jl")
+  end
 end
 
 # Run if executed directly
 if abspath(PROGRAM_FILE) == @__FILE__
-    main()
+  main()
 end
