@@ -16,7 +16,7 @@ exportToVTU(taskName * "_nodal_densities.vtu", X, IEN, VTK_CODE, ρₙ)
 
 # Grid:
 X_min, X_max = getMesh_AABB(mesh.X)
-sdf_grid = Grid(X_min, X_max, N, 3)
+sdf_grid = Grid(X_min, X_max, N, 2)
 points = generateGridPoints(sdf_grid)
 
 # SDF from densities:
@@ -26,3 +26,5 @@ sdf_dists = dists .* signs
 
 # Export SDF to vti - Paraview
 exportSdfToVTI(taskName * "_SDF.vti", sdf_grid, sdf_dists, "distance")
+
+print_success("01_SDF_VALIDATION - (roof_geometry) done")
