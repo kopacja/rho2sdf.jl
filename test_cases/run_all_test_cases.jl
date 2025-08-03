@@ -28,9 +28,9 @@ using MAT
 
 # Test case selection
 RUN_01_SDF_VALIDATION   = false
-RUN_02_GRID_STUDY       = false 
-RUN_03_CANTILEVER_BEAM  = true
-RUN_04_ROBOT_GRIPPER    = true
+RUN_02_GRID_STUDY       = true
+RUN_03_CANTILEVER_BEAM  = false
+RUN_04_ROBOT_GRIPPER    = false
 
 # Grid study mesh types
 RUN_CUBE_HEX      = true
@@ -56,11 +56,11 @@ function main()
         
         # Run for each grid resolution
         for N in GRID_RESOLUTIONS
-            # include("02_grid_resolution_study/SphereInCube-Meshes.jl")
+            include("02_grid_resolution_study/SphereInCube-Meshes.jl")
         end
         
         # Convergence tests
-        include("02_grid_resolution_study/SphereConvergenceTest.jl")
+        # include("02_grid_resolution_study/SphereConvergenceTest.jl")
     end
     
     # Test Case 3: Cantilever Beam
