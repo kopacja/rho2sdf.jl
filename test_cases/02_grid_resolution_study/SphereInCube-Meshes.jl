@@ -6,11 +6,6 @@ if (RUN_CUBE_HEX)
    taskName = "sphere_in_cube_hex"
    include("SimpleCube.jl")
    
-   ## Grid resolution study:
-   # N = 3  # Number of cells along the longest side (coarse)
-   # N = 10  # Number of cells along the longest side (optimal)
-   # N = 80  # Number of cells along the longest side (fine)
-  
    ## Generate FEM mesh structure with new type system:
    mesh, ρₙ = create_test_cube_with_linear_density()
    
@@ -37,6 +32,8 @@ if (RUN_CUBE_HEX)
    
    ## Export raw SDF:
    exportSdfToVTI("$(taskName)_SDF_N-$(N).vti", sdf_grid, sdf_dists, "distance")
+
+   print_success("01_SDF_VALIDATION - (simple cube N = $(N)) done")
 end
 
 if (RUN_CUBE_HEX_REF)
@@ -44,11 +41,6 @@ if (RUN_CUBE_HEX_REF)
    taskName = "sphere_in_cube_ref_hex"
    include("CubeWithRefinedBottome.jl")
    
-   ## Grid resolution study:
-   # N = 3  # Number of cells along the longest side (coarse)
-   N = 10  # Number of cells along the longest side (optimal)
-   # N = 80  # Number of cells along the longest side (fine)
-  
    ## Generate FEM mesh structure with new type system:
    mesh, ρₙ = create_test_cube_with_refined_bottom()
    
@@ -75,6 +67,8 @@ if (RUN_CUBE_HEX_REF)
    
    ## Export raw SDF:
    exportSdfToVTI("$(taskName)_SDF_N-$(N).vti", sdf_grid, sdf_dists, "distance")
+   
+   print_success("01_SDF_VALIDATION - (cube with refined bottome N = $(N)) done")
 end
 
 if (RUN_CUBE_TET)
@@ -82,11 +76,6 @@ if (RUN_CUBE_TET)
    taskName = "sphere_in_cube_tet"
    include("SimpleCubeWithSchlafli.jl")
    
-   ## Grid resolution study:
-   # N = 3  # Number of cells along the longest side (coarse)
-   N = 10  # Number of cells along the longest side (optimal)
-   # N = 80  # Number of cells along the longest side (fine)
-  
    ## Generate FEM mesh structure with new type system:
    print_info("\n1. Generate tet mesh...")
    mesh, ρₙ = create_test_cube_with_schlafli_tetrahedra()
@@ -118,6 +107,8 @@ if (RUN_CUBE_TET)
    ## Export raw SDF:
    print_info("\n5. Export SDF to VTI...")
    exportSdfToVTI("$(taskName)_SDF_N-$(N).vti", sdf_grid, sdf_dists, "distance")
+   
+   print_success("01_SDF_VALIDATION - (simple cube with schlafli N = $(N)) done")
 end
 
 
@@ -126,11 +117,6 @@ if (RUN_CUBE_TET_REF)
    taskName = "sphere_in_cube_ref_tet"
    include("CubeWithRefinedBottomeSchlafli.jl")
 
-   ## Grid resolution study:
-   # N = 3  # Number of cells along the longest side (coarse)
-   N = 10  # Number of cells along the longest side (optimal)
-   # N = 80  # Number of cells along the longest side (fine)
-  
    ## Generate FEM mesh structure with new type system:
    print_info("\n1. Generate tet mesh...")
    mesh, ρₙ = create_test_cube_with_refined_bottom_schlafli()
@@ -162,5 +148,7 @@ if (RUN_CUBE_TET_REF)
    ## Export raw SDF:
    print_info("\n5. Export SDF to VTI...")
    exportSdfToVTI("$(taskName)_SDF_N-$(N).vti", sdf_grid, sdf_dists, "distance")
+   
+   print_success("01_SDF_VALIDATION - (cube with refined bottome schlafli cube N = $(N)) done")
 end
 
