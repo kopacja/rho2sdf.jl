@@ -1,13 +1,21 @@
+*.DS_Store
+*.png
+*.csv
+*.zip
+
+# Julia files:
 *.toml
 *.jld
-*.csv
+*.jld2
+
+# Paraview formats:
 *.vtu
 *.vtk
-*.jld2
-*.h5
-**vizualizace/
-*.png
 *.vtr
 *.vti
+*.pvsm
 
+# Folders:
+**vizualizace/
+# **test_cases/
 !doc/*.png

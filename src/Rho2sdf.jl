@@ -7,14 +7,26 @@ using Statistics
 using DelimitedFiles
 using Einsum
 using BenchmarkTools
+using JLD2
 
 # Tools for monitoring the computation process:
 include("TerminalUtils/TerminalUtils.jl")
 using .TerminalUtils
 
-# Predefined shape functions and its derivatives:
+# Element type system
+include("ElementTypes/ElementTypes.jl")
+using .ElementTypes
+export AbstractElement, HEX8, TET4
+
+# Data import capabilities
+include("DataImport/DataImport.jl")
+using .DataImport
+export import_vtu_mesh, validate_vtu_mesh
+
+# Updated shape functions with type dispatch
 include("ShapeFunctions/ShapeFunctions.jl")
 using .ShapeFunctions
+export shape_functions, compute_shape_and_derivatives!
 
 include("MeshGrid/MeshGrid.jl")
 using .MeshGrid
@@ -35,6 +47,6 @@ include("Visualizations/Visualizations.jl")
 using .Visualizations
 
 include("RhoToSDF.jl")
-export Rho2sdfOptions, rho2sdf
+export Rho2sdfOptions, rho2sdf, rho2sdf_hex8, rho2sdf_tet4
 
 end # module Rho2sdf

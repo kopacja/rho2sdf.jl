@@ -4,7 +4,6 @@ export round_down_to_even, selectPrimitiveGeometry
 
 using LinearAlgebra
 using Statistics
-using Base.Threads
 
 function round_down_to_even(number::Int)
     # Zaokrouhlení dolů na nejbližší celé číslo
@@ -108,7 +107,7 @@ function TestGeometryCube(max_elements::Int64)
     node_map = Dict()
 
     # Calculate nodes in parallel
-    @threads for i in 0:max_elements
+    for i in 0:max_elements
         for j in 0:max_elements
             for k in 0:max_elements
                 x = -half_side + i * delta
@@ -128,7 +127,7 @@ function TestGeometryCube(max_elements::Int64)
     elements_center = zeros(Float64, total_elements, 3)
     densities = zeros(Float64, total_elements)
 
-    @threads for i in 0:max_elements-1
+    for i in 0:max_elements-1
         for j in 0:max_elements-1
             for k in 0:max_elements-1
                 element_idx = i * max_elements^2 + j * max_elements + k + 1
@@ -169,7 +168,7 @@ function TestGeometryBlock(N::Vector{Int64})
     node_map = Dict()
 
     # Calculate nodes in parallel
-    @threads for i in 0:N[1]
+    for i in 0:N[1]
         for j in 0:N[2]
             for k in 0:N[3]
                 x = -Lxyz[1]/2 + i * delta
@@ -189,7 +188,7 @@ function TestGeometryBlock(N::Vector{Int64})
     elements_center = zeros(Float64, total_elements, 3)
     densities = zeros(Float64, total_elements)
 
-    @threads for i in 0:N[1]-1
+    for i in 0:N[1]-1
         for j in 0:N[2]-1
             for k in 0:N[3]-1
                 element_idx = i * N[3] * N[2]  + j * N[3] + k + 1

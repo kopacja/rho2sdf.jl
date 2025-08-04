@@ -1,7 +1,20 @@
-function find_local_coordinates(
-  Xₑ::AbstractMatrix{Float64},
-  xₙ::AbstractVector{Float64}
-)::Tuple{Bool,Vector{Float64}}
+using Rho2sdf.ElementTypes
+using Rho2sdf.ShapeFunctions
+
+# Main dispatch function
+function find_local_coordinates(Xₑ::AbstractMatrix{Float64}, xₙ::AbstractVector{Float64}, 
+                               element_type::Type{T}) where {T<:AbstractElement}
+  return find_local_coordinates_dispatch(Xₑ, xₙ, element_type)
+end
+
+# Backward compatibility - defaults to HEX8
+function find_local_coordinates(Xₑ::AbstractMatrix{Float64}, xₙ::AbstractVector{Float64})
+  return find_local_coordinates_dispatch(Xₑ, xₙ, HEX8)
+end
+
+# HEX8 implementation (existing algorithm)
+function find_local_coordinates_dispatch(Xₑ::AbstractMatrix{Float64}, xₙ::AbstractVector{Float64}, 
+                                       ::Type{HEX8})::Tuple{Bool,Vector{Float64}}
 
   # Preallocation of arrays - must be inside the function, not as const
   N = MVector{8,Float64}(undef)
@@ -24,18 +37,18 @@ function find_local_coordinates(
   ]
 
   function objective(ξ::Vector, grad::Vector)
-    # Calculation of shape functions - @inbounds not suitable here due to calculation complexity
-    compute_hex8_shape!(N, d¹N_dξ¹, ξ[1], ξ[2], ξ[3])
+    # Calculation of shape functions
+    compute_shape_and_derivatives!(HEX8, N, d¹N_dξ¹, ξ[1], ξ[2], ξ[3])
 
     # Using @fastmath and @inbounds for matrix operations
     @fastmath @inbounds begin
-      # Matrix multiplication - we know exact dimensions
+      # Matrix multiplication
       mul!(x, Xₑ, N)
-      # Vector operations - we know vector lengths
+      # Vector operations
       @. R = x - xₙ
     end
 
-    # Sum of squares - here @fastmath can speed up the calculation
+    # Sum of squares
     @fastmath f = sum(abs2, R)
 
     if !isempty(grad)
@@ -55,26 +68,26 @@ function find_local_coordinates(
   found_solution::Bool = false
 
   # Optimizer settings for finding local coordinates
-  opt = Opt(:LD_LBFGS, 3)  # L-BFGS optimizer for 3D problem - good choice for smooth functions with gradients
+  opt = Opt(:LD_LBFGS, 3)
 
   # Search space boundaries - narrowed to unit cube with small margin
-  opt.lower_bounds = fill(-1.1, 3)  # Lower bound slightly below -1 to cover entire element
-  opt.upper_bounds = fill(1.1, 3)   # Upper bound slightly above 1 to cover entire element
+  opt.lower_bounds = fill(-1.1, 3)
+  opt.upper_bounds = fill(1.1, 3)
 
   # Memory and convergence parameters
-  opt.vector_storage = 5    # Number of stored previous iterations - optimal for 3D
-  opt.ftol_rel = 1e-8      # Relative tolerance for function value change - more precise than original
-  opt.xtol_rel = 1e-6      # Relative tolerance for parameter change - good speed/precision compromise
+  opt.vector_storage = 5
+  opt.ftol_rel = 1e-8
+  opt.xtol_rel = 1e-6
 
   # Limit parameters
-  opt.maxeval = 200        # Maximum number of function evaluations - usually less than 500 is sufficient
-  opt.maxtime = 1.0        # Time limit in seconds - reasonable safeguard against infinite loops
+  opt.maxeval = 200
+  opt.maxtime = 1.0
   
   # Additional parameters for robustness
-  opt.ftol_abs = 1e-10     # Absolute function value tolerance - useful for known target precision
-  opt.initial_step = 0.1   # Initial step size - suitable for normalized solution space
+  opt.ftol_abs = 1e-10
+  opt.initial_step = 0.1
 
-  opt.min_objective = objective  # Setting the minimization objective function
+  opt.min_objective = objective
 
   # Iteration through starting points
   @inbounds for start_point in starting_points
@@ -93,141 +106,44 @@ function find_local_coordinates(
   return found_solution ? (true, best_solution) : (false, fill(10.0, 3))
 end
 
-"""
-Old version that works fine but it is slower
-"""
-# function find_local_coordinates(
-#   Xₑ,
-#   xₙ
-# )
-#   starting_points::Vector{Tuple{Float64,Float64,Float64}} = [
-#     (0.0, 0.0, 0.0),
-#     (-0.5, -0.5, -0.5),
-#     (0.5, -0.5, -0.5),
-#     (0.5, 0.5, -0.5),
-#     (-0.5, 0.5, -0.5),
-#     (-0.5, -0.5, 0.5),
-#     (0.5, -0.5, 0.5),
-#     (0.5, 0.5, 0.5),
-#     (-0.5, 0.5, 0.5)
-#   ]
-#
-#   function objective(ξ::Vector, grad::Vector)
-#     ξ₁, ξ₂, ξ₃ = ξ
-#
-#     # Compute N(ξ)
-#     N = [
-#       -1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ - 1),
-#       1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ - 1),
-#       -1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ - 1),
-#       1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ - 1),
-#       1 / 8 * (ξ₁ - 1) * (ξ₂ - 1) * (ξ₃ + 1),
-#       -1 / 8 * (ξ₁ + 1) * (ξ₂ - 1) * (ξ₃ + 1),
-#       1 / 8 * (ξ₁ + 1) * (ξ₂ + 1) * (ξ₃ + 1),
-#       -1 / 8 * (ξ₁ - 1) * (ξ₂ + 1) * (ξ₃ + 1)
-#     ]
-#
-#     d¹N_dξ¹ = zeros(Float64, 8, 3)
-#     d¹N_dξ¹[1, :] = [
-#       -0.125 * (ξ₂ - 1) * (ξ₃ - 1)
-#       -0.125 * (ξ₁ - 1) * (ξ₃ - 1)
-#       -0.125 * (ξ₁ - 1) * (ξ₂ - 1)
-#     ]
-#
-#     d¹N_dξ¹[2, :] = [
-#       0.125 * (ξ₂ - 1) * (ξ₃ - 1)
-#       0.125 * (ξ₁ + 1) * (ξ₃ - 1)
-#       0.125 * (ξ₁ + 1) * (ξ₂ - 1)
-#     ]
-#
-#     d¹N_dξ¹[3, :] = [
-#       -0.125 * (ξ₂ + 1) * (ξ₃ - 1)
-#       -0.125 * (ξ₁ + 1) * (ξ₃ - 1)
-#       -0.125 * (ξ₁ + 1) * (ξ₂ + 1)
-#     ]
-#
-#     d¹N_dξ¹[4, :] = [
-#       0.125 * (ξ₂ + 1) * (ξ₃ - 1)
-#       0.125 * (ξ₁ - 1) * (ξ₃ - 1)
-#       0.125 * (ξ₁ - 1) * (ξ₂ + 1)
-#     ]
-#
-#     d¹N_dξ¹[5, :] = [
-#       0.125 * (ξ₂ - 1) * (ξ₃ + 1)
-#       0.125 * (ξ₁ - 1) * (ξ₃ + 1)
-#       0.125 * (ξ₁ - 1) * (ξ₂ - 1)
-#     ]
-#
-#     d¹N_dξ¹[6, :] = [
-#       -0.125 * (ξ₂ - 1) * (ξ₃ + 1)
-#       -0.125 * (ξ₁ + 1) * (ξ₃ + 1)
-#       -0.125 * (ξ₁ + 1) * (ξ₂ - 1)
-#     ]
-#
-#     d¹N_dξ¹[7, :] = [
-#       0.125 * (ξ₂ + 1) * (ξ₃ + 1)
-#       0.125 * (ξ₁ + 1) * (ξ₃ + 1)
-#       0.125 * (ξ₁ + 1) * (ξ₂ + 1)
-#     ]
-#
-#     d¹N_dξ¹[8, :] = [
-#       -0.125 * (ξ₂ + 1) * (ξ₃ + 1)
-#       -0.125 * (ξ₁ - 1) * (ξ₃ + 1)
-#       -0.125 * (ξ₁ - 1) * (ξ₂ + 1)
-#     ]
-#
-#     # Compute x(ξ)
-#     x = Xₑ * N  # x is a 3-element vector
-#
-#     # Compute residual R = x - xₙ
-#     R = x - xₙ  # R is a 3-element vector
-#
-#     # Compute objective function value f
-#     f = dot(R, R)  # Equivalent to sum(R[i]^2 for i in 1:3)
-#
-#     if length(grad) > 0
-#       # Compute the derivatives of N with respect to ξ
-#       dN_dξ = zeros(Float64, 8, 3)  # 8 shape functions x 3 variables
-#
-#       # Assign your computed derivatives to dN_dξ
-#       dN_dξ .= d¹N_dξ¹  # Ensure dN_dξ is correctly populated
-#
-#       # Compute Jacobian J = Xₑ * dN_dξ
-#       J = Xₑ * dN_dξ  # J is 3x3
-#
-#       # Compute gradient grad = 2 * Jᵗ * R
-#       grad .= 2 * (J' * R)
-#     end
-#
-#     return f
-#   end
-#
-#   best_solution = nothing
-#   best_objective = Inf
-#
-#   for start_point in starting_points
-#     #   opt = Opt(:LN_COBYLA, 3)
-#     opt = Opt(:LD_LBFGS, 3)
-#     opt.lower_bounds = [-5.0, -5.0, -5.0]
-#     opt.upper_bounds = [5.0, 5.0, 5.0]
-#     opt.xtol_rel = 1e-6
-#     opt.maxeval = 500
-#     opt.min_objective = objective
-#     opt.maxtime = 1.0
-#
-#     (minf, minx, ret) = NLopt.optimize(opt, collect(start_point))
-#
-#     if minf < best_objective
-#       best_objective = minf
-#       best_solution = minx
-#     end
-#   end
-#
-#   if best_solution === nothing
-#     return (false, [10.0, 10.0, 10.0])
-#   else
-#     return (true, best_solution)
-#   end
-# end
+# TET4 implementation (simplified for barycentric coordinates)
+function find_local_coordinates_dispatch(Xₑ::AbstractMatrix{Float64}, xₙ::AbstractVector{Float64}, 
+                                       ::Type{TET4})::Tuple{Bool,Vector{Float64}}
 
-
+  # For tetrahedron, we can use barycentric coordinates
+  # Solve: xₙ = λ₁*x₁ + λ₂*x₂ + λ₃*x₃ + λ₄*x₄
+  # with constraint: λ₁ + λ₂ + λ₃ + λ₄ = 1
+  
+  # Get tetrahedron vertices
+  x₁ = Xₑ[:, 1]
+  x₂ = Xₑ[:, 2]
+  x₃ = Xₑ[:, 3]
+  x₄ = Xₑ[:, 4]
+  
+  # Set up system: [x₂-x₁, x₃-x₁, x₄-x₁] * [λ₂, λ₃, λ₄]ᵀ = xₙ - x₁
+  A = hcat(x₂ - x₁, x₃ - x₁, x₄ - x₁)
+  b = xₙ - x₁
+  
+  try
+    # Solve for λ₂, λ₃, λ₄
+    λ_234 = A \ b
+    
+    # Calculate λ₁
+    λ₁ = 1.0 - sum(λ_234)
+    
+    # Return in natural coordinates format [λ₁, λ₂, λ₃]
+    # (λ₄ is implicit as 1 - λ₁ - λ₂ - λ₃)
+    local_coords = [λ₁, λ_234[1], λ_234[2]]
+    
+    # Validate coordinates
+    if validate_local_coords(TET4, [λ₁, λ_234...])
+      return (true, local_coords)
+    else
+      return (false, fill(10.0, 3))
+    end
+    
+  catch e
+    # Singular matrix or other numerical issues
+    return (false, fill(10.0, 3))
+  end
+end
