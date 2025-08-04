@@ -80,7 +80,7 @@ Each test case generates visualization files compatible with ParaView:
 - `.vti` files: Structured SDF data for analysis
 - `.jld2` files: Julia-specific data for post-processing
 
-**Typical runtime:** 5-15 minutes per test case depending on grid resolution and hardware configuration.
+**Typical runtime:** 2-10 minutes per test case depending on grid resolution and hardware configuration.
 
 ## Grid Resolution Study Details
 
