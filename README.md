@@ -120,5 +120,5 @@ The package generates several output files for analysis and visualization:
 
 ## Requirements
 
-- Julia ≥ 1.11
+- Julia LTS (1.10.10)
 - Dependencies are automatically managed by the package manager
