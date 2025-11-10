@@ -3,8 +3,8 @@ function SelectProjectedNodes(
   mesh::Mesh,
   grid::Grid,
   xp::Matrix{Float64},
-  points::Matrix{Float64})
-
+  points::Matrix{Float64}
+)
   ngp = grid.ngp # number of nodes in grid
   nsd = mesh.nsd # number of spacial dimensions
 
@@ -15,7 +15,7 @@ function SelectProjectedNodes(
   Xp = [zeros(Float64, nsd) for _ in 1:max_size]
 
   count = 0
-  for i = 1:ngp
+  for i in 1:ngp
     if sum(abs.(xp[:, i])) > 1.0e-10
       count += 1
       X[count] = points[:, i]
@@ -40,7 +40,6 @@ function SelectProjectedNodes(
   return X, Xp, mean_PD, max_PD
 end
 
-
 # Update distance filed if the distance is smaller then the previous one
 function WriteValue(
   dist_tmp::Float64,
@@ -48,8 +47,8 @@ function WriteValue(
   xp_local::Vector{Matrix{Float64}},
   xₚ::Vector{Float64},
   v::Int,
-  tid::Int)
-
+  tid::Int
+)
   if (abs(dist_tmp) < abs(dist_local[tid][v]))
     dist_local[tid][v] = dist_tmp
     xp_local[tid][:, v] = xₚ
@@ -57,12 +56,10 @@ function WriteValue(
   return dist_local, xp_local
 end
 
-
-
 # Function to create AABB from a set of points
 function compute_aabb(points::SubArray)
-  min_bounds = minimum(points, dims=2)
-  max_bounds = maximum(points, dims=2)
+  min_bounds = minimum(points, dims = 2)
+  max_bounds = maximum(points, dims = 2)
   return min_bounds, max_bounds
 end
 
@@ -91,10 +88,9 @@ function IsProjectedOnFullSegment(
   v::Int,
   tid::Int,
   x::Vector,
-) where {T<:AbstractElement}
-  
+) where {T <: AbstractElement}
   (_, local_coords) = find_local_coordinates(Xₑ, xₚ, mesh.element_type)
-  
+
   # Validate coordinates based on element type
   coords_valid = if T == HEX8
     maximum(abs.(local_coords)) < 1.001
@@ -122,14 +118,15 @@ function IsProjectedOnFullSegment(
   return false
 end
 
-function update_distance_parallel!(dist_local::Vector{Vector{Float64}},
+function update_distance_parallel!(
+  dist_local::Vector{Vector{Float64}},
   dist_tmp::Float64,
   v::Int,
   tid::Int,
   xp_local::Vector{Matrix{Float64}},
   xₚ::Vector{Float64},
-  isFaceOrEdge::Bool)
-
+  isFaceOrEdge::Bool
+)
   if abs(dist_tmp) < abs(dist_local[tid][v])
     dist_local[tid][v] = dist_tmp
     isFaceOrEdge = true
@@ -138,7 +135,6 @@ function update_distance_parallel!(dist_local::Vector{Vector{Float64}},
   return isFaceOrEdge  # Optionally return whether the vertex was updated
 end
 
-
 # MAIN FUNCTION for eval SDF
 function evalDistances(
   mesh::Mesh,
@@ -146,10 +142,9 @@ function evalDistances(
   points::Matrix,
   ρₙ::Vector{Float64},
   ρₜ::Float64;
-  taskName::String="block",
-  plot_projection_points_and_lines::Bool=false
+  taskName::String = "block",
+  plot_projection_points_and_lines::Bool = false
 )# where {T<:AbstractElement}
-
   print_info("\nComputing distace function...")
 
   linkedList = MeshGrid.LinkedList(grid, points) # pro rychlé vyhledávání
@@ -160,7 +155,7 @@ function evalDistances(
   AABB_min = linkedList.grid.AABB_min # Minimum coordinates of the Axis-Aligned Bounding Box (AABB)
   AABB_max = linkedList.grid.AABB_max # Maximum coordinates of the AABB
   #TODO: δ nemůžu násobit grid cell size skalárem -> ale nejdelší hrana nepravidelného elementu * skalár!
-  δ = 2.5 * grid.cell_size # offset for mini AABB
+  δ = 1.1 * grid.cell_size # offset for mini AABB
 
   X = mesh.X   # vector of nodes positions
   IEN = mesh.IEN # ID element -> ID nodes
@@ -292,9 +287,26 @@ function evalDistances(
       #     end
       #   end
       # end
-      process_boundary_faces!(mesh, el, grid, points, ρₙ, ρₜ, dist_local, xp_local, 
-                          head, next, N, AABB_min, AABB_max, δ, EN, EPN, tid,
-                          true)  # PŘIDÁN PARAMETR - true pro solidní elementy
+      process_boundary_faces!(
+        mesh,
+        el,
+        grid,
+        points,
+        ρₙ,
+        ρₜ,
+        dist_local,
+        xp_local,
+        head,
+        next,
+        N,
+        AABB_min,
+        AABB_max,
+        δ,
+        EN,
+        EPN,
+        tid,
+        true
+      )  # PŘIDÁN PARAMETR - true pro solidní elementy
     else
       #TODO: else -> elseif, delete if
       if (ρₑ_max > ρₜ) # The boundary (isocontour) goes through the element
@@ -411,8 +423,25 @@ function evalDistances(
         #
         #   end
         # end
-        process_isocontour_element!(mesh, el, grid, points, ρₙ, ρₜ, dist_local, xp_local,
-                                  head, next, N, AABB_min, AABB_max, δ, EN, EPN, tid)
+        process_isocontour_element!(
+          mesh,
+          el,
+          grid,
+          points,
+          ρₙ,
+          ρₜ,
+          dist_local,
+          xp_local,
+          head,
+          next,
+          N,
+          AABB_min,
+          AABB_max,
+          δ,
+          EN,
+          EPN,
+          tid
+        )
       end
     end
     count = atomic_add!(counter_elements, 1)
@@ -441,12 +470,12 @@ function evalDistances(
 
     nnp = size(Xg, 1)
 
-    IEN = [[i; i + nnp] for i = 1:nnp]
+    IEN = [[i; i + nnp] for i in 1:nnp]
     X = vec([Xg Xp])
 
     Rho2sdf.exportToVTU("lines_$(taskName).vtu", X, IEN, 3)
 
-    IEN = [[i] for i = 1:nnp]
+    IEN = [[i] for i in 1:nnp]
     Rho2sdf.exportToVTU("Xg_$(taskName).vtu", Xg, IEN, 1)
     Rho2sdf.exportToVTU("Xp_$(taskName).vtu", Xp, IEN, 1)
   end
@@ -454,16 +483,30 @@ function evalDistances(
   dist = abs.(dist)
 
   return dist, xp
-
 end
 
 # Helper function for boundary face processing
-function process_boundary_faces!(mesh::Mesh{T}, el::Int, grid::Grid, points::Matrix,
-                                ρₙ::Vector{Float64}, ρₜ::Float64, 
-                                dist_local::Vector{Vector{Float64}}, xp_local::Vector{Matrix{Float64}},
-                                head, next, N, AABB_min, AABB_max, δ, EN, EPN, tid::Int,
-                                is_solid_element::Bool) where {T<:AbstractElement}  # PŘIDÁN PARAMETR
-  
+function process_boundary_faces!(
+  mesh::Mesh{T},
+  el::Int,
+  grid::Grid,
+  points::Matrix,
+  ρₙ::Vector{Float64},
+  ρₜ::Float64,
+  dist_local::Vector{Vector{Float64}},
+  xp_local::Vector{Matrix{Float64}},
+  head,
+  next,
+  N,
+  AABB_min,
+  AABB_max,
+  δ,
+  EN,
+  EPN,
+  tid::Int,
+  is_solid_element::Bool
+) where {T <: AbstractElement}  # PŘIDÁN PARAMETR
+
   # Process faces based on element type
   for sg in 1:mesh.nes
     # Check if face is on boundary
@@ -475,7 +518,7 @@ function process_boundary_faces!(mesh::Mesh{T}, el::Int, grid::Grid, points::Mat
 
     if length(commonEls) == 1  # Boundary face
       Xs = mesh.X[:, mesh.IEN[mesh.ISN[sg], el]]
-      Xc = vec(mean(Xs, dims=2))
+      Xc = vec(mean(Xs, dims = 2))
 
       # Process triangular subdivisions of face
       for a in 1:mesh.nsn
@@ -487,39 +530,88 @@ function process_boundary_faces!(mesh::Mesh{T}, el::Int, grid::Grid, points::Mat
         ID_tri = find_triangle_position(EN, [x₁ x₂ x₃])
 
         # Process triangle projection with solid element info
-        process_triangle_projection!(Xt, grid, points, mesh, el, ρₙ, ρₜ, 
-                                   dist_local, xp_local, head, next, N, 
-                                   AABB_min, AABB_max, δ, EN, EPN, ID_tri, tid,
-                                   is_solid_element)  # PŘEDÁN PARAMETR
+        process_triangle_projection!(
+          Xt,
+          grid,
+          points,
+          mesh,
+          el,
+          ρₙ,
+          ρₜ,
+          dist_local,
+          xp_local,
+          head,
+          next,
+          N,
+          AABB_min,
+          AABB_max,
+          δ,
+          EN,
+          EPN,
+          ID_tri,
+          tid,
+          is_solid_element
+        )  # PŘEDÁN PARAMETR
       end
     end
   end
 end
 
 # Helper function for isocontour element processing  
-function process_isocontour_element!(mesh::Mesh{T}, el::Int, grid::Grid, points::Matrix,
-                                   ρₙ::Vector{Float64}, ρₜ::Float64,
-                                   dist_local::Vector{Vector{Float64}}, xp_local::Vector{Matrix{Float64}},
-                                   head, next, N, AABB_min, AABB_max, δ, EN, EPN, tid::Int) where {T<:AbstractElement}
-  
+function process_isocontour_element!(
+  mesh::Mesh{T},
+  el::Int,
+  grid::Grid,
+  points::Matrix,
+  ρₙ::Vector{Float64},
+  ρₜ::Float64,
+  dist_local::Vector{Vector{Float64}},
+  xp_local::Vector{Matrix{Float64}},
+  head,
+  next,
+  N,
+  AABB_min,
+  AABB_max,
+  δ,
+  EN,
+  EPN,
+  tid::Int
+) where {T <: AbstractElement}
   Xₑ = mesh.X[:, mesh.IEN[:, el]]
   ρₑ = ρₙ[mesh.IEN[:, el]]
-  
+
   # First process boundary faces like solid elements
-  process_boundary_faces!(mesh, el, grid, points, ρₙ, ρₜ, dist_local, xp_local,
-                        head, next, N, AABB_min, AABB_max, δ, EN, EPN, tid,
-                        false)  # PŘIDÁN PARAMETR - false pro elementy s isokonturou
-  
+  process_boundary_faces!(
+    mesh,
+    el,
+    grid,
+    points,
+    ρₙ,
+    ρₜ,
+    dist_local,
+    xp_local,
+    head,
+    next,
+    N,
+    AABB_min,
+    AABB_max,
+    δ,
+    EN,
+    EPN,
+    tid,
+    false
+  )  # PŘIDÁN PARAMETR - false pro elementy s isokonturou
+
   # Then process interior isocontour
   Is = MeshGrid.calculateMiniAABB_grid(Xₑ, δ, N, AABB_min, AABB_max, mesh.nsd)
 
-  for I ∈ Is
+  for I in Is
     ii = Int(I[3] * (N[1] + 1) * (N[2] + 1) + I[2] * (N[1] + 1) + I[1] + 1)
     v = head[ii]
-    
+
     while v != -1
       x = points[:, v]
-      
+
       # Compute coordinates on isocontour using element-specific method
       Ξ = compute_coords_on_iso(x, ρₜ, Xₑ, ρₑ, mesh.element_type)
       H = shape_functions(mesh.element_type, Ξ)
@@ -533,114 +625,191 @@ function process_isocontour_element!(mesh::Mesh{T}, el::Int, grid::Grid, points:
 end
 
 # Complete triangle projection processing algorithm
-function process_triangle_projection!(Xt, grid, points, mesh, el, ρₙ, ρₜ,
-                                     dist_local, xp_local, head, next, N,
-                                     AABB_min, AABB_max, δ, EN, EPN, ID_tri, tid,
-                                     is_solid_element::Bool)  # PŘIDÁN PARAMETR
-    
-    nsd = mesh.nsd
-    
-    # Calculate triangle edges
-    Et = calculate_triangle_edges(Xt)
-    
-    # Compute triangle normal vector
-    n = cross(Et[1], Et[2])
-    n = n / norm(n)  # unit normal
-    
-    # Extract triangle vertices
-    x₁ = Xt[:, 1]
-    x₂ = Xt[:, 2] 
-    x₃ = Xt[:, 3]
-    
-    # Calculate mini AABB grid nodes for this triangle
-    Is = MeshGrid.calculateMiniAABB_grid(Xt, δ, N, AABB_min, AABB_max, nsd)
-    
-    # Process all grid points in the mini AABB
-    for I ∈ Is
-        # Calculate grid node ID
-        ii = Int(I[3] * (N[1] + 1) * (N[2] + 1) + I[2] * (N[1] + 1) + I[1] + 1)
-        
-        # Process all points associated with this grid node
-        v = head[ii]
-        while v != -1
-            x = points[:, v]
-            
-            # Calculate barycentric coordinates
-            λ = barycentricCoordinates(x₁, x₂, x₃, n, x)
-            
-            xₚ = zeros(nsd)  # projection point
-            isFaceOrEdge = false  # projection success flag
-            
-            # Check if projection is inside the triangle
-            if minimum(λ) >= 0.0
-                # Point projects inside triangle - use barycentric interpolation
-                xₚ = λ[1] * x₁ + λ[2] * x₂ + λ[3] * x₃
-                dist_tmp = norm(x - xₚ)
-                
-                # OPRAVENÁ LOGIKA
-                if is_solid_element
-                    # Pro solidní elementy přímo aktualizujeme vzdálenost
-                    isFaceOrEdge = update_distance_parallel!(dist_local, dist_tmp, v, tid, xp_local, xₚ, isFaceOrEdge)
-                else
-                    # Pro elementy s isokonturou musíme validovat projekci
-                    isFaceOrEdge = IsProjectedOnFullSegment(mesh, mesh.X[:, mesh.IEN[:, el]], xₚ, el, mesh.IEN, ρₙ, ρₜ, 
-                                                          dist_local, xp_local, v, tid, x)
-                end
-            else
-                # Projection is outside triangle - check edges
-                for j = 1:3
-                    L = norm(Et[j])  # edge length
-                    xᵥ = Xt[:, j]    # edge start vertex
-                    
-                    # Project point onto edge line
-                    P = dot(x - xᵥ, Et[j] / L)  # scalar projection
-                    
-                    # Check if projection falls within edge segment
-                    if P >= 0 && P <= L
-                        xₚ = xᵥ + (Et[j] / L) * P  # projected point on edge
-                        
-                        # Use pseudo-normal for edge if available
-                        if ID_tri > 0 && ID_tri <= length(EPN)
-                            n_edge = EPN[ID_tri][j]
-                        else
-                            n_edge = n  # fallback to face normal
-                        end
-                        
-                        dist_tmp = norm(x - xₚ)
-                        
-                        # OPRAVENÁ LOGIKA
-                        if is_solid_element
-                            isFaceOrEdge = update_distance_parallel!(dist_local, dist_tmp, v, tid, xp_local, xₚ, isFaceOrEdge)
-                        else
-                            isFaceOrEdge = IsProjectedOnFullSegment(mesh, mesh.X[:, mesh.IEN[:, el]], xₚ, el, mesh.IEN, ρₙ, ρₜ,
-                                                                  dist_local, xp_local, v, tid, x)
-                        end
-                        
-                        # Break on first valid edge projection
-                        if isFaceOrEdge
-                            break
-                        end
-                    end
-                end
-            end
-            
-            # If no face/edge projection worked, project to nearest vertex
-            if !isFaceOrEdge
-                distances_to_vertices = [norm(x - x₁), norm(x - x₂), norm(x - x₃)]
-                dist_tmp, idx = findmin(distances_to_vertices)
-                xₚ = Xt[:, idx]  # closest vertex
-                
-                # OPRAVENÁ LOGIKA
-                if is_solid_element
-                    isFaceOrEdge = update_distance_parallel!(dist_local, dist_tmp, v, tid, xp_local, xₚ, isFaceOrEdge)
-                else
-                    isFaceOrEdge = IsProjectedOnFullSegment(mesh, mesh.X[:, mesh.IEN[:, el]], xₚ, el, mesh.IEN, ρₙ, ρₜ,
-                                                          dist_local, xp_local, v, tid, x)
-                end
-            end
-            
-            # Move to next point in linked list
-            v = next[v]
+function process_triangle_projection!(
+  Xt,
+  grid,
+  points,
+  mesh,
+  el,
+  ρₙ,
+  ρₜ,
+  dist_local,
+  xp_local,
+  head,
+  next,
+  N,
+  AABB_min,
+  AABB_max,
+  δ,
+  EN,
+  EPN,
+  ID_tri,
+  tid,
+  is_solid_element::Bool
+)  # PŘIDÁN PARAMETR
+  nsd = mesh.nsd
+
+  # Calculate triangle edges
+  Et = calculate_triangle_edges(Xt)
+
+  # Compute triangle normal vector
+  n = cross(Et[1], Et[2])
+  n = n / norm(n)  # unit normal
+
+  # Extract triangle vertices
+  x₁ = Xt[:, 1]
+  x₂ = Xt[:, 2]
+  x₃ = Xt[:, 3]
+
+  # Calculate mini AABB grid nodes for this triangle
+  Is = MeshGrid.calculateMiniAABB_grid(Xt, δ, N, AABB_min, AABB_max, nsd)
+
+  # Process all grid points in the mini AABB
+  for I in Is
+    # Calculate grid node ID
+    ii = Int(I[3] * (N[1] + 1) * (N[2] + 1) + I[2] * (N[1] + 1) + I[1] + 1)
+
+    # Process all points associated with this grid node
+    v = head[ii]
+    while v != -1
+      x = points[:, v]
+
+      # Calculate barycentric coordinates
+      λ = barycentricCoordinates(x₁, x₂, x₃, n, x)
+
+      xₚ = zeros(nsd)  # projection point
+      isFaceOrEdge = false  # projection success flag
+
+      # Check if projection is inside the triangle
+      if minimum(λ) >= 0.0
+        # Point projects inside triangle - use barycentric interpolation
+        xₚ = λ[1] * x₁ + λ[2] * x₂ + λ[3] * x₃
+        dist_tmp = norm(x - xₚ)
+
+        # OPRAVENÁ LOGIKA
+        if is_solid_element
+          # Pro solidní elementy přímo aktualizujeme vzdálenost
+          isFaceOrEdge = update_distance_parallel!(
+            dist_local,
+            dist_tmp,
+            v,
+            tid,
+            xp_local,
+            xₚ,
+            isFaceOrEdge
+          )
+        else
+          # Pro elementy s isokonturou musíme validovat projekci
+          isFaceOrEdge = IsProjectedOnFullSegment(
+            mesh,
+            mesh.X[:, mesh.IEN[:, el]],
+            xₚ,
+            el,
+            mesh.IEN,
+            ρₙ,
+            ρₜ,
+            dist_local,
+            xp_local,
+            v,
+            tid,
+            x
+          )
         end
+      else
+        # Projection is outside triangle - check edges
+        for j in 1:3
+          L = norm(Et[j])  # edge length
+          xᵥ = Xt[:, j]    # edge start vertex
+
+          # Project point onto edge line
+          P = dot(x - xᵥ, Et[j] / L)  # scalar projection
+
+          # Check if projection falls within edge segment
+          if P >= 0 && P <= L
+            xₚ = xᵥ + (Et[j] / L) * P  # projected point on edge
+
+            # Use pseudo-normal for edge if available
+            if ID_tri > 0 && ID_tri <= length(EPN)
+              n_edge = EPN[ID_tri][j]
+            else
+              n_edge = n  # fallback to face normal
+            end
+
+            dist_tmp = norm(x - xₚ)
+
+            # OPRAVENÁ LOGIKA
+            if is_solid_element
+              isFaceOrEdge = update_distance_parallel!(
+                dist_local,
+                dist_tmp,
+                v,
+                tid,
+                xp_local,
+                xₚ,
+                isFaceOrEdge
+              )
+            else
+              isFaceOrEdge = IsProjectedOnFullSegment(
+                mesh,
+                mesh.X[:, mesh.IEN[:, el]],
+                xₚ,
+                el,
+                mesh.IEN,
+                ρₙ,
+                ρₜ,
+                dist_local,
+                xp_local,
+                v,
+                tid,
+                x
+              )
+            end
+
+            # Break on first valid edge projection
+            if isFaceOrEdge
+              break
+            end
+          end
+        end
+      end
+
+      # If no face/edge projection worked, project to nearest vertex
+      if !isFaceOrEdge
+        distances_to_vertices = [norm(x - x₁), norm(x - x₂), norm(x - x₃)]
+        dist_tmp, idx = findmin(distances_to_vertices)
+        xₚ = Xt[:, idx]  # closest vertex
+
+        # OPRAVENÁ LOGIKA
+        if is_solid_element
+          isFaceOrEdge = update_distance_parallel!(
+            dist_local,
+            dist_tmp,
+            v,
+            tid,
+            xp_local,
+            xₚ,
+            isFaceOrEdge
+          )
+        else
+          isFaceOrEdge = IsProjectedOnFullSegment(
+            mesh,
+            mesh.X[:, mesh.IEN[:, el]],
+            xₚ,
+            el,
+            mesh.IEN,
+            ρₙ,
+            ρₜ,
+            dist_local,
+            xp_local,
+            v,
+            tid,
+            x
+          )
+        end
+      end
+
+      # Move to next point in linked list
+      v = next[v]
     end
+  end
 end
