@@ -10,8 +10,8 @@ This package converts density-based topology optimization results (from SIMP met
 ## Installation
 
 ```julia
-using Pkg
-Pkg.add(url="https://github.com/kopacja/rho2sdf.jl")
+# From Julia REPL, press ] to enter package mode
+add https://github.com/kopacja/rho2sdf.jl
 ```
 
 Or clone the repository and set up the environment:
